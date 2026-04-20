@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
+const API_URL = "https://passua-api.onrender.com";
 const STATUS_COLORS: Record<string, string> = {
   pending: "var(--pb-ivory3)",
   confirmed: "#60a5fa",
@@ -60,10 +61,12 @@ export default function AdminDashboard() {
     enabled: !!token,
   });
 
+  const API_URL = "https://passua-api.onrender.com";
+
   // Fetch pending reviews
   useEffect(() => {
     if (!token) return;
-    fetch("/api/trpc/reviews.listPending")
+    fetch(`${API_URL}/api/trpc/reviews.listPending`)
       .then(r => r.json())
       .then(d => setPendingReviews(d.result?.data?.json || []))
       .catch(() => {});
@@ -71,7 +74,7 @@ export default function AdminDashboard() {
 
   const handleReviewAction = async (id: number, approved: boolean) => {
     try {
-      await fetch("/api/trpc/reviews.moderate", {
+      await fetch(`${API_URL}/api/trpc/reviews.moderate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ json: { id, approved } }),
