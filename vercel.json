@@ -1,6 +1,6 @@
 {
   "framework": null,
-  "buildCommand": "pnpm run build && pnpm run build:api",
+  "buildCommand": "pnpm run build",
   "outputDirectory": "dist/public",
   "installCommand": "pnpm install",
   "devCommand": "pnpm run dev"
