@@ -4,10 +4,11 @@
   "outputDirectory": "dist/public",
   "installCommand": "pnpm install",
   "devCommand": "pnpm run dev",
-  "functions": {
-    "dist/api/index.js": {
-      "runtime": "nodejs20.x",
-      "maxDuration": 60
-    }
-  }
+  "version": 2,
+  "builds": [{ "src": "dist/api/index.js", "use": "@vercel/node@2" }],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/dist/api/index.js" },
+    { "src": "/health", "dest": "/dist/api/index.js" },
+    { "handle": "filesystem" }
+  ]
 }
