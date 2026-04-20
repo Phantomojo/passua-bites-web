@@ -3,12 +3,5 @@
   "buildCommand": "pnpm run build",
   "outputDirectory": "dist/public",
   "installCommand": "pnpm install",
-  "devCommand": "pnpm run dev",
-  "version": 2,
-  "builds": [{ "src": "api/index.ts", "use": "@vercel/node" }],
-  "routes": [
-    { "src": "/api/(.*)", "dest": "/api/index.js" },
-    { "src": "/health", "dest": "/api/index.js" },
-    { "handle": "filesystem" }
-  ]
+  "devCommand": "pnpm run dev"
 }
