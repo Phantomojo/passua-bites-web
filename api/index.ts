@@ -23,8 +23,7 @@ export default function handler(req: any, res: any) {
               id: 1,
               name: "Burger",
               price: "150.00",
-              imageUrl:
-                "https://ptewdrb0fmlmvmtc.public.blob.vercel-storage.com/burger.jpg",
+              imageUrl: "/media/images/burger.jpg",
               description:
                 "Buns, lettuce, sliced kachumbari, sauces, beef pattie",
               category: "Burgers",
@@ -35,8 +34,7 @@ export default function handler(req: any, res: any) {
               id: 2,
               name: "Masala Chips",
               price: "150.00",
-              imageUrl:
-                "https://ptewdrb0fmlmvmtc.public.blob.vercel-storage.com/masala-chips.jpg",
+              imageUrl: "/media/images/masala-chips.jpg",
               description:
                 "Crunchy outside, soft inside fries, well marinated — spicy or non-spicy",
               category: "Sides",
@@ -47,7 +45,7 @@ export default function handler(req: any, res: any) {
               id: 3,
               name: "Hot Blazer",
               price: "190.00",
-              imageUrl:
+              imageUrl: "/media/images/hot-blazer.jpg",
                 "https://ptewdrb0fmlmvmtc.public.blob.vercel-storage.com/hot-blazer.jpg",
               description:
                 "Two chapatis (wrapped), lettuce, kachumbari, boerewors, indomie, avocado, gravy sauce",
@@ -59,8 +57,7 @@ export default function handler(req: any, res: any) {
               id: 4,
               name: "Pasua Corn",
               price: "280.00",
-              imageUrl:
-                "https://ptewdrb0fmlmvmtc.public.blob.vercel-storage.com/pasua-corn.jpg",
+              imageUrl: "/media/images/pasua-corn.jpg",
               description:
                 "One beef burger + masala chips (spicy or non-spicy)",
               category: "Sides",
@@ -71,49 +68,45 @@ export default function handler(req: any, res: any) {
               id: 5,
               name: "Passua Smocha",
               price: "95.00",
-              imageUrl: null,
+              imageUrl: "/media/images/hot-blazer.jpg",
               description:
                 "Chapati, beef smokie, kachumbari, indomie, avocado, seasoned with sauces",
               category: "Smoshas",
               available: 1,
-              videoUrl:
-                "https://ptewdrb0fmlmvmtc.public.blob.vercel-storage.com/passua-smocha.mp4",
+              videoUrl: "/media/videos/Pasuasmocha.mp4",
             },
             {
               id: 6,
               name: "Zigizaga",
               price: "125.00",
-              imageUrl: null,
+              imageUrl: "/media/images/hot-blazer.jpg",
               description:
                 "Chapati, beef smokie, kachumbari, indomie, avocado, topped with a boiled egg, seasoned with sauces",
               category: "Smoshas",
               available: 1,
-              videoUrl:
-                "https://ptewdrb0fmlmvmtc.public.blob.vercel-storage.com/zigizaga.mp4",
+              videoUrl: "/media/videos/zigizaga.mp4",
             },
             {
               id: 7,
               name: "Sultan",
               price: "250.00",
-              imageUrl: null,
+              imageUrl: "/media/images/hot-blazer.jpg",
               description:
                 "Two chapatis (wrapped), lettuce, kachumbari, one beef pattie, masala chips, avocado, sauces — comes with a soda",
               category: "Combos",
               available: 1,
-              videoUrl:
-                "https://ptewdrb0fmlmvmtc.public.blob.vercel-storage.com/sultan.mp4",
+              videoUrl: "/media/videos/Sultan.mp4",
             },
             {
               id: 8,
               name: "Mega Sultan",
               price: "560.00",
-              imageUrl: null,
+              imageUrl: "/media/images/hot-blazer.jpg",
               description:
                 "Two chapatis (wrapped), lettuce, kachumbari, two beef patties, cheese, masala chips, avocado, sauces — comes with a soda",
               category: "Combos",
               available: 1,
-              videoUrl:
-                "https://ptewdrb0fmlmvmtc.public.blob.vercel-storage.com/mega-sultan.mp4",
+              videoUrl: "/media/videos/megasultan.mp4",
             },
           ],
         },
