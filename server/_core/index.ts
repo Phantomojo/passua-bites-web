@@ -10,6 +10,37 @@ import { serveStatic, setupVite } from "./vite";
 import { getDb } from "../db";
 import { orders, mpesaTransactions } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
+import rateLimit from "express-rate-limit";
+
+// Security: Rate limiting
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: { error: "Too many requests, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const orderLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // limit each IP to 10 orders per minute
+  message: { error: "Too many orders, please slow down" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Security: Security headers middleware
+function securityHeaders(req: any, res: any, next: any) {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=()"
+  );
+  next();
+}
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -36,6 +67,10 @@ async function startServer() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  // Security middleware
+  app.use(securityHeaders);
+  app.use("/api/", generalLimiter); // Apply rate limiting to API routes
 
   // CORS for cross-origin requests (Vercel frontend)
   app.use((req, res, next) => {
@@ -169,7 +204,24 @@ async function startServer() {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
-  // tRPC API
+  // tRPC API with stricter rate limiting on mutations
+  app.use(
+    "/api/trpc/orders.create",
+    orderLimiter, // Stricter limit for orders
+    createExpressMiddleware({
+      router: appRouter,
+      createContext,
+    })
+  );
+  app.use(
+    "/api/trpc/payments.initiateStkPush",
+    orderLimiter, // Stricter limit for payments
+    createExpressMiddleware({
+      router: appRouter,
+      createContext,
+    })
+  );
+  // Other API routes with general limit
   app.use(
     "/api/trpc",
     createExpressMiddleware({
