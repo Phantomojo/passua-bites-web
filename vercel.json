@@ -3,5 +3,11 @@
   "buildCommand": "pnpm run build",
   "outputDirectory": "dist/public",
   "installCommand": "pnpm install",
-  "devCommand": "pnpm run dev"
+  "devCommand": "pnpm run dev",
+  "functions": {
+    "dist/api/index.js": {
+      "runtime": "nodejs20.x",
+      "maxDuration": 60
+    }
+  }
 }
