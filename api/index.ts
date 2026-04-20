@@ -46,7 +46,6 @@ export default function handler(req: any, res: any) {
               name: "Hot Blazer",
               price: "190.00",
               imageUrl: "/media/images/hot-blazer.jpg",
-                "https://ptewdrb0fmlmvmtc.public.blob.vercel-storage.com/hot-blazer.jpg",
               description:
                 "Two chapatis (wrapped), lettuce, kachumbari, boerewors, indomie, avocado, gravy sauce",
               category: "Specials",
