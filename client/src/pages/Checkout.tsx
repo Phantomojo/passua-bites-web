@@ -75,9 +75,20 @@ export default function Checkout() {
     if (stored) setCart(JSON.parse(stored));
   }, []);
 
+  const [deliveryZone, setDeliveryZone] = useState<
+    "ruiru" | "environs" | "other"
+  >("ruiru");
+
+  const DELIVERY_ZONES = {
+    ruiru: { fee: 0, label: "Ruiru Town" },
+    environs: { fee: 50, label: "Ruiru Environs (Kiu, Gatongora, etc)" },
+    other: { fee: null, label: "Outside Ruiru - Chat with us" },
+  };
+
   const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-  const deliveryFee = total >= 300 ? 0 : 50;
-  const grandTotal = total + deliveryFee;
+  const deliveryFee =
+    deliveryZone === "other" ? null : deliveryZone === "ruiru" ? 0 : 50;
+  const grandTotal = deliveryFee !== null ? total + deliveryFee : null;
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
