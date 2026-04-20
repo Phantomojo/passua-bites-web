@@ -5,11 +5,34 @@ import { getDb } from "../db";
 import { users } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "dev-secret-key"
-);
+const getJwtSecret = () => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "JWT_SECRET environment variable is required in production"
+      );
+    }
+    return "dev-secret-key-do-not-use-in-prod";
+  }
+  return secret;
+};
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "passua2026";
+const getAdminPassword = () => {
+  const password = process.env.ADMIN_PASSWORD;
+  if (!password) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "ADMIN_PASSWORD environment variable is required in production"
+      );
+    }
+    return "passua2026";
+  }
+  return password;
+};
+
+const JWT_SECRET = new TextEncoder().encode(getJwtSecret());
+const ADMIN_PASSWORD = getAdminPassword();
 
 interface AdminSession {
   userId: number;
