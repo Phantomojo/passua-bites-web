@@ -1,0 +1,7 @@
+{
+  "framework": null,
+  "buildCommand": "pnpm run vercel-build",
+  "outputDirectory": "dist/public",
+  "installCommand": "pnpm install",
+  "devCommand": "pnpm run dev"
+}
