@@ -74,7 +74,7 @@ export default function AdminDashboard() {
 
   const handleReviewAction = async (id: number, approved: boolean) => {
     try {
-      await fetch(`${API_URL}/api/trpc/reviews.moderate", {
+      await fetch(`${API_URL}/api/trpc/reviews.moderate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ json: { id, approved } }),
@@ -89,7 +89,7 @@ export default function AdminDashboard() {
   const handleDeleteReview = async (id: number) => {
     if (!confirm("Delete this review?")) return;
     try {
-      await fetch("/api/trpc/reviews.delete", {
+      await fetch(`${API_URL}/api/trpc/reviews.delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ json: { id } }),
@@ -147,7 +147,7 @@ export default function AdminDashboard() {
     setIsLoggingIn(true);
     try {
       const res = await fetch(
-        `/api/login?password=${encodeURIComponent(password)}`
+        `${API_URL}/api/login?password=${encodeURIComponent(password)}`
       );
       const data = await res.json();
       if (data.error) throw new Error(data.error);
