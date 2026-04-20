@@ -1,13 +1,23 @@
 {
   "framework": null,
-  "buildCommand": "pnpm run build",
+  "buildCommand": "pnpm run build && pnpm run build:api",
   "outputDirectory": "dist/public",
   "installCommand": "pnpm install",
   "devCommand": "pnpm run dev",
+  "builds": [
+    {
+      "src": "api/index.ts",
+      "use": "@vercel/node"
+    }
+  ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/dist/index.js"
+      "dest": "/api/index.js"
+    },
+    {
+      "src": "/health",
+      "dest": "/api/index.js"
     },
     {
       "handle": "filesystem"
