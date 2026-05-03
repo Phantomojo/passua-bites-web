@@ -1,6 +1,348 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
+
+function MediaPreview({ item }: { item: any }) {
+  const [isMuted, setIsMuted] = useState(true);
+  const [isPaused, setIsPaused] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const modalVideoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = isMuted;
+    }
+  }, [isMuted]);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      isPaused ? videoRef.current.pause() : videoRef.current.play();
+    }
+  }, [isPaused]);
+
+  useEffect(() => {
+    if (showModal && modalVideoRef.current) {
+      modalVideoRef.current.play();
+    }
+  }, [showModal]);
+
+  return (
+    <>
+      <div
+        style={{
+          height: 170,
+          overflow: "hidden",
+          background: "var(--pb-bg3)",
+          position: "relative",
+          cursor: "pointer",
+        }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onClick={() => item.videoUrl && setShowModal(true)}
+      >
+        {item.videoUrl ? (
+          <>
+            <video
+              ref={videoRef}
+              src={item.videoUrl}
+              poster={item.imageUrl || undefined}
+              autoPlay
+              loop
+              muted={isMuted}
+              playsInline
+              preload="metadata"
+              className="pb-food-img"
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                display: "block",
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+                width: 48,
+                height: 48,
+                borderRadius: "50%",
+                background: "rgba(0,0,0,0.5)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: isHovered ? 1 : 0,
+                transition: "opacity 0.2s",
+                backdropFilter: "blur(4px)",
+                pointerEvents: "none",
+              }}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </div>
+            <div
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                padding: "0.5rem 0.7rem",
+                background: "linear-gradient(transparent,rgba(0,0,0,0.7))",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                opacity: isHovered ? 1 : 0,
+                transition: "opacity 0.2s",
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "'DM Mono',monospace",
+                  fontSize: "0.5rem",
+                  color: "rgba(255,255,255,0.8)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                }}
+              >
+                Video
+              </span>
+              <div style={{ display: "flex", gap: "0.3rem" }}>
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    setIsPaused(!isPaused);
+                  }}
+                  style={{
+                    background: "rgba(255,255,255,0.15)",
+                    border: "none",
+                    borderRadius: "50%",
+                    width: 28,
+                    height: 28,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "white",
+                    backdropFilter: "blur(4px)",
+                    padding: 0,
+                  }}
+                >
+                  {isPaused ? (
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  ) : (
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                    </svg>
+                  )}
+                </button>
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    setIsMuted(!isMuted);
+                  }}
+                  style={{
+                    background: "rgba(255,255,255,0.15)",
+                    border: "none",
+                    borderRadius: "50%",
+                    width: 28,
+                    height: 28,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "white",
+                    backdropFilter: "blur(4px)",
+                    padding: 0,
+                  }}
+                >
+                  {isMuted ? (
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <path d="M3.63 3.63a.996.996 0 000 1.41L7.29 8.7 7 9H4c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1h3l3.29 3.29c.63.63 1.71.18 1.71-.71v-4.17l4.18 4.18c-.49.37-1.02.68-1.6.91-.36.15-.58.53-.58.92 0 .72.73 1.18 1.39.91.8-.33 1.55-.77 2.22-1.31l1.34 1.34a.996.996 0 101.41-1.41L5.05 3.63c-.39-.39-1.02-.39-1.42 0z" />
+                    </svg>
+                  ) : (
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <img
+            src={item.imageUrl || ""}
+            alt={item.name}
+            loading="lazy"
+            decoding="async"
+            className="pb-food-img"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              display: "block",
+            }}
+          />
+        )}
+        {isHovered && (
+          <div
+            style={{
+              position: "absolute",
+              top: "0.5rem",
+              left: "0.5rem",
+              background: "rgba(196,92,40,0.9)",
+              padding: "0.2rem 0.5rem",
+              borderRadius: "2px",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "'Playfair Display',serif",
+                fontSize: "0.75rem",
+                fontWeight: 700,
+                color: "white",
+              }}
+            >
+              {item.name}
+            </span>
+            <span
+              style={{
+                fontFamily: "'DM Mono',monospace",
+                fontSize: "0.55rem",
+                color: "rgba(255,255,255,0.9)",
+                marginLeft: "0.4rem",
+              }}
+            >
+              KSH {Number(item.price)}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {showModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.95)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: "1rem",
+          }}
+          onClick={() => setShowModal(false)}
+        >
+          <div
+            style={{
+              position: "relative",
+              maxWidth: "90vw",
+              maxHeight: "90vh",
+              width: "800px",
+              maxWidth: "100%",
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowModal(false)}
+              style={{
+                position: "absolute",
+                top: "-2.5rem",
+                right: 0,
+                background: "none",
+                border: "none",
+                color: "white",
+                fontSize: "2rem",
+                cursor: "pointer",
+                padding: "0.5rem",
+                lineHeight: 1,
+              }}
+            >
+              ×
+            </button>
+            {item.videoUrl && (
+              <video
+                ref={modalVideoRef}
+                src={item.videoUrl}
+                poster={item.imageUrl || undefined}
+                autoPlay
+                loop
+                controls
+                playsInline
+                style={{
+                  width: "100%",
+                  maxHeight: "70vh",
+                  objectFit: "contain",
+                  background: "#000",
+                }}
+              />
+            )}
+            <div style={{ marginTop: "1rem", textAlign: "center" }}>
+              <h2
+                style={{
+                  fontFamily: "'Playfair Display',serif",
+                  fontSize: "1.5rem",
+                  fontWeight: 700,
+                  color: "var(--pb-ivory)",
+                  marginBottom: "0.5rem",
+                }}
+              >
+                {item.name}
+              </h2>
+              <p
+                style={{
+                  fontSize: "0.9rem",
+                  color: "var(--pb-ivory3)",
+                  marginBottom: "1rem",
+                }}
+              >
+                {item.desc || item.description}
+              </p>
+              <span
+                style={{
+                  fontFamily: "'Playfair Display',serif",
+                  fontSize: "1.8rem",
+                  fontWeight: 700,
+                  color: "var(--pb-ember)",
+                }}
+              >
+                KSH {Number(item.price)}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 const LOGO =
   "https://d2xsxph8kpxj0f.cloudfront.net/310519663257647439/2dcKibrZSdH6mbhicYbaoL/pasua_222967c7.jpeg";
@@ -682,46 +1024,7 @@ export default function Home() {
                 (e.currentTarget.style.background = "var(--pb-bg)")
               }
             >
-              <div
-                style={{
-                  height: 170,
-                  overflow: "hidden",
-                  background: "var(--pb-bg3)",
-                }}
-              >
-                {item.videoUrl ? (
-                  <video
-                    src={item.videoUrl}
-                    poster={item.imageUrl || undefined}
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    preload="metadata"
-                    className="pb-food-img"
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      display: "block",
-                    }}
-                  />
-                ) : (
-                  <img
-                    src={item.imageUrl || ""}
-                    alt={item.name}
-                    loading="lazy"
-                    decoding="async"
-                    className="pb-food-img"
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      display: "block",
-                    }}
-                  />
-                )}
-              </div>
+              <MediaPreview item={item} />
               <div style={{ padding: "1.1rem" }}>
                 <div
                   style={{
