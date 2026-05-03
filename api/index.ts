@@ -13,8 +13,8 @@ export default function handler(req: any, res: any) {
     return res.status(204).end();
   }
 
-  // Menu list - exact match
-  if (url === "/api/trpc/menu.list" || url === "/api/trpc/menu.list?input={}") {
+  // Menu list - match various formats
+  if (url.includes("/api/trpc/menu.list")) {
     return res.status(200).json({
       result: {
         data: {
