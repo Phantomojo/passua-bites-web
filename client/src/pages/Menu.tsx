@@ -641,6 +641,34 @@ export default function Menu() {
                   Bolt Food ↗
                 </a>
                 <a
+                  href="https://glovoapp.com/en/ke/nairobi/stores/passua-bites-nbo"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "block",
+                    fontSize: "0.75rem",
+                    color: "var(--pb-ember)",
+                    marginBottom: "0.2rem",
+                    textDecoration: "none",
+                  }}
+                >
+                  Glovo ↗
+                </a>
+                <a
+                  href="https://www.ubereats.com/store-browse-uuid/8a0a02ac-406c-5bae-a83d-680ef5c4cb1f?diningMode=DELIVERY"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "block",
+                    fontSize: "0.75rem",
+                    color: "var(--pb-ember)",
+                    marginBottom: "0.2rem",
+                    textDecoration: "none",
+                  }}
+                >
+                  Uber Eats ↗
+                </a>
+                <a
                   href="https://wa.me/254722473873?text=Hi%20Passua%20Bites%2C%20I%27d%20like%20to%20place%20an%20order"
                   target="_blank"
                   rel="noopener noreferrer"

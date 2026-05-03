@@ -261,6 +261,22 @@ function PBFooter() {
           >
             Bolt Food
           </a>
+          <a
+            href="https://glovoapp.com/en/ke/nairobi/stores/passua-bites-nbo"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="pb-footer-link"
+          >
+            Glovo
+          </a>
+          <a
+            href="https://www.ubereats.com/store-browse-uuid/8a0a02ac-406c-5bae-a83d-680ef5c4cb1f?diningMode=DELIVERY"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="pb-footer-link"
+          >
+            Uber Eats
+          </a>
         </div>
       </div>
       <div
@@ -1005,6 +1021,14 @@ export default function Home() {
             {
               label: "Bolt Food",
               href: "https://food.bolt.eu/en/320-nairobi/p/170268-passua-bites/",
+            },
+            {
+              label: "Glovo",
+              href: "https://glovoapp.com/en/ke/nairobi/stores/passua-bites-nbo",
+            },
+            {
+              label: "Uber Eats",
+              href: "https://www.ubereats.com/store-browse-uuid/8a0a02ac-406c-5bae-a83d-680ef5c4cb1f?diningMode=DELIVERY",
             },
           ].map(s => (
             <a

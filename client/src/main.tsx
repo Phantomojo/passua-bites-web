@@ -40,7 +40,10 @@ queryClient.getMutationCache().subscribe(event => {
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url: "https://passua-api.onrender.com/api/trpc",
+      url:
+        process.env.NODE_ENV === "development"
+          ? "http://localhost:3000/api/trpc"
+          : "https://passua-bites-web.vercel.app/api/trpc",
       transformer: superjson,
       fetch(input, init) {
         return globalThis.fetch(input, {

@@ -271,6 +271,22 @@ export default function About() {
           >
             Bolt Food
           </a>
+          <a
+            href="https://glovoapp.com/en/ke/nairobi/stores/passua-bites-nbo"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="pb-btn-ghost"
+          >
+            Glovo
+          </a>
+          <a
+            href="https://www.ubereats.com/store-browse-uuid/8a0a02ac-406c-5bae-a83d-680ef5c4cb1f?diningMode=DELIVERY"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="pb-btn-ghost"
+          >
+            Uber Eats
+          </a>
         </div>
       </section>
 
