@@ -363,7 +363,13 @@ interface CartItem {
 }
 
 export default function Menu() {
-  const { data: menuItems = [], isLoading } = trpc.menu.list.useQuery();
+  const { data: menuItems = [], isLoading, error } = trpc.menu.list.useQuery();
+
+  if (error) {
+    console.error("Menu fetch error:", error);
+  }
+
+  console.log("Menu items:", menuItems);
   const [cart, setCart] = useState<CartItem[]>(() => {
     const stored = localStorage.getItem("passua_cart");
     return stored ? JSON.parse(stored) : [];
