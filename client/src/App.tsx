@@ -14,6 +14,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import About from "./pages/About";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
+import NairobiFoodFest from "./pages/NairobiFoodFest";
 
 function Router() {
   return (
@@ -28,6 +29,7 @@ function Router() {
       <Route path="/about" component={About} />
       <Route path="/privacy" component={PrivacyPolicy} />
       <Route path="/terms" component={TermsOfService} />
+      <Route path="/nairobi-food-fest" component={NairobiFoodFest} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>

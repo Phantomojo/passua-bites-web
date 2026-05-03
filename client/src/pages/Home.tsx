@@ -567,6 +567,55 @@ export default function Home() {
         </div>
       )}
 
+      {/* Nairobi Food Fest Section */}
+      <section
+        style={{
+          padding: "4rem 2.5rem",
+          background:
+            "linear-gradient(to right, rgba(255, 140, 0, 0.1), rgba(50, 205, 50, 0.1))",
+          borderTop: "1px solid var(--pb-rule)",
+          borderBottom: "1px solid var(--pb-rule)",
+          textAlign: "center",
+        }}
+      >
+        <div
+          className="pb-eyebrow"
+          style={{ color: "#FF8C00", justifyContent: "center" }}
+        >
+          Recent Event
+        </div>
+        <h2
+          style={{
+            fontFamily: "'Playfair Display', serif",
+            fontSize: "2.2rem",
+            marginBottom: "1rem",
+          }}
+        >
+          Nairobi Street <span style={{ color: "#FF8C00" }}>Food Festival</span>{" "}
+          2025
+        </h2>
+        <p
+          style={{
+            maxWidth: "600px",
+            margin: "0 auto 2rem",
+            color: "var(--pb-ivory2)",
+            fontSize: "0.95rem",
+            lineHeight: "1.6",
+          }}
+        >
+          Thank you to everyone who visited our booth! It was an incredible
+          weekend of flavors, music, and community. Missed it? Check out our
+          festival recap.
+        </p>
+        <Link
+          href="/nairobi-food-fest"
+          className="pb-btn-primary"
+          style={{ background: "#FF8C00" }}
+        >
+          View Festival Recap
+        </Link>
+      </section>
+
       {/* Menu preview */}
       <section
         className="pb-section-mobile"
