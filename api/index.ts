@@ -23,7 +23,7 @@ export default function handler(req: any, res: any) {
               id: 1,
               name: "Burger",
               price: "150.00",
-              imageUrl: "/media/images/burger.jpg",
+              imageUrl: "/media/images/burger.webp",
               description:
                 "Buns, lettuce, sliced kachumbari, sauces, beef pattie",
               category: "Burgers",
@@ -34,7 +34,7 @@ export default function handler(req: any, res: any) {
               id: 2,
               name: "Masala Chips",
               price: "150.00",
-              imageUrl: "/media/images/masala-chips.jpg",
+              imageUrl: "/media/images/masala-chips.webp",
               description:
                 "Crunchy outside, soft inside fries, well marinated — spicy or non-spicy",
               category: "Sides",
@@ -45,7 +45,7 @@ export default function handler(req: any, res: any) {
               id: 3,
               name: "Hot Blazer",
               price: "200.00",
-              imageUrl: "/media/images/hot-blazer.jpg",
+              imageUrl: "/media/images/hot-blazer.webp",
               description:
                 "Two chapatis (wrapped), lettuce, kachumbari, boerewors, indomie, avocado, gravy sauce",
               category: "Specials",
@@ -67,7 +67,7 @@ export default function handler(req: any, res: any) {
               id: 5,
               name: "Passua Smocha",
               price: "110.00",
-              imageUrl: "/media/images/hot-blazer.jpg",
+              imageUrl: "/media/images/hot-blazer.webp",
               description:
                 "Chapati, beef smokie, kachumbari, indomie, avocado, seasoned with sauces",
               category: "Smoshas",
@@ -78,7 +78,7 @@ export default function handler(req: any, res: any) {
               id: 6,
               name: "Zigizaga",
               price: "140.00",
-              imageUrl: "/media/images/hot-blazer.jpg",
+              imageUrl: "/media/images/hot-blazer.webp",
               description:
                 "Chapati, beef smokie, kachumbari, indomie, avocado, topped with a boiled egg, seasoned with sauces",
               category: "Smoshas",
@@ -89,7 +89,7 @@ export default function handler(req: any, res: any) {
               id: 7,
               name: "Sultan",
               price: "270.00",
-              imageUrl: "/media/images/hot-blazer.jpg",
+              imageUrl: "/media/images/hot-blazer.webp",
               description:
                 "Two chapatis (wrapped), lettuce, kachumbari, one beef pattie, masala chips, avocado, sauces — comes with a soda",
               category: "Combos",
@@ -100,7 +100,7 @@ export default function handler(req: any, res: any) {
               id: 8,
               name: "Mega Sultan",
               price: "560.00",
-              imageUrl: "/media/images/hot-blazer.jpg",
+              imageUrl: "/media/images/hot-blazer.webp",
               description:
                 "Two chapatis (wrapped), lettuce, kachumbari, two beef patties, cheese, masala chips, avocado, sauces — comes with a soda",
               category: "Combos",
