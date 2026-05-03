@@ -363,7 +363,13 @@ interface CartItem {
 }
 
 export default function Menu() {
-  const { data: menuItems = [], isLoading } = trpc.menu.list.useQuery();
+  const { data: menuItems = [], isLoading } = trpc.menu.list.useQuery(
+    undefined,
+    {
+      staleTime: 1000 * 60 * 5,
+      refetchOnMount: true,
+    }
+  );
   const [cart, setCart] = useState<CartItem[]>(() => {
     const stored = localStorage.getItem("passua_cart");
     return stored ? JSON.parse(stored) : [];

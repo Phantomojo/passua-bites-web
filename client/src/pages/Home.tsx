@@ -369,56 +369,64 @@ const MENU = [
     category: "Smoshas",
     price: 95,
     desc: "Chapati, beef smokie, kachumbari, indomie, avocado, seasoned with sauces",
-    img: SMOCHA,
+    imageUrl: SMOCHA,
+    videoUrl: "/media/videos/Pasuasmocha.mp4",
   },
   {
     name: "Zigizaga",
     category: "Smoshas",
     price: 125,
     desc: "Chapati, beef smokie, kachumbari, indomie, avocado, topped with a boiled egg, seasoned with sauces",
-    img: ZIGIZAGA,
+    imageUrl: ZIGIZAGA,
+    videoUrl: "/media/videos/zigizaga.mp4",
   },
   {
     name: "Burger",
     category: "Burgers",
     price: 150,
     desc: "Buns, lettuce, sliced kachumbari, sauces, beef pattie",
-    img: BURGER,
+    imageUrl: BURGER,
+    videoUrl: null,
   },
   {
     name: "Masala Chips",
     category: "Sides",
     price: 150,
     desc: "Crunchy outside, soft inside fries, well marinated — spicy or non-spicy",
-    img: MASALACHIPS,
+    imageUrl: MASALACHIPS,
+    videoUrl: null,
   },
   {
     name: "Hot Blazer",
     category: "Specials",
     price: 190,
     desc: "Two chapatis (wrapped), lettuce, kachumbari, boerewors, indomie, avocado, gravy sauce",
-    img: HOTBLAZER,
+    imageUrl: HOTBLAZER,
+    videoUrl: null,
   },
   {
     name: "Sultan",
     category: "Combos",
     price: 250,
     desc: "Two chapatis (wrapped), lettuce, kachumbari, one beef pattie, masala chips, avocado, sauces — comes with a soda",
-    img: SULTAN,
+    imageUrl: SULTAN,
+    videoUrl: "/media/videos/Sultan.mp4",
   },
   {
     name: "Pasua Corn",
     category: "Sides",
     price: 280,
     desc: "One beef burger + masala chips (spicy or non-spicy)",
-    img: PASUACORN,
+    imageUrl: PASUACORN,
+    videoUrl: null,
   },
   {
     name: "Mega Sultan",
     category: "Combos",
     price: 560,
     desc: "Two chapatis (wrapped), lettuce, kachumbari, two beef patties, cheese, masala chips, avocado, sauces — comes with a soda",
-    img: MEGASULTAN,
+    imageUrl: MEGASULTAN,
+    videoUrl: "/media/videos/megasultan.mp4",
   },
 ];
 
@@ -682,7 +690,11 @@ export default function Home() {
   const { data: displacementMessage } = trpc.location.get.useQuery(undefined, {
     staleTime: 1000 * 60 * 5,
   });
-  const { data: menuItems = [] } = trpc.menu.list.useQuery();
+  const { data: menuItems = [] } = trpc.menu.list.useQuery(undefined, {
+    staleTime: 1000 * 60 * 5,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
 
   const tickerItems =
     (menuItems?.length ?? 0) > 0
