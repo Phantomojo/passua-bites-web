@@ -44,7 +44,7 @@ export default function handler(req: any, res: any) {
             {
               id: 3,
               name: "Hot Blazer",
-              price: "190.00",
+              price: "200.00",
               imageUrl: "/media/images/hot-blazer.jpg",
               description:
                 "Two chapatis (wrapped), lettuce, kachumbari, boerewors, indomie, avocado, gravy sauce",
@@ -55,7 +55,7 @@ export default function handler(req: any, res: any) {
             {
               id: 4,
               name: "Pasua Corn",
-              price: "280.00",
+              price: "300.00",
               imageUrl: "/media/images/pasua-corn.jpg",
               description:
                 "One beef burger + masala chips (spicy or non-spicy)",
@@ -66,7 +66,7 @@ export default function handler(req: any, res: any) {
             {
               id: 5,
               name: "Passua Smocha",
-              price: "95.00",
+              price: "110.00",
               imageUrl: "/media/images/hot-blazer.jpg",
               description:
                 "Chapati, beef smokie, kachumbari, indomie, avocado, seasoned with sauces",
@@ -77,7 +77,7 @@ export default function handler(req: any, res: any) {
             {
               id: 6,
               name: "Zigizaga",
-              price: "125.00",
+              price: "140.00",
               imageUrl: "/media/images/hot-blazer.jpg",
               description:
                 "Chapati, beef smokie, kachumbari, indomie, avocado, topped with a boiled egg, seasoned with sauces",
@@ -88,7 +88,7 @@ export default function handler(req: any, res: any) {
             {
               id: 7,
               name: "Sultan",
-              price: "250.00",
+              price: "270.00",
               imageUrl: "/media/images/hot-blazer.jpg",
               description:
                 "Two chapatis (wrapped), lettuce, kachumbari, one beef pattie, masala chips, avocado, sauces — comes with a soda",
