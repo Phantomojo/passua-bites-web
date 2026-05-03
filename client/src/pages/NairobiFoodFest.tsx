@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
+import { LazyImage } from "../LazyImage";
 
 const LOGO =
   "https://d2xsxph8kpxj0f.cloudfront.net/310519663257647439/2dcKibrZSdH6mbhicYbaoL/pasua_222967c7.jpeg";
@@ -253,9 +254,12 @@ export default function NairobiFoodFest() {
           }}
         >
           <div style={{ textAlign: "center", maxWidth: "300px" }}>
-            <img
+            <LazyImage
               src="/media/images/festival-doodle-1.png"
+              webpSrc="/media/images/festival-doodle-1.webp"
               alt="Smocha Doodle"
+              width={180}
+              height={180}
               style={{
                 width: "180px",
                 marginBottom: "1.5rem",
@@ -269,9 +273,12 @@ export default function NairobiFoodFest() {
             </p>
           </div>
           <div style={{ textAlign: "center", maxWidth: "300px" }}>
-            <img
+            <LazyImage
               src="/media/images/festival-doodle-2.png"
+              webpSrc="/media/images/festival-doodle-2.webp"
               alt="Dancing Doodle"
+              width={180}
+              height={180}
               style={{
                 width: "180px",
                 marginBottom: "1.5rem",
