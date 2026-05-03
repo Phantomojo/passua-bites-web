@@ -690,11 +690,7 @@ export default function Home() {
   const { data: displacementMessage } = trpc.location.get.useQuery(undefined, {
     staleTime: 1000 * 60 * 5,
   });
-  const { data: menuItems = [] } = trpc.menu.list.useQuery(undefined, {
-    staleTime: 1000 * 60 * 5,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
-  });
+  const { data: menuItems = [] } = trpc.menu.list.useQuery();
 
   const tickerItems =
     (menuItems?.length ?? 0) > 0
