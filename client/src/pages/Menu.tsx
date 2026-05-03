@@ -194,19 +194,39 @@ function MediaPreview({ item }: { item: any }) {
             </div>
           </>
         ) : (
-          <img
-            src={item.imageUrl || ""}
-            alt={item.name}
-            loading="lazy"
-            decoding="async"
-            className="pb-food-img"
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              display: "block",
-            }}
-          />
+          <>
+            {item.imageUrl ? (
+              <img
+                src={item.imageUrl}
+                alt={item.name || "Food item"}
+                loading="lazy"
+                decoding="async"
+                className="pb-food-img"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  display: "block",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "var(--pb-bg3)",
+                  color: "var(--pb-ivory3)",
+                  fontFamily: "'DM Mono',monospace",
+                  fontSize: "0.7rem",
+                }}
+              >
+                No image
+              </div>
+            )}
+          </>
         )}
         {isHovered && (
           <div
@@ -365,11 +385,6 @@ interface CartItem {
 export default function Menu() {
   const { data: menuItems = [], isLoading, error } = trpc.menu.list.useQuery();
 
-  if (error) {
-    console.error("Menu fetch error:", error);
-  }
-
-  console.log("Menu items:", menuItems);
   const [cart, setCart] = useState<CartItem[]>(() => {
     const stored = localStorage.getItem("passua_cart");
     return stored ? JSON.parse(stored) : [];
