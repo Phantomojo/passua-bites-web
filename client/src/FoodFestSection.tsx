@@ -10,7 +10,7 @@
 
 import { LazyImage } from "./LazyImage";
 
-const FOODFEST_DATE = "June 21, 2025";
+const FOODFEST_DATE = "June 21, 2026";
 const FOODFEST_VENUE = "Ruiru Town Square";
 
 export function FoodFestSection() {
@@ -18,7 +18,9 @@ export function FoodFestSection() {
     <section
       id="foodfest"
       className="relative overflow-hidden bg-[#0a0a0a] py-20 px-4"
-      style={{ "--ember": "#FF6B1A", "--abyss": "#0a0a0a" } as React.CSSProperties}
+      style={
+        { "--ember": "#FF6B1A", "--abyss": "#0a0a0a" } as React.CSSProperties
+      }
     >
       {/* ── Background: fireworks hero image ───────────────────── */}
       <div className="absolute inset-0 z-0">
@@ -27,7 +29,7 @@ export function FoodFestSection() {
           webpSrc="/media/images/fireworks-rain.webp"
           alt=""
           aria-hidden="true"
-          eager                          // Above the fold → load immediately
+          eager // Above the fold → load immediately
           className="w-full h-full object-cover"
           style={{ opacity: 0.35 }}
         />
@@ -86,7 +88,7 @@ export function FoodFestSection() {
         >
           Passua&nbsp;
           <span style={{ color: "#FF6B1A" }}>FoodFest</span>
-          &nbsp;2025
+          &nbsp;2026
         </h2>
 
         {/* Tagline */}
@@ -99,14 +101,20 @@ export function FoodFestSection() {
         <div className="flex flex-wrap gap-3 justify-center mb-10">
           <div
             className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium text-white"
-            style={{ background: "rgba(255,255,255,0.08)", backdropFilter: "blur(8px)" }}
+            style={{
+              background: "rgba(255,255,255,0.08)",
+              backdropFilter: "blur(8px)",
+            }}
           >
             <span>📅</span>
             <span>{FOODFEST_DATE}</span>
           </div>
           <div
             className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium text-white"
-            style={{ background: "rgba(255,255,255,0.08)", backdropFilter: "blur(8px)" }}
+            style={{
+              background: "rgba(255,255,255,0.08)",
+              backdropFilter: "blur(8px)",
+            }}
           >
             <span>📍</span>
             <span>{FOODFEST_VENUE}</span>
@@ -115,7 +123,7 @@ export function FoodFestSection() {
 
         {/* CTA */}
         <a
-          href="https://wa.me/254XXXXXXXXX?text=I%20want%20to%20know%20more%20about%20Passua%20FoodFest%202025"
+          href="https://wa.me/254722473873?text=I%20want%20to%20know%20more%20about%20Passua%20FoodFest%202026"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-bold text-white text-base transition-all hover:scale-105 active:scale-95"

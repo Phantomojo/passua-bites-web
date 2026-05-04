@@ -95,7 +95,7 @@ function PBFooter() {
             }}
           >
             Celebrating the flavors of Nairobi, one bite at a time. Thank you
-            for making the Nairobi Street Food Festival 2025 unforgettable!
+            for making the Nairobi Street Food Festival 2026 unforgettable!
           </p>
         </div>
         <div>
@@ -113,6 +113,12 @@ function PBFooter() {
             className="pb-footer-link"
           >
             TikTok
+          </a>
+          <a
+            href="https://youtube.com/@passuabites?si=_QYhenyVQvo73eG4"
+            className="pb-footer-link"
+          >
+            YouTube
           </a>
         </div>
         <div>

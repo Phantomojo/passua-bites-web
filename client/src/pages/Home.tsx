@@ -583,6 +583,16 @@ function PBFooter() {
             </a>
             <span style={{ color: "var(--pb-ivory3)" }}>·</span>
             <a
+              href="https://youtube.com/@passuabites?si=_QYhenyVQvo73eG4"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="pb-footer-link"
+              style={{ display: "inline" }}
+            >
+              YouTube
+            </a>
+            <span style={{ color: "var(--pb-ivory3)" }}>·</span>
+            <a
               href="https://www.facebook.com/PassuaBites/"
               target="_blank"
               rel="noopener noreferrer"
@@ -961,7 +971,7 @@ export default function Home() {
           }}
         >
           Nairobi Street <span style={{ color: "#FF8C00" }}>Food Festival</span>{" "}
-          2025
+          2026
         </h2>
         <p
           style={{
