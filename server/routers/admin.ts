@@ -1,22 +1,11 @@
+import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { getSessionCookieOptions } from "../_core/cookies";
+import { sdk } from "../_core/sdk";
 import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
-import { SignJWT, jwtVerify } from "jose";
 import { getDb } from "../db";
 import { users } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
-
-const getJwtSecret = () => {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error(
-        "JWT_SECRET environment variable is required in production"
-      );
-    }
-    return "dev-secret-key-do-not-use-in-prod";
-  }
-  return secret;
-};
 
 const getAdminPassword = () => {
   const password = process.env.ADMIN_PASSWORD;
@@ -31,39 +20,13 @@ const getAdminPassword = () => {
   return password;
 };
 
-const JWT_SECRET = new TextEncoder().encode(getJwtSecret());
 const ADMIN_PASSWORD = getAdminPassword();
-
-interface AdminSession {
-  userId: number;
-  role: "admin";
-}
-
-async function createAdminSession(userId: number): Promise<string> {
-  return new SignJWT({ userId, role: "admin" as const })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime("24h")
-    .sign(JWT_SECRET);
-}
-
-async function verifyAdminSession(token: string): Promise<AdminSession | null> {
-  try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
-    if (payload.role === "admin") {
-      return payload as unknown as AdminSession;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
 
 export const adminRouter = router({
   // Login with password
   login: publicProcedure
     .input(z.object({ password: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       if (input.password !== ADMIN_PASSWORD) {
         throw new Error("Invalid password");
       }
@@ -79,10 +42,7 @@ export const adminRouter = router({
         .limit(1)
         .execute();
 
-      let userId: number;
-
       if (adminUser.length === 0) {
-        // Create admin user
         const result = await db
           .insert(users)
           .values({
@@ -91,33 +51,31 @@ export const adminRouter = router({
             role: "admin",
           })
           .execute();
-        userId = Number((result as any).insertId || 0);
-      } else {
-        userId = adminUser[0].id;
+        adminUser = [
+          {
+            id: Number((result as any).insertId || 0),
+            openId: "admin-local",
+            name: "Passua Bites Admin",
+            role: "admin",
+          } as any,
+        ];
       }
 
-      const token = await createAdminSession(userId);
+      const admin = adminUser[0];
+      const token = await sdk.createSessionToken(admin.openId, {
+        name: admin.name || "Admin",
+        expiresInMs: ONE_YEAR_MS,
+      });
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.cookie(COOKIE_NAME, token, {
+        ...cookieOptions,
+        maxAge: ONE_YEAR_MS,
+      });
 
       return {
         success: true,
         token,
-        userId,
+        userId: admin.id,
       };
     }),
-
-  // Verify admin session
-  verify: publicProcedure
-    .input(z.object({ token: z.string() }))
-    .query(async ({ input }) => {
-      const session = await verifyAdminSession(input.token);
-      if (!session) {
-        return { valid: false };
-      }
-      return { valid: true, userId: session.userId };
-    }),
-
-  // Logout (client-side token discard)
-  logout: publicProcedure.mutation(async () => {
-    return { success: true };
-  }),
 });

@@ -18,7 +18,10 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
-  window.location.href = getLoginUrl();
+  const loginUrl = getLoginUrl();
+  if (loginUrl) {
+    window.location.href = loginUrl;
+  }
 };
 
 queryClient.getQueryCache().subscribe(event => {
@@ -43,7 +46,7 @@ const trpcClient = trpc.createClient({
       url:
         process.env.NODE_ENV === "development"
           ? "http://localhost:3000/api/trpc"
-          : "https://passua-bites-web.vercel.app/api/trpc",
+          : "https://passua-api.onrender.com/api/trpc",
       transformer: superjson,
       fetch(input, init) {
         return globalThis.fetch(input, {

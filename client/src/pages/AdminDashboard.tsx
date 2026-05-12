@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import AnalyticsTab from "@/components/AnalyticsTab";
 
-const API_URL = "https://passua-api.onrender.com";
 const STATUS_COLORS: Record<string, string> = {
   pending: "var(--pb-ivory3)",
   confirmed: "#60a5fa",
@@ -13,23 +13,16 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: "#f87171",
 };
 
-type Tab = "overview" | "orders" | "menu" | "reviews" | "settings";
+type Tab =
+  | "overview"
+  | "orders"
+  | "menu"
+  | "reviews"
+  | "settings"
+  | "analytics";
 
 export default function AdminDashboard() {
-  const [token, setToken] = useState<string | null>(() => {
-    const stored = localStorage.getItem("pb_admin_token");
-    if (!stored) return null;
-    // Check expiry
-    const parts = stored.split("_");
-    if (parts.length >= 2) {
-      const expiresAt = parseInt(parts[1]);
-      if (Date.now() > expiresAt) {
-        localStorage.removeItem("pb_admin_token");
-        return null;
-      }
-    }
-    return stored;
-  });
+  const [token, setToken] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("overview");
@@ -40,14 +33,13 @@ export default function AdminDashboard() {
   const login = trpc.admin.login.useMutation();
   const stats = trpc.orders.getStats.useQuery(undefined, {
     enabled: !!token,
-    refetchInterval: 30000,
+    refetchInterval: 60000,
   });
   const orders = trpc.orders.listAll.useQuery(undefined, {
     enabled: !!token,
-    refetchInterval: 15000,
+    refetchInterval: 30000,
   });
   const menuItems = trpc.menu.list.useQuery(undefined, { enabled: !!token });
-  const allMenuItems = trpc.menu.list.useQuery(undefined, { enabled: !!token });
   const updateOrderStatus = trpc.orders.updateStatus.useMutation();
   const createMenuItem = trpc.menu.create.useMutation();
   const updateMenuItem = trpc.menu.update.useMutation();
@@ -61,12 +53,10 @@ export default function AdminDashboard() {
     enabled: !!token,
   });
 
-  const API_URL = "https://passua-api.onrender.com";
-
-  // Fetch pending reviews
+  // Fetch pending reviews (same-origin)
   useEffect(() => {
     if (!token) return;
-    fetch(`${API_URL}/api/trpc/reviews.listPending`)
+    fetch(`/api/trpc/reviews.listPending`)
       .then(r => r.json())
       .then(d => setPendingReviews(d.result?.data?.json || []))
       .catch(() => {});
@@ -74,7 +64,7 @@ export default function AdminDashboard() {
 
   const handleReviewAction = async (id: number, approved: boolean) => {
     try {
-      await fetch(`${API_URL}/api/trpc/reviews.moderate`, {
+      await fetch(`/api/trpc/reviews.moderate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ json: { id, approved } }),
@@ -89,7 +79,7 @@ export default function AdminDashboard() {
   const handleDeleteReview = async (id: number) => {
     if (!confirm("Delete this review?")) return;
     try {
-      await fetch(`${API_URL}/api/trpc/reviews.delete`, {
+      await fetch(`/api/trpc/reviews.delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ json: { id } }),
@@ -146,13 +136,9 @@ export default function AdminDashboard() {
     e.preventDefault();
     setIsLoggingIn(true);
     try {
-      const res = await fetch(
-        `${API_URL}/api/login?password=${encodeURIComponent(password)}`
-      );
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      setToken(data.token);
-      localStorage.setItem("pb_admin_token", data.token);
+      const result = await login.mutateAsync({ password });
+      setToken(result.token);
+      localStorage.setItem("pb_admin_token", result.token);
       toast.success("Logged in successfully");
     } catch (err: any) {
       toast.error(err.message || "Invalid password");
@@ -440,54 +426,39 @@ export default function AdminDashboard() {
             flexWrap: "wrap",
           }}
         >
-          {(["overview", "orders", "menu", "reviews", "settings"] as const).map(
-            t => (
-              <button
-                key={t}
-                onClick={() => setActiveTab(t)}
-                style={{
-                  fontFamily: "'DM Mono',monospace",
-                  fontSize: "0.65rem",
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  padding: "0.5rem 1rem",
-                  cursor: "pointer",
-                  border: "1px solid",
-                  background:
-                    activeTab === t ? "var(--pb-ember)" : "transparent",
-                  color: activeTab === t ? "var(--pb-bg)" : "var(--pb-ivory3)",
-                  borderColor:
-                    activeTab === t ? "var(--pb-ember)" : "var(--pb-rule)",
-                  transition: "all 0.2s",
-                  minHeight: 44,
-                }}
-              >
-                {t}
-                {t === "orders" &&
-                  orderList.filter((o: any) => o.status === "pending").length >
-                    0 && (
-                    <span
-                      style={{
-                        marginLeft: "0.4rem",
-                        background: "var(--pb-bg)",
-                        color: "var(--pb-ember)",
-                        borderRadius: "50%",
-                        width: 18,
-                        height: 18,
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "0.6rem",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {
-                        orderList.filter((o: any) => o.status === "pending")
-                          .length
-                      }
-                    </span>
-                  )}
-                {t === "reviews" && pendingReviews.length > 0 && (
+          {(
+            [
+              "overview",
+              "orders",
+              "menu",
+              "reviews",
+              "settings",
+              "analytics",
+            ] as const
+          ).map(t => (
+            <button
+              key={t}
+              onClick={() => setActiveTab(t)}
+              style={{
+                fontFamily: "'DM Mono',monospace",
+                fontSize: "0.65rem",
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                padding: "0.5rem 1rem",
+                cursor: "pointer",
+                border: "1px solid",
+                background: activeTab === t ? "var(--pb-ember)" : "transparent",
+                color: activeTab === t ? "var(--pb-bg)" : "var(--pb-ivory3)",
+                borderColor:
+                  activeTab === t ? "var(--pb-ember)" : "var(--pb-rule)",
+                transition: "all 0.2s",
+                minHeight: 44,
+              }}
+            >
+              {t}
+              {t === "orders" &&
+                orderList.filter((o: any) => o.status === "pending").length >
+                  0 && (
                   <span
                     style={{
                       marginLeft: "0.4rem",
@@ -503,12 +474,33 @@ export default function AdminDashboard() {
                       fontWeight: 700,
                     }}
                   >
-                    {pendingReviews.length}
+                    {
+                      orderList.filter((o: any) => o.status === "pending")
+                        .length
+                    }
                   </span>
                 )}
-              </button>
-            )
-          )}
+              {t === "reviews" && pendingReviews.length > 0 && (
+                <span
+                  style={{
+                    marginLeft: "0.4rem",
+                    background: "var(--pb-bg)",
+                    color: "var(--pb-ember)",
+                    borderRadius: "50%",
+                    width: 18,
+                    height: 18,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "0.6rem",
+                    fontWeight: 700,
+                  }}
+                >
+                  {pendingReviews.length}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
 
         {/* ===== OVERVIEW ===== */}
@@ -909,7 +901,7 @@ export default function AdminDashboard() {
                       </td>
                       <td style={{ padding: "0.85rem 1rem" }}>
                         <a
-                          href={`https://wa.me/254${o.customerPhone.startsWith("0") ? o.customerPhone.slice(1) : o.customerPhone}?text=${encodeURIComponent(`Hi ${o.customerName}! Your Passua Bites order #${o.id} is ${o.status}.`)}`}
+                          href={`https://wa.me/254${o.customerPhone?.startsWith("0") ? o.customerPhone.slice(1) : (o.customerPhone ?? "")}?text=${encodeURIComponent(`Hi ${o.customerName}! Your Passua Bites order #${o.id} is ${o.status}.`)}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{
@@ -1414,7 +1406,7 @@ export default function AdminDashboard() {
                           fontSize: "0.85rem",
                         }}
                       >
-                        {"★".repeat(r.rating)}
+                        {"★".repeat(r.rating ?? 0)}
                         {"☆".repeat(5 - r.rating)}
                       </div>
                     </div>
@@ -1538,6 +1530,7 @@ export default function AdminDashboard() {
               Displacement Alert Message
             </div>
             <textarea
+              key={currentLocation || "empty"}
               defaultValue={currentLocation || ""}
               id="displacementMessage"
               style={{
@@ -1645,6 +1638,13 @@ export default function AdminDashboard() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ===== ANALYTICS ===== */}
+      {activeTab === "analytics" && (
+        <div style={{ paddingTop: "1rem" }}>
+          <AnalyticsTab />
         </div>
       )}
     </div>

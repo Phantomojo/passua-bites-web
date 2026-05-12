@@ -707,6 +707,19 @@ function PBFooter() {
           >
             Terms
           </Link>
+          <Link
+            href="/admin"
+            style={{
+              fontFamily: "'DM Mono',monospace",
+              fontSize: "0.55rem",
+              color: "var(--pb-ivory3)",
+              opacity: 0.35,
+              letterSpacing: "0.06em",
+              textDecoration: "none",
+            }}
+          >
+            Admin
+          </Link>
         </div>
       </div>
     </footer>

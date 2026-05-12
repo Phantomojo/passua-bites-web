@@ -8,6 +8,7 @@ import { ordersRouter } from "./routers/orders";
 import { paymentsRouter } from "./routers/payments";
 import { reviewsRouter } from "./routers/reviews";
 import { adminRouter } from "./routers/admin";
+import { analyticsRouter } from "./routers/analytics";
 
 export const appRouter = router({
   system: systemRouter,
@@ -26,6 +27,7 @@ export const appRouter = router({
   payments: paymentsRouter,
   reviews: reviewsRouter,
   admin: adminRouter,
+  analytics: analyticsRouter,
 
   // Location/Displacement message router
   location: router({
@@ -44,7 +46,7 @@ export const appRouter = router({
         await setSiteSetting("displacementMessage", input.message);
         return { success: true };
       }),
-    getAll: publicProcedure.query(async () => {
+    getAll: adminProcedure.query(async () => {
       const { getAllSiteSettings } = await import("./db");
       return getAllSiteSettings();
     }),

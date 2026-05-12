@@ -8,6 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { getDb } from "../db";
+import { analyticsMiddleware } from "../middleware/analytics";
 import { orders, mpesaTransactions } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 import rateLimit from "express-rate-limit";
@@ -15,7 +16,7 @@ import rateLimit from "express-rate-limit";
 // Security: Rate limiting
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: process.env.NODE_ENV === "production" ? 200 : 500,
   message: { error: "Too many requests, please try again later" },
   standardHeaders: true,
   legacyHeaders: false,
@@ -71,6 +72,7 @@ async function startServer() {
   // Security middleware
   app.use(securityHeaders);
   app.use("/api/", generalLimiter); // Apply rate limiting to API routes
+  app.use(analyticsMiddleware);
 
   // CORS for cross-origin requests (Vercel frontend)
   app.use((req, res, next) => {

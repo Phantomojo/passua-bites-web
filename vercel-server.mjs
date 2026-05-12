@@ -15,6 +15,8 @@ import { serveStatic, setupVite } from './server/_core/vite';
 import { getDb } from './server/db';
 import { orders, mpesaTransactions } from './drizzle/schema';
 import { eq } from 'drizzle-orm';
+import { analyticsMiddleware } from './server/middleware/analytics';
+import rateLimit from 'express-rate-limit';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,9 +24,30 @@ const __dirname = path.dirname(__filename);
 async function startServer() {
   const app = express();
   const server = createServer(app);
-  
+
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+  // Security headers
+  app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    next();
+  });
+
+  // Rate limiting
+  const generalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: process.env.NODE_ENV === 'production' ? 200 : 500,
+    message: { error: 'Too many requests, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  app.use('/api/', generalLimiter);
+
+  // Analytics (passive, never blocks)
+  app.use(analyticsMiddleware);
   
   // OAuth routes
   app.get('/api/oauth/callback', async (req: any, res: any) => {

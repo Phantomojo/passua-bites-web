@@ -142,3 +142,26 @@ export const mpesaTransactions = pgTable("mpesaTransactions", {
 
 export type MpesaTransaction = typeof mpesaTransactions.$inferSelect;
 export type InsertMpesaTransaction = typeof mpesaTransactions.$inferInsert;
+
+/**
+ * Analytics events table — passive traffic + behaviour tracking (no external service)
+ */
+export const analyticsEvents = pgTable("analyticsEvents", {
+  id: serial("id").primaryKey(),
+  sessionId: varchar("sessionId", { length: 64 }).notNull(),
+  ip: varchar("ip", { length: 50 }),
+  country: varchar("country", { length: 4 }),
+  city: varchar("city", { length: 100 }),
+  userAgent: varchar("userAgent", { length: 512 }),
+  device: varchar("device", { length: 20 }),
+  os: varchar("os", { length: 50 }),
+  browser: varchar("browser", { length: 50 }),
+  page: varchar("page", { length: 500 }),
+  referer: varchar("referer", { length: 500 }),
+  eventType: varchar("eventType", { length: 50 }).default("pageview").notNull(),
+  metadata: text("metadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
+export type InsertAnalyticsEvent = typeof analyticsEvents.$inferInsert;
