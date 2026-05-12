@@ -69,13 +69,13 @@ CREATE TABLE "siteSettings" (
 
 -- Seed menu items
 INSERT INTO "menuItems" ("name", "description", "price", "category", "available") VALUES
-('Passua Smocha', 'Chapati, beef smokie, kachumbari, indomie, avocado, seasoned with sauces', 95, 'smoshas', 1),
-('Zigizaga', 'Chapati, beef smokie, kachumbari, indomie, avocado, topped with a boiled egg, seasoned with sauces', 125, 'smoshas', 1),
+('Passua Smocha', 'Chapati, beef smokie, kachumbari, indomie, avocado, seasoned with sauces', 110, 'smoshas', 1),
+('Zigizaga', 'Chapati, beef smokie, kachumbari, indomie, avocado, topped with a boiled egg, seasoned with sauces', 140, 'smoshas', 1),
 ('Burger', 'Buns, lettuce, sliced kachumbari, sauces, beef pattie', 150, 'burgers', 1),
 ('Masala Chips', 'Crunchy outside, soft inside fries, well marinated — spicy or non-spicy', 150, 'sides', 1),
-('Hot Blazer', 'Two chapatis (wrapped), lettuce, kachumbari, boerewors, indomie, avocado, gravy sauce', 190, 'specials', 1),
-('Sultan', 'Two chapatis (wrapped), lettuce, kachumbari, one beef pattie, masala chips, avocado, sauces — comes with a soda', 250, 'combos', 1),
-('Pasua Corn', 'One beef burger + masala chips (spicy or non-spicy)', 280, 'sides', 1),
+('Hot Blazer', 'Two chapatis (wrapped), lettuce, kachumbari, boerewors, indomie, avocado, gravy sauce', 200, 'specials', 1),
+('Sultan', 'Two chapatis (wrapped), lettuce, kachumbari, one beef pattie, masala chips, avocado, sauces — comes with a soda', 270, 'combos', 1),
+('Pasua Corn', 'One beef burger + masala chips (spicy or non-spicy)', 300, 'sides', 1),
 ('Mega Sultan', 'Two chapatis (wrapped), lettuce, kachumbari, two beef patties, cheese, masala chips, avocado, sauces — comes with a soda', 560, 'combos', 1);
 
 -- Seed site settings

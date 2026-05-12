@@ -386,7 +386,7 @@ const MENU = [
   {
     name: "Passua Smocha",
     category: "Smoshas",
-    price: 95,
+    price: 110,
     desc: "Chapati, beef smokie, kachumbari, indomie, avocado, seasoned with sauces",
     imageUrl: SMOCHA,
     videoUrl: "/media/videos/Pasuasmocha.mp4",
@@ -394,7 +394,7 @@ const MENU = [
   {
     name: "Zigizaga",
     category: "Smoshas",
-    price: 125,
+    price: 140,
     desc: "Chapati, beef smokie, kachumbari, indomie, avocado, topped with a boiled egg, seasoned with sauces",
     imageUrl: ZIGIZAGA,
     videoUrl: "/media/videos/zigizaga.mp4",
@@ -418,7 +418,7 @@ const MENU = [
   {
     name: "Hot Blazer",
     category: "Specials",
-    price: 190,
+    price: 200,
     desc: "Two chapatis (wrapped), lettuce, kachumbari, boerewors, indomie, avocado, gravy sauce",
     imageUrl: HOTBLAZER,
     videoUrl: null,
@@ -426,7 +426,7 @@ const MENU = [
   {
     name: "Sultan",
     category: "Combos",
-    price: 250,
+    price: 270,
     desc: "Two chapatis (wrapped), lettuce, kachumbari, one beef pattie, masala chips, avocado, sauces — comes with a soda",
     imageUrl: SULTAN,
     videoUrl: "/media/videos/Sultan.mp4",
@@ -434,7 +434,7 @@ const MENU = [
   {
     name: "Pasua Corn",
     category: "Sides",
-    price: 280,
+    price: 300,
     desc: "One beef burger + masala chips (spicy or non-spicy)",
     imageUrl: PASUACORN,
     videoUrl: null,
@@ -725,13 +725,13 @@ export default function Home() {
     (menuItems?.length ?? 0) > 0
       ? menuItems.map((m: any) => `${m.name} — KSH ${m.price}`)
       : [
-          "Passua Smocha — KSH 95",
-          "Zigizaga — KSH 125",
+          "Passua Smocha — KSH 110",
+          "Zigizaga — KSH 140",
           "Burger — KSH 150",
           "Masala Chips — KSH 150",
-          "Hot Blazer — KSH 190",
-          "Sultan — KSH 250",
-          "Pasua Corn — KSH 280",
+          "Hot Blazer — KSH 200",
+          "Sultan — KSH 270",
+          "Pasua Corn — KSH 300",
           "Mega Sultan — KSH 560",
         ];
 
@@ -898,7 +898,7 @@ export default function Home() {
                 lineHeight: 1,
               }}
             >
-              100{" "}
+              110{" "}
               <span
                 style={{
                   fontFamily: "'DM Mono',monospace",
