@@ -2,7 +2,5 @@
   "buildCommand": "pnpm run build",
   "outputDirectory": "dist/public",
   "installCommand": "pnpm install",
-  "devCommand": "pnpm run dev",
-  "builds": [{ "src": "api/index.js", "use": "@vercel/node" }],
-  "routes": [{ "src": "/api/(.*)", "dest": "api/index.js" }]
+  "devCommand": "pnpm run dev"
 }
