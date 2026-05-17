@@ -3,6 +3,5 @@
   "buildCommand": "pnpm run build",
   "outputDirectory": "dist/public",
   "installCommand": "pnpm install",
-  "devCommand": "pnpm run dev",
-  "routes": [{ "src": "/api/(.*)", "dest": "api/index.js" }]
+  "devCommand": "pnpm run dev"
 }
