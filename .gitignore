@@ -115,5 +115,5 @@ client/public/__manus__/version.json
 .env*.local
 .env.vercel
 
-# Compiled Vercel serverless handler
-api/handler.mjs
+# Compiled Vercel serverless handler (built by vercel-build)
+api/index.js

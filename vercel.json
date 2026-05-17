@@ -4,18 +4,5 @@
   "outputDirectory": "dist/public",
   "installCommand": "pnpm install",
   "devCommand": "pnpm run dev",
-  "builds": [
-    {
-      "src": "api/index.ts",
-      "use": "@vercel/node",
-      "config": {
-        "esbuild": {
-          "alias": {
-            "@shared": "./shared"
-          }
-        }
-      }
-    }
-  ],
-  "routes": [{ "src": "/api/(.*)", "dest": "api/index.ts" }]
+  "routes": [{ "src": "/api/(.*)", "dest": "api/index.js" }]
 }
