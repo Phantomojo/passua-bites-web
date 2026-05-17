@@ -1,7 +1,9 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
+import { useEffect, useRef } from "react";
+import { trpc } from "@/lib/trpc";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
@@ -16,23 +18,44 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import NairobiFoodFest from "./pages/NairobiFoodFest";
 
+function SpaPageviewTracker() {
+  const [location] = useLocation();
+  const prev = useRef(location);
+  const record = trpc.analytics.recordPageview.useMutation();
+
+  useEffect(() => {
+    if (prev.current === location) return;
+    prev.current = location;
+    record.mutate({
+      page: location,
+      referrer: document.referrer || null,
+      userAgent: navigator.userAgent || null,
+    });
+  }, [location, record]);
+
+  return null;
+}
+
 function Router() {
   return (
-    <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/menu"} component={Menu} />
-      <Route path={"/checkout"} component={Checkout} />
-      <Route path={"/orders"} component={OrderTracking} />
-      <Route path={"/contact"} component={Contact} />
-      <Route path={"/reviews"} component={Reviews} />
-      <Route path="/admin" component={AdminDashboard} />
-      <Route path="/about" component={About} />
-      <Route path="/privacy" component={PrivacyPolicy} />
-      <Route path="/terms" component={TermsOfService} />
-      <Route path="/nairobi-food-fest" component={NairobiFoodFest} />
-      <Route path={"/404"} component={NotFound} />
-      <Route component={NotFound} />
-    </Switch>
+    <>
+      <SpaPageviewTracker />
+      <Switch>
+        <Route path={"/"} component={Home} />
+        <Route path={"/menu"} component={Menu} />
+        <Route path={"/checkout"} component={Checkout} />
+        <Route path={"/orders"} component={OrderTracking} />
+        <Route path={"/contact"} component={Contact} />
+        <Route path={"/reviews"} component={Reviews} />
+        <Route path="/admin" component={AdminDashboard} />
+        <Route path="/about" component={About} />
+        <Route path="/privacy" component={PrivacyPolicy} />
+        <Route path="/terms" component={TermsOfService} />
+        <Route path="/nairobi-food-fest" component={NairobiFoodFest} />
+        <Route path={"/404"} component={NotFound} />
+        <Route component={NotFound} />
+      </Switch>
+    </>
   );
 }
 

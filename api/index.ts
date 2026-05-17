@@ -1,155 +1,63 @@
-// @ts-nocheck
-export default function handler(req: any, res: any) {
-  const url = req.url || "";
-  const origin = req.headers.origin || "";
-  const isProduction = origin.includes("vercel.app");
+/**
+ * Vercel serverless entry point
+ * Serves Express + tRPC backend for Passua Bites
+ */
+import serverless from "serverless-http";
+import express from "express";
+import { createExpressMiddleware } from "@trpc/server/adapters/express";
+import { appRouter } from "../server/routers";
+import { createContext } from "../server/_core/context";
+import rateLimit from "express-rate-limit";
 
-  // Set CORS headers - restrict in production
-  res.setHeader("Access-Control-Allow-Origin", isProduction ? origin : "*");
+const app = express();
+
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+// Security headers
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  next();
+});
+
+// Rate limiting
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: process.env.NODE_ENV === "production" ? 200 : 500,
+  message: { error: "Too many requests, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use("/api/", generalLimiter);
+
+// CORS for cross-origin requests
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  res.setHeader("Access-Control-Allow-Origin", origin || "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
+  res.setHeader("Access-Control-Allow-Credentials", "true");
   if (req.method === "OPTIONS") {
-    return res.status(204).end();
+    res.status(204).end();
+    return;
   }
+  next();
+});
 
-  // Menu list - match various formats
-  if (url.includes("/api/trpc/menu.list")) {
-    return res.status(200).json({
-      result: {
-        data: {
-          json: [
-            {
-              id: 1,
-              name: "Burger",
-              price: "150.00",
-              imageUrl: "/media/images/burger.webp",
-              description:
-                "Buns, lettuce, sliced kachumbari, sauces, beef pattie",
-              category: "Burgers",
-              available: 1,
-              videoUrl: null,
-            },
-            {
-              id: 2,
-              name: "Masala Chips",
-              price: "150.00",
-              imageUrl: "/media/images/masala-chips.webp",
-              description:
-                "Crunchy outside, soft inside fries, well marinated — spicy or non-spicy",
-              category: "Sides",
-              available: 1,
-              videoUrl: null,
-            },
-            {
-              id: 3,
-              name: "Hot Blazer",
-              price: "200.00",
-              imageUrl: "/media/images/hot-blazer.webp",
-              description:
-                "Two chapatis (wrapped), lettuce, kachumbari, boerewors, indomie, avocado, gravy sauce",
-              category: "Specials",
-              available: 1,
-              videoUrl: null,
-            },
-            {
-              id: 4,
-              name: "Pasua Corn",
-              price: "300.00",
-              imageUrl: "/media/images/pasua-corn.jpg",
-              description:
-                "One beef burger + masala chips (spicy or non-spicy)",
-              category: "Sides",
-              available: 1,
-              videoUrl: null,
-            },
-            {
-              id: 5,
-              name: "Passua Smocha",
-              price: "110.00",
-              imageUrl: "/media/images/hot-blazer.webp",
-              description:
-                "Chapati, beef smokie, kachumbari, indomie, avocado, seasoned with sauces",
-              category: "Smoshas",
-              available: 1,
-              videoUrl: "/media/videos/Pasuasmocha.mp4",
-            },
-            {
-              id: 6,
-              name: "Zigizaga",
-              price: "140.00",
-              imageUrl: "/media/images/hot-blazer.webp",
-              description:
-                "Chapati, beef smokie, kachumbari, indomie, avocado, topped with a boiled egg, seasoned with sauces",
-              category: "Smoshas",
-              available: 1,
-              videoUrl: "/media/videos/zigizaga.mp4",
-            },
-            {
-              id: 7,
-              name: "Sultan",
-              price: "270.00",
-              imageUrl: "/media/images/hot-blazer.webp",
-              description:
-                "Two chapatis (wrapped), lettuce, kachumbari, one beef pattie, masala chips, avocado, sauces — comes with a soda",
-              category: "Combos",
-              available: 1,
-              videoUrl: "/media/videos/Sultan.mp4",
-            },
-            {
-              id: 8,
-              name: "Mega Sultan",
-              price: "560.00",
-              imageUrl: "/media/images/hot-blazer.webp",
-              description:
-                "Two chapatis (wrapped), lettuce, kachumbari, two beef patties, cheese, masala chips, avocado, sauces — comes with a soda",
-              category: "Combos",
-              available: 1,
-              videoUrl: "/media/videos/megasultan.mp4",
-            },
-          ],
-        },
-      },
-    });
-  }
+// Health check
+app.get("/api/health", (_req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
 
-  // Location get
-  if (
-    url === "/api/trpc/location.get" ||
-    url === "/api/trpc/location.get?input={}"
-  ) {
-    return res.status(200).json({
-      result: {
-        data: {
-          json: { key: "displacementMessage", value: "Find us in Ruiru!" },
-        },
-      },
-    });
-  }
+// tRPC API
+app.use(
+  "/api/trpc",
+  createExpressMiddleware({
+    router: appRouter,
+    createContext,
+  })
+);
 
-  // Location getAll
-  if (
-    url === "/api/trpc/location.getAll" ||
-    url === "/api/trpc/location.getAll?input={}"
-  ) {
-    return res.status(200).json({
-      result: {
-        data: {
-          json: [
-            { key: "displacementMessage", value: "Find us in Ruiru!" },
-            { key: "phone", value: "+254700000000" },
-            { key: "location", value: "Ruiru, Kenya" },
-          ],
-        },
-      },
-    });
-  }
-
-  // Health check
-  if (url === "/health" || url === "/api/health") {
-    return res.status(200).json({ status: "ok" });
-  }
-
-  // Default fallback - return empty array
-  return res.status(200).json({ result: { data: { json: [] } } });
-}
+export default serverless(app);

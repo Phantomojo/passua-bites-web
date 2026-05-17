@@ -1,12 +1,91 @@
-import { adminProcedure, router } from "../_core/trpc";
+import { adminProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
+import { analyticsEvents } from "../../drizzle/schema";
+import { z } from "zod";
+import { createHash } from "crypto";
 
 function rows(result: any): any[] {
   return result?.rows ?? result ?? [];
 }
 
+function parseDevice(ua: string): "mobile" | "tablet" | "desktop" {
+  if (/ipad|tablet|playbook|silk/i.test(ua)) return "tablet";
+  if (/mobile|android|iphone|ipod|blackberry|opera mini|iemobile/i.test(ua))
+    return "mobile";
+  return "desktop";
+}
+
+function parseBrowser(ua: string): string {
+  if (/edg\//i.test(ua)) return "Edge";
+  if (/opr\/|opera/i.test(ua)) return "Opera";
+  if (/chrome\/\d/i.test(ua) && !/chromium/i.test(ua)) return "Chrome";
+  if (/firefox\/\d/i.test(ua)) return "Firefox";
+  if (/safari\/\d/i.test(ua) && !/chrome/i.test(ua)) return "Safari";
+  return "Other";
+}
+
+function parseOS(ua: string): string {
+  if (/android/i.test(ua)) return "Android";
+  if (/iphone|ipad|ipod/i.test(ua)) return "iOS";
+  if (/windows nt/i.test(ua)) return "Windows";
+  if (/mac os x/i.test(ua)) return "macOS";
+  if (/linux/i.test(ua)) return "Linux";
+  return "Other";
+}
+
+function getClientIp(req: any): string {
+  const fwd = req.headers?.["x-forwarded-for"];
+  if (fwd) {
+    const first = Array.isArray(fwd) ? fwd[0] : fwd;
+    return first.split(",")[0].trim().slice(0, 50);
+  }
+  return req.socket?.remoteAddress || req.ip || "unknown";
+}
+
+function makeSessionId(ip: string, ua: string): string {
+  const day = new Date().toISOString().slice(0, 10);
+  return createHash("sha256")
+    .update(`${ip}:${ua}:${day}`)
+    .digest("hex")
+    .slice(0, 32);
+}
+
 export const analyticsRouter = router({
+
+  recordPageview: publicProcedure
+    .input(z.object({
+      page: z.string().max(500),
+      referrer: z.string().max(500).nullable().optional(),
+      userAgent: z.string().max(512).nullable().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) return { success: false };
+
+      const ua = input.userAgent || "";
+      const ip = getClientIp(ctx.req);
+      const referrer = input.referrer || null;
+
+      try {
+        await db.insert(analyticsEvents).values({
+          sessionId: makeSessionId(ip, ua),
+          ip: ip.slice(0, 50),
+          userAgent: ua?.slice(0, 512) || null,
+          device: parseDevice(ua),
+          os: parseOS(ua),
+          browser: parseBrowser(ua),
+          page: input.page,
+          referer: referrer?.slice(0, 500) || null,
+          eventType: "pageview",
+          metadata: null,
+        }).execute();
+      } catch {
+        // Analytics must never crash
+      }
+
+      return { success: true };
+    }),
 
   getTraffic: adminProcedure.query(async () => {
     const db = await getDb();
