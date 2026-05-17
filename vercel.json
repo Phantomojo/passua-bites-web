@@ -4,5 +4,5 @@
   "outputDirectory": "dist/public",
   "installCommand": "pnpm install",
   "devCommand": "pnpm run dev",
-  "routes": [{ "src": "/api/(.*)", "dest": "/api/index.ts" }]
+  "routes": [{ "src": "/api/(.*)", "dest": "api/handler.mjs" }]
 }
