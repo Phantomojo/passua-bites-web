@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { PBNav, PBFooter } from "./Home";
 import { trpc } from "@/lib/trpc";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 const STATUS_STEPS = [
   {
@@ -23,6 +24,7 @@ const STATUS_STEPS = [
 ];
 
 export default function OrderTracking() {
+  usePageMeta({ title: "Track Order — Passua Bites", description: "Track your Passua Bites order by order ID or phone number." });
   const [searchId, setSearchId] = useState("");
   const [searchPhone, setSearchPhone] = useState("");
   const [searchBy, setSearchBy] = useState<"id" | "phone">("phone");
@@ -37,6 +39,8 @@ export default function OrderTracking() {
     { phone: searchPhone },
     { enabled: false, retry: false }
   );
+
+  const isSearching = getOrderById.isFetching || getOrdersByPhone.isFetching;
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -195,7 +199,27 @@ export default function OrderTracking() {
           </button>
         </form>
 
-        {order ? (
+        {isSearching ? (
+          <div
+            style={{
+              background: "var(--pb-bg2)",
+              border: "1px solid var(--pb-rule2)",
+              padding: "3rem",
+              textAlign: "center",
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "'DM Mono',monospace",
+                fontSize: "0.62rem",
+                color: "var(--pb-ivory3)",
+                letterSpacing: "0.1em",
+              }}
+            >
+              Searching...
+            </div>
+          </div>
+        ) : order ? (
           <div
             className="pb-grid-mobile"
             style={{

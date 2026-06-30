@@ -1,7 +1,9 @@
 import { Link } from "wouter";
 import { PBNav } from "./Home";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 export default function NotFound() {
+  usePageMeta({ title: "Page Not Found — Passua Bites", description: "The page you are looking for does not exist." });
   return (
     <div style={{ minHeight:"100vh", background:"var(--pb-bg)" }}>
       <PBNav />

@@ -5,6 +5,17 @@ import { analyticsEvents } from "../../drizzle/schema";
 import { z } from "zod";
 import { createHash } from "crypto";
 
+let geo: typeof import("geoip-lite") | null = null;
+async function getGeo() {
+  if (geo) return geo;
+  try {
+    geo = (await import("geoip-lite")).default;
+  } catch {
+    geo = null;
+  }
+  return geo;
+}
+
 function rows(result: any): any[] {
   return result?.rows ?? result ?? [];
 }
@@ -17,6 +28,7 @@ function parseDevice(ua: string): "mobile" | "tablet" | "desktop" {
 }
 
 function parseBrowser(ua: string): string {
+  if (/curl|headlesschrome|playwright|bot|spider|crawl|wget|postman/i.test(ua)) return "Bot/Crawler";
   if (/edg\//i.test(ua)) return "Edge";
   if (/opr\/|opera/i.test(ua)) return "Opera";
   if (/chrome\/\d/i.test(ua) && !/chromium/i.test(ua)) return "Chrome";
@@ -67,10 +79,16 @@ export const analyticsRouter = router({
       const ip = getClientIp(ctx.req);
       const referrer = input.referrer || null;
 
+      // Geo enrichment for SPA navigations
+      const geoLib = await getGeo();
+      const location = geoLib && ip !== "unknown" ? geoLib.lookup(ip) : null;
+
       try {
         await db.insert(analyticsEvents).values({
           sessionId: makeSessionId(ip, ua),
           ip: ip.slice(0, 50),
+          country: location?.country?.slice(0, 4) || null,
+          city: location?.city?.slice(0, 100) || null,
           userAgent: ua?.slice(0, 512) || null,
           device: parseDevice(ua),
           os: parseOS(ua),
@@ -91,14 +109,15 @@ export const analyticsRouter = router({
     const db = await getDb();
     if (!db) return null;
 
-    const [summaryRes, dailyRes, pagesRes, devicesRes, countriesRes, browsersRes, referrersRes] =
+    const [summaryRes, dailyRes, pagesRes, devicesRes, countriesRes, citiesRes, browsersRes, referrersRes] =
       await Promise.all([
 
         db.execute(sql`
           SELECT
-            COUNT(*)                        AS total_pageviews,
-            COUNT(DISTINCT "sessionId")     AS total_sessions,
-            COUNT(DISTINCT "ip")            AS unique_ips
+            SUM(CASE WHEN "browser" != 'Bot/Crawler' THEN 1 ELSE 0 END) AS total_pageviews,
+            COUNT(DISTINCT CASE WHEN "browser" != 'Bot/Crawler' THEN "sessionId" END) AS total_sessions,
+            COUNT(DISTINCT CASE WHEN "browser" != 'Bot/Crawler' THEN "ip" END) AS unique_ips,
+            SUM(CASE WHEN "browser" = 'Bot/Crawler' THEN 1 ELSE 0 END) AS bot_hits
           FROM "analyticsEvents"
           WHERE "createdAt" >= NOW() - INTERVAL '30 days'
             AND "eventType" = 'pageview'
@@ -113,6 +132,7 @@ export const analyticsRouter = router({
           FROM "analyticsEvents"
           WHERE "createdAt" >= NOW() - INTERVAL '30 days'
             AND "eventType" = 'pageview'
+            AND "browser" != 'Bot/Crawler'
           GROUP BY DATE("createdAt")
           ORDER BY date ASC
         `),
@@ -125,6 +145,7 @@ export const analyticsRouter = router({
           WHERE "createdAt" >= NOW() - INTERVAL '30 days'
             AND "eventType" = 'pageview'
             AND "page" IS NOT NULL
+            AND "browser" != 'Bot/Crawler'
           GROUP BY "page"
           ORDER BY views DESC
           LIMIT 10
@@ -136,6 +157,7 @@ export const analyticsRouter = router({
             COUNT(DISTINCT "sessionId")     AS sessions
           FROM "analyticsEvents"
           WHERE "createdAt" >= NOW() - INTERVAL '30 days'
+            AND "browser" != 'Bot/Crawler'
           GROUP BY "device"
           ORDER BY sessions DESC
         `),
@@ -146,7 +168,20 @@ export const analyticsRouter = router({
             COUNT(DISTINCT "ip")            AS visitors
           FROM "analyticsEvents"
           WHERE "createdAt" >= NOW() - INTERVAL '30 days'
+            AND "browser" != 'Bot/Crawler'
           GROUP BY "country"
+          ORDER BY visitors DESC
+          LIMIT 10
+        `),
+
+        db.execute(sql`
+          SELECT
+            COALESCE("city", 'Unknown')  AS city,
+            COUNT(DISTINCT "ip")         AS visitors
+          FROM "analyticsEvents"
+          WHERE "createdAt" >= NOW() - INTERVAL '30 days'
+            AND "browser" != 'Bot/Crawler'
+          GROUP BY "city"
           ORDER BY visitors DESC
           LIMIT 10
         `),
@@ -157,6 +192,7 @@ export const analyticsRouter = router({
             COUNT(DISTINCT "sessionId")     AS sessions
           FROM "analyticsEvents"
           WHERE "createdAt" >= NOW() - INTERVAL '30 days'
+            AND "browser" != 'Bot/Crawler'
           GROUP BY "browser"
           ORDER BY sessions DESC
         `),
@@ -168,6 +204,7 @@ export const analyticsRouter = router({
           FROM "analyticsEvents"
           WHERE "createdAt" >= NOW() - INTERVAL '30 days'
             AND "eventType" = 'pageview'
+            AND "browser" != 'Bot/Crawler'
           GROUP BY "referer"
           ORDER BY visits DESC
           LIMIT 8
@@ -181,6 +218,7 @@ export const analyticsRouter = router({
         totalPageviews: Number(s.total_pageviews ?? 0),
         totalSessions:  Number(s.total_sessions  ?? 0),
         uniqueVisitors: Number(s.unique_ips       ?? 0),
+        botHits:        Number(s.bot_hits         ?? 0),
       },
       daily: rows(dailyRes).map((r: any) => ({
         date:      String(r.date).slice(0, 10),
@@ -198,6 +236,10 @@ export const analyticsRouter = router({
       })),
       countries: rows(countriesRes).map((r: any) => ({
         country:  r.country as string,
+        visitors: Number(r.visitors),
+      })),
+      cities: rows(citiesRes).map((r: any) => ({
+        city:  r.city as string,
         visitors: Number(r.visitors),
       })),
       browsers: rows(browsersRes).map((r: any) => ({

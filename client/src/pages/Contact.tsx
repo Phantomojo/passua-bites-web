@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { PBNav, PBFooter } from "./Home";
 import { Link } from "wouter";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 export default function Contact() {
+  usePageMeta({ title: "Contact — Passua Bites", description: "Get in touch with Passua Bites. Visit us opposite Rainbow Resort in Ruiru, or reach out on WhatsApp." });
   const [formData, setFormData] = useState({
     name: "",
     email: "",

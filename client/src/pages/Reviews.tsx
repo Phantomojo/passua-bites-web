@@ -1,69 +1,43 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { PBNav, PBFooter } from "./Home";
 import { toast } from "sonner";
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { trpc } from "@/lib/trpc";
 
 export default function Reviews() {
-  const [reviews, setReviews] = useState<any[]>([]);
-  const [avgRating, setAvgRating] = useState({ average: 0, count: 0 });
-  const [isLoading, setIsLoading] = useState(true);
+  usePageMeta({ title: "Reviews — Passua Bites", description: "Read and leave reviews for Passua Bites. Share your experience with our Kenyan street food." });
+  const { data: reviews = [], isLoading } = trpc.reviews.list.useQuery();
+  const { data: avgRating = { average: 0, count: 0 } } = trpc.reviews.getAverageRating.useQuery({});
+  const utils = trpc.useUtils();
+
   const [formData, setFormData] = useState({
     customerName: "",
     rating: 5,
     reviewText: "",
   });
   const [submitted, setSubmitted] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetchReviews();
-  }, []);
-
-  const API_URL = "https://passua-api.onrender.com";
-
-  const fetchReviews = async () => {
-    setIsLoading(true);
-    try {
-      const [reviewsRes, ratingRes] = await Promise.all([
-        fetch(`${API_URL}/api/trpc/reviews.list`),
-        fetch(`${API_URL}/api/trpc/reviews.getAverageRating`),
-      ]);
-      const reviewsData = await reviewsRes.json();
-      const ratingData = await ratingRes.json();
-      setReviews(reviewsData.result?.data?.json || []);
-      setAvgRating(ratingData.result?.data?.json || { average: 0, count: 0 });
-    } catch {
-      toast.error("Failed to load reviews");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const createReview = trpc.reviews.create.useMutation({
+    onSuccess: () => {
+      setSubmitted(true);
+      toast.success("Review submitted! It will appear after moderation.");
+      setFormData({ customerName: "", rating: 5, reviewText: "" });
+      utils.reviews.list.invalidate();
+      utils.reviews.getAverageRating.invalidate();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to submit review");
+    },
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.customerName || formData.rating < 1) return;
-    setIsSubmitting(true);
-    try {
-      const res = await fetch(`${API_URL}/api/trpc/reviews.create`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          json: {
-            customerName: formData.customerName,
-            rating: formData.rating,
-            reviewText: formData.reviewText || undefined,
-          },
-        }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error.message);
-      setSubmitted(true);
-      toast.success("Review submitted! It will appear after moderation.");
-      setFormData({ customerName: "", rating: 5, reviewText: "" });
-    } catch (err: any) {
-      toast.error(err.message || "Failed to submit review");
-    } finally {
-      setIsSubmitting(false);
-    }
+    createReview.mutate({
+      customerName: formData.customerName,
+      rating: formData.rating,
+      reviewText: formData.reviewText || undefined,
+    });
   };
 
   return (
@@ -293,12 +267,12 @@ export default function Reviews() {
                 className="pb-btn-primary"
                 style={{
                   padding: "0.75rem",
-                  cursor: isSubmitting ? "not-allowed" : "pointer",
+                  cursor: createReview.isPending ? "not-allowed" : "pointer",
                   width: "100%",
-                  opacity: isSubmitting ? 0.6 : 1,
+                  opacity: createReview.isPending ? 0.6 : 1,
                 }}
               >
-                {isSubmitting ? "Submitting..." : "Submit Review"}
+                {createReview.isPending ? "Submitting..." : "Submit Review"}
               </button>
             </form>
           )}

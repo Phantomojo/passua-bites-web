@@ -4,6 +4,7 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch, useLocation } from "wouter";
 import { useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
+import { useAnalytics } from "@/hooks/useAnalytics";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
@@ -22,16 +23,22 @@ function SpaPageviewTracker() {
   const [location] = useLocation();
   const prev = useRef(location);
   const record = trpc.analytics.recordPageview.useMutation();
+  const { trackPageView } = useAnalytics();
 
   useEffect(() => {
     if (prev.current === location) return;
     prev.current = location;
+
+    // Backend tRPC analytics
     record.mutate({
       page: location,
       referrer: document.referrer || null,
       userAgent: navigator.userAgent || null,
     });
-  }, [location, record]);
+
+    // GA4 page view
+    trackPageView(location);
+  }, [location, record, trackPageView]);
 
   return null;
 }

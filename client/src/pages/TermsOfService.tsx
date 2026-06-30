@@ -1,7 +1,9 @@
 import { PBNav, PBFooter } from "./Home";
 import { Link } from "wouter";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 export default function TermsOfService() {
+  usePageMeta({ title: "Terms of Service — Passua Bites", description: "Terms of service for ordering from Passua Bites." });
   return (
     <div style={{ minHeight: "100vh", background: "var(--pb-bg)" }}>
       <PBNav />

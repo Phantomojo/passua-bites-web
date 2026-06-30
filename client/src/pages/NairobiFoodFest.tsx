@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { LazyImage } from "../LazyImage";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 const LOGO =
   "https://d2xsxph8kpxj0f.cloudfront.net/310519663257647439/2dcKibrZSdH6mbhicYbaoL/pasua_222967c7.jpeg";
@@ -154,6 +155,7 @@ function PBFooter() {
 }
 
 export default function NairobiFoodFest() {
+  usePageMeta({ title: "Nairobi Food Fest — Passua Bites", description: "Passua Bites at Nairobi Food Fest — come taste our award-winning smocha and chapo." });
   return (
     <div
       style={{

@@ -3,6 +3,8 @@ import { Link } from "wouter";
 import { PBNav, PBFooter } from "./Home";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { trackGA4Event } from "@/hooks/useAnalytics";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 interface CartItem {
   id: number;
@@ -12,6 +14,7 @@ interface CartItem {
 }
 
 export default function Checkout() {
+  usePageMeta({ title: "Checkout — Passua Bites", description: "Review your cart and pay with M-Pesa for delivery or pickup from Passua Bites in Ruiru." });
   const [cart, setCart] = useState<CartItem[]>([]);
   const [formData, setFormData] = useState({
     customerName: "",
@@ -113,6 +116,14 @@ export default function Checkout() {
     }
 
     setIsProcessing(true);
+
+    // GA4 begin_checkout
+    trackGA4Event("begin_checkout", {
+      currency: "KES",
+      value: cart.reduce((s, i) => s + i.price * i.quantity, 0),
+      items: cart.map(i => ({ item_id: String(i.id), item_name: i.name, price: i.price, quantity: i.quantity })),
+    });
+
     try {
       // Create order
       const orderResult = await createOrder.mutateAsync({
@@ -153,6 +164,14 @@ export default function Checkout() {
         // Cash payment - order confirmed
         toast.success("Order placed! Pay cash on delivery.");
       }
+
+      // Track purchase event
+      trackGA4Event("purchase", {
+        transaction_id: String(newOrderId),
+        currency: "KES",
+        value: grandTotal,
+        items: cart.map(i => ({ item_id: String(i.id), item_name: i.name, price: i.price, quantity: i.quantity })),
+      });
 
       // Clear cart
       localStorage.removeItem("passua_cart");

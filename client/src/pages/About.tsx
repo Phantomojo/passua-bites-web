@@ -1,11 +1,13 @@
 import { Link } from "wouter";
 import { PBNav, PBFooter } from "./Home";
 import { trpc } from "@/lib/trpc";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 const LOGO =
   "https://d2xsxph8kpxj0f.cloudfront.net/310519663257647439/2dcKibrZSdH6mbhicYbaoL/pasua_222967c7.jpeg";
 
 export default function About() {
+  usePageMeta({ title: "About — Passua Bites", description: "Learn the story behind Passua Bites — authentic Kenyan street food from Ruiru." });
   const { data: displacementMessage } = trpc.location.get.useQuery(undefined, {
     staleTime: 1000 * 60 * 5,
   });

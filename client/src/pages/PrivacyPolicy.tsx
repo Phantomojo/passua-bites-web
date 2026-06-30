@@ -1,7 +1,9 @@
 import { PBNav, PBFooter } from "./Home";
 import { Link } from "wouter";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 export default function PrivacyPolicy() {
+  usePageMeta({ title: "Privacy Policy — Passua Bites", description: "Privacy policy for Passua Bites. Learn how we handle your data." });
   return (
     <div style={{ minHeight: "100vh", background: "var(--pb-bg)" }}>
       <PBNav />

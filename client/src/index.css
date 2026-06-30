@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,400&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,400&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&family=Anton&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -653,5 +653,111 @@
     .pb-footer-col-title {
       font-size: 0.55rem;
     }
+  }
+}
+
+/* ===== MATATU STREET ENERGY ANIMATIONS ===== */
+
+@keyframes letter-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-40px) rotate(-8deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+}
+
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.7);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateY(-8px) scale(1);
+  }
+  100% {
+    opacity: 0.6;
+    transform: translateY(0) scale(0.95);
+  }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-letter-drop {
+  animation: letter-drop 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 14s linear infinite;
+}
+
+.animate-scroll {
+  animation: scroll 22s linear infinite;
+}
+
+/* Hero polaroid perspective */
+.perspective {
+  perspective: 1000px;
+}
+
+/* Hero mobile responsive */
+@media (max-width: 768px) {
+  .pb-hero-matatu {
+    grid-template-columns: 1fr !important;
+    min-height: auto !important;
+  }
+  .pb-hero-matatu .pb-hero-left {
+    padding: 3rem 1.5rem 2rem !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--pb-rule);
+  }
+  .pb-hero-matatu .pb-hero-right {
+    padding: 2rem 1.5rem 4rem !important;
+    justify-content: center !important;
+  }
+  .pb-hero-matatu .pb-hero-badge {
+    display: none !important;
+  }
+  .pb-hero-matatu .pb-hero-polaroid {
+    width: 260px !important;
+    margin: 0 auto;
+  }
+  .pb-hero-marquee {
+    bottom: 0 !important;
+    position: relative !important;
+  }
+  .pb-hero-hazard-top,
+  .pb-hero-hazard-bottom {
+    display: none !important;
   }
 }

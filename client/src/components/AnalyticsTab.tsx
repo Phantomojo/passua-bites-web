@@ -85,7 +85,7 @@ export default function AnalyticsTab() {
               <StatCard label="Unique Visitors" value={t?.summary.uniqueVisitors.toLocaleString() ?? "—"} sub="distinct IPs (30d)" />
               <StatCard label="Sessions" value={t?.summary.totalSessions.toLocaleString() ?? "—"} sub="daily session IDs" />
               <StatCard label="Pageviews" value={t?.summary.totalPageviews.toLocaleString() ?? "—"} sub="total page hits" />
-              <StatCard label="Top Country" value={t?.countries[0]?.country ?? "—"} sub={`${t?.countries[0]?.visitors ?? 0} visitors`} />
+              <StatCard label="Bot Hits" value={t?.summary.botHits.toLocaleString() ?? "0"} sub="automated probes" />
             </>
           )}
         </div>
@@ -167,7 +167,27 @@ export default function AnalyticsTab() {
           </Panel>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginTop: "1rem" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem", marginTop: "1rem" }}>
+          <Panel>
+            <div style={{ fontFamily: "'DM Mono',monospace", fontSize: "0.58rem", color: C.ivory3, marginBottom: "1rem", letterSpacing: "0.08em", textTransform: "uppercase" }}>Top Cities</div>
+            {loading ? <Skeleton h={120} /> : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                {(t?.cities ?? []).slice(0, 6).map((c, i) => {
+                  const max = t?.cities[0]?.visitors ?? 1;
+                  return (
+                    <div key={i}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "'DM Mono',monospace", fontSize: "0.6rem", marginBottom: "0.2rem" }}>
+                        <span style={{ color: C.ivory }}>{c.city}</span>
+                        <span style={{ color: C.ivory3 }}>{c.visitors}</span>
+                      </div>
+                      <div style={{ height: 3, background: C.rule2 }}><div style={{ height: "100%", width: `${(c.visitors / max) * 100}%`, background: C.ember2 }} /></div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Panel>
+
           <Panel>
             <div style={{ fontFamily: "'DM Mono',monospace", fontSize: "0.58rem", color: C.ivory3, marginBottom: "1rem", letterSpacing: "0.08em", textTransform: "uppercase" }}>Browsers</div>
             {loading ? <Skeleton h={120} /> : (

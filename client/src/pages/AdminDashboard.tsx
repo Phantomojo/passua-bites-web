@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import AnalyticsTab from "@/components/AnalyticsTab";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "var(--pb-ivory3)",
@@ -22,6 +23,7 @@ type Tab =
   | "analytics";
 
 export default function AdminDashboard() {
+  usePageMeta({ title: "Admin Dashboard — Passua Bites", description: "Passua Bites admin dashboard — manage orders, menu, reviews, and analytics." });
   const [token, setToken] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);

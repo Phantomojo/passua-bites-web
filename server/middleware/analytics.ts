@@ -39,6 +39,7 @@ function parseDevice(ua: string): "mobile" | "tablet" | "desktop" {
 }
 
 function parseBrowser(ua: string): string {
+  if (/curl|headlesschrome|playwright|bot|spider|crawl|wget|postman/i.test(ua)) return "Bot/Crawler";
   if (/edg\//i.test(ua)) return "Edge";
   if (/opr\/|opera/i.test(ua)) return "Opera";
   if (/chrome\/\d/i.test(ua) && !/chromium/i.test(ua)) return "Chrome";
@@ -60,7 +61,17 @@ const SKIP = [
   /^\/api\//,
   /^\/health$/,
   /^\/_vite\//,
-  /\.(js|css|map|png|jpg|jpeg|webp|svg|ico|woff|woff2|ttf|eot|json|txt)(\?.*)?$/i,
+  /^\/@vite\//,
+  /^\/@react-refresh/,
+  /^\/@id\//,
+  /^\/@fs\//,
+  /^\/node_modules\//,
+  /^\/src\//,
+  /^\/__manus__\//,
+  /^\/favicon\./,
+  /^\/robots\.txt$/,
+  /^\/sitemap\.xml$/,
+  /\.(js|css|map|png|jpg|jpeg|webp|svg|ico|woff|woff2|ttf|eot|json|txt|mp4|webm|avi|mov|ogv)(\?.*)?$/i,
 ];
 
 export function analyticsMiddleware(
@@ -68,6 +79,7 @@ export function analyticsMiddleware(
   _res: Response,
   next: NextFunction
 ) {
+  const ua = req.headers["user-agent"] || "";
   if (req.method !== "GET" || SKIP.some(p => p.test(req.path))) {
     return next();
   }
