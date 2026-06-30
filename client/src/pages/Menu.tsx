@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { PBNav, PBFooter } from "./Home";
 import { trpc } from "@/lib/trpc";
+import { trackGA4Event } from "@/hooks/useAnalytics";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 function MediaPreview({ item }: { item: any }) {
   const [isMuted, setIsMuted] = useState(true);
@@ -283,11 +285,9 @@ function MediaPreview({ item }: { item: any }) {
           <div
             style={{
               position: "relative",
-              maxWidth: "90vw",
+              maxWidth: "min(90vw, 800px)",
               maxHeight: "90vh",
               width: "auto",
-              width: "800px",
-              maxWidth: "100%",
             }}
             onClick={e => e.stopPropagation()}
           >
@@ -372,6 +372,20 @@ function MediaPreview({ item }: { item: any }) {
 const LOGO =
   "https://d2xsxph8kpxj0f.cloudfront.net/310519663257647439/2dcKibrZSdH6mbhicYbaoL/pasua_222967c7.jpeg";
 
+const CLOUD =
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663257647439/2dcKibrZSdH6mbhicYbaoL";
+
+const FALLBACK_MENU = [
+  { id: 1, name: "Passua Smocha", category: "Smoshas", price: 110, description: "Chapati, beef smokie, kachumbari, indomie, avocado, seasoned with sauces", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: "/media/videos/Pasuasmocha.mp4" },
+  { id: 2, name: "Zigizaga", category: "Smoshas", price: 140, description: "Chapati, beef smokie, kachumbari, indomie, avocado, topped with a boiled egg, seasoned with sauces", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: "/media/videos/zigizaga.mp4" },
+  { id: 3, name: "Burger", category: "Burgers", price: 150, description: "Buns, lettuce, sliced kachumbari, sauces, beef pattie", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: null },
+  { id: 4, name: "Masala Chips", category: "Sides", price: 150, description: "Crunchy outside, soft inside fries, well marinated — spicy or non-spicy", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: null },
+  { id: 5, name: "Hot Blazer", category: "Specials", price: 200, description: "Two chapatis (wrapped), lettuce, kachumbari, boerewors, indomie, avocado, gravy sauce", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: null },
+  { id: 6, name: "Sultan", category: "Combos", price: 270, description: "Two chapatis (wrapped), lettuce, kachumbari, one beef pattie, masala chips, avocado, sauces — comes with a soda", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: "/media/videos/Sultan.mp4" },
+  { id: 7, name: "Pasua Corn", category: "Sides", price: 300, description: "One beef burger + masala chips (spicy or non-spicy)", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: null },
+  { id: 8, name: "Mega Sultan", category: "Combos", price: 560, description: "Two chapatis (wrapped), lettuce, kachumbari, two beef patties, cheese, masala chips, avocado, sauces — comes with a soda", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: "/media/videos/megasultan.mp4" },
+];
+
 interface CartItem {
   id: number;
   name: string;
@@ -383,7 +397,9 @@ interface CartItem {
 }
 
 export default function Menu() {
-  const { data: menuItems = [], isLoading, error } = trpc.menu.list.useQuery();
+  usePageMeta({ title: "Menu — Passua Bites", description: "Browse our full menu of Kenyan street food: smocha, chapati, ndengu, viazi karai, and ice-cold drinks." });
+  const { data: apiItems, isLoading, error } = trpc.menu.list.useQuery();
+  const menuItems = (apiItems && apiItems.length > 0) ? apiItems : FALLBACK_MENU;
 
   const [cart, setCart] = useState<CartItem[]>(() => {
     const stored = localStorage.getItem("passua_cart");
@@ -415,10 +431,21 @@ export default function Menu() {
     };
     setCart(prev => {
       const existing = prev.find(c => c.id === item.id);
-      if (existing)
+      if (existing) {
+        trackGA4Event("add_to_cart", {
+          currency: "KES",
+          value: item.price,
+          items: [{ item_id: String(item.id), item_name: item.name, price: item.price, quantity: 1 }],
+        });
         return prev.map(c =>
           c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c
         );
+      }
+      trackGA4Event("add_to_cart", {
+        currency: "KES",
+        value: item.price,
+        items: [{ item_id: String(item.id), item_name: item.name, price: item.price, quantity: 1 }],
+      });
       return [...prev, cartItem];
     });
   };
@@ -844,43 +871,83 @@ export default function Menu() {
                   <div
                     key={item.id}
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
                       paddingBottom: "0.75rem",
                       borderBottom: "1px solid var(--pb-rule2)",
                     }}
                   >
-                    <div>
-                      <div
-                        style={{
-                          fontSize: "0.85rem",
-                          color: "var(--pb-ivory)",
-                          fontWeight: 400,
-                        }}
-                      >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.4rem" }}>
+                      <div style={{ fontSize: "0.85rem", color: "var(--pb-ivory)", fontWeight: 400 }}>
                         {item.name}
                       </div>
-                      <div
+                      <button
+                        onClick={() => setCart(prev => prev.filter(c => c.id !== item.id))}
                         style={{
-                          fontFamily: "'DM Mono',monospace",
-                          fontSize: "0.62rem",
+                          background: "none",
+                          border: "none",
                           color: "var(--pb-ivory3)",
-                          marginTop: "0.15rem",
+                          cursor: "pointer",
+                          fontSize: "0.8rem",
+                          padding: "0.15rem 0.3rem",
+                          lineHeight: 1,
+                          opacity: 0.6,
+                          transition: "opacity 0.15s",
                         }}
+                        onMouseOver={e => (e.currentTarget.style.opacity = "1")}
+                        onMouseOut={e => (e.currentTarget.style.opacity = "0.6")}
+                        aria-label={`Remove ${item.name}`}
                       >
-                        x{item.quantity}
-                      </div>
+                        ✕
+                      </button>
                     </div>
-                    <div
-                      style={{
-                        fontFamily: "'Playfair Display',serif",
-                        fontSize: "1rem",
-                        fontWeight: 700,
-                        color: "var(--pb-ember)",
-                      }}
-                    >
-                      Ksh {item.price * item.quantity}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <button
+                          onClick={() => updateQty(item.id, item.quantity - 1)}
+                          style={{
+                            background: "var(--pb-rule2)",
+                            border: "none",
+                            color: "var(--pb-ivory2)",
+                            cursor: "pointer",
+                            width: "1.4rem",
+                            height: "1.4rem",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "0.7rem",
+                            padding: 0,
+                            lineHeight: 1,
+                          }}
+                          aria-label={`Decrease quantity of ${item.name}`}
+                        >
+                          −
+                        </button>
+                        <span style={{ fontFamily: "'DM Mono',monospace", fontSize: "0.7rem", color: "var(--pb-ivory)", minWidth: "1rem", textAlign: "center" }}>
+                          {item.quantity}
+                        </span>
+                        <button
+                          onClick={() => updateQty(item.id, item.quantity + 1)}
+                          style={{
+                            background: "var(--pb-rule2)",
+                            border: "none",
+                            color: "var(--pb-ivory2)",
+                            cursor: "pointer",
+                            width: "1.4rem",
+                            height: "1.4rem",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "0.7rem",
+                            padding: 0,
+                            lineHeight: 1,
+                          }}
+                          aria-label={`Increase quantity of ${item.name}`}
+                        >
+                          +
+                        </button>
+                      </div>
+                      <div style={{ fontFamily: "'Playfair Display',serif", fontSize: "1rem", fontWeight: 700, color: "var(--pb-ember)" }}>
+                        Ksh {item.price * item.quantity}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -922,18 +989,40 @@ export default function Menu() {
                   </span>
                 </div>
               </div>
-              <button
-                onClick={handleCheckout}
-                className="pb-btn-primary"
-                style={{
-                  width: "100%",
-                  display: "block",
-                  textAlign: "center",
-                  padding: "0.75rem",
-                }}
-              >
-                Checkout
-              </button>
+              <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem" }}>
+                <button
+                  onClick={handleCheckout}
+                  className="pb-btn-primary"
+                  style={{
+                    flex: 1,
+                    display: "block",
+                    textAlign: "center",
+                    padding: "0.75rem",
+                  }}
+                >
+                  Checkout
+                </button>
+                <button
+                  onClick={() => setCart([])}
+                  style={{
+                    background: "none",
+                    border: "1px solid var(--pb-rule2)",
+                    color: "var(--pb-ivory3)",
+                    cursor: "pointer",
+                    padding: "0.75rem 0.6rem",
+                    fontSize: "0.6rem",
+                    fontFamily: "'DM Mono',monospace",
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    whiteSpace: "nowrap",
+                    transition: "color 0.15s, border-color 0.15s",
+                  }}
+                  onMouseOver={e => { e.currentTarget.style.color = "var(--pb-ember)"; e.currentTarget.style.borderColor = "var(--pb-ember)"; }}
+                  onMouseOut={e => { e.currentTarget.style.color = "var(--pb-ivory3)"; e.currentTarget.style.borderColor = "var(--pb-rule2)"; }}
+                >
+                  Clear
+                </button>
+              </div>
               <div
                 style={{
                   marginTop: "0.75rem",
