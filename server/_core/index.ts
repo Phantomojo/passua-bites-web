@@ -8,10 +8,11 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { getDb } from "../db";
-import { analyticsMiddleware } from "../middleware/analytics";
 import { orders, mpesaTransactions } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 import rateLimit from "express-rate-limit";
+import pinoHttp from "pino-http";
+import { logger } from "../logger";
 
 // Security: Rate limiting
 const generalLimiter = rateLimit({
@@ -28,6 +29,18 @@ const orderLimiter = rateLimit({
   message: { error: "Too many orders, please slow down" },
   standardHeaders: true,
   legacyHeaders: false,
+});
+
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  message: { error: "Too many authentication attempts, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, res) => {
+    res.setHeader("Retry-After", "60");
+    res.status(429).json({ error: "Too many authentication attempts, please try again later" });
+  },
 });
 
 // Security: Security headers middleware
@@ -69,10 +82,11 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+  app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === "/health" } }));
+
   // Security middleware
   app.use(securityHeaders);
   app.use("/api/", generalLimiter); // Apply rate limiting to API routes
-  app.use(analyticsMiddleware);
 
   // CORS for cross-origin requests (Vercel frontend)
   app.use((req, res, next) => {
@@ -97,7 +111,7 @@ async function startServer() {
     try {
       const { Body } = req.body;
       if (!Body || !Body.stkCallback) {
-        console.error("[M-Pesa] Invalid callback payload");
+        logger.error("[M-Pesa] Invalid callback payload");
         return;
       }
 
@@ -106,7 +120,7 @@ async function startServer() {
 
       const db = await getDb();
       if (!db) {
-        console.error("[M-Pesa] Database not available for callback");
+        logger.error("[M-Pesa] Database not available for callback");
         return;
       }
 
@@ -119,7 +133,7 @@ async function startServer() {
         .execute();
 
       if (tx.length === 0) {
-        console.error("[M-Pesa] Transaction not found:", CheckoutRequestID);
+        logger.error({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Transaction not found");
         return;
       }
 
@@ -140,7 +154,7 @@ async function startServer() {
           .set({ paymentStatus: "failed" })
           .where(eq(orders.id, tx[0].orderId));
 
-        console.log(`[M-Pesa] Payment ${status}:`, CheckoutRequestID);
+        logger.info({ status, checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Payment processed");
         return;
       }
 
@@ -154,20 +168,13 @@ async function startServer() {
 
       // Idempotency check
       if (tx[0].status === "completed") {
-        console.log(
-          "[M-Pesa] Duplicate callback, skipping:",
-          CheckoutRequestID
-        );
+        logger.info({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Duplicate callback, skipping");
         return;
       }
 
       // Validate amount
       if (Number(Amount) !== Number(tx[0].amount)) {
-        console.error("[M-Pesa] Amount mismatch:", {
-          expected: tx[0].amount,
-          received: Amount,
-          orderId: tx[0].orderId,
-        });
+        logger.error({ expected: tx[0].amount, received: Amount, orderId: tx[0].orderId }, "[M-Pesa] Amount mismatch");
         return;
       }
 
@@ -191,13 +198,9 @@ async function startServer() {
         })
         .where(eq(orders.id, tx[0].orderId));
 
-      console.log("[M-Pesa] Payment confirmed:", {
-        orderId: tx[0].orderId,
-        receipt: MpesaReceiptNumber,
-        amount: Amount,
-      });
+      logger.info({ orderId: tx[0].orderId, receipt: MpesaReceiptNumber, amount: Amount }, "[M-Pesa] Payment confirmed");
     } catch (error) {
-      console.error("[M-Pesa] Callback processing error:", error);
+      logger.error({ err: error }, "[M-Pesa] Callback processing error");
     }
   });
 
@@ -223,6 +226,15 @@ async function startServer() {
       createContext,
     })
   );
+  app.use(
+    "/api/trpc/admin.login",
+    authLimiter,
+    createExpressMiddleware({
+      router: appRouter,
+      createContext,
+    })
+  );
+
   // Other API routes with general limit
   app.use(
     "/api/trpc",
@@ -242,12 +254,12 @@ async function startServer() {
   const port = await findAvailablePort(preferredPort);
 
   if (port !== preferredPort) {
-    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
+    logger.info({ preferredPort, port }, "Port busy, using alternative");
   }
 
   server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
+    logger.info({ port }, "Server running");
   });
 }
 
-startServer().catch(console.error);
+startServer().catch((err) => logger.fatal({ err }, "Server failed to start"));

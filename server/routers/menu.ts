@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { publicProcedure, adminProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
+import { logger } from "../logger";
 import { menuItems } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 
@@ -98,7 +99,7 @@ export const menuRouter = router({
   list: publicProcedure.query(async () => {
     const db = await getDb();
     if (!db) {
-      console.log("[Menu] Using fallback menu (DB unavailable)");
+      logger.info("[Menu] Using fallback menu (DB unavailable)");
       return FALLBACK_MENU;
     }
     const items = await db
@@ -107,7 +108,7 @@ export const menuRouter = router({
       .where(eq(menuItems.available, 1))
       .execute();
     if (items.length === 0) {
-      console.log("[Menu] Using fallback menu (DB empty)");
+      logger.info("[Menu] Using fallback menu (DB empty)");
       return FALLBACK_MENU;
     }
     return items;

@@ -30,7 +30,21 @@ const generalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  message: { error: "Too many authentication attempts, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, res) => {
+    res.setHeader("Retry-After", "60");
+    res.status(429).json({ error: "Too many authentication attempts, please try again later" });
+  },
+});
+
 app.use("/api/", generalLimiter);
+app.use("/api/trpc/admin.login", authLimiter);
 
 // CORS for cross-origin requests
 app.use((req, res, next) => {

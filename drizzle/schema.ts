@@ -1,5 +1,6 @@
 import {
   decimal,
+  index,
   serial,
   pgTable,
   text,
@@ -67,7 +68,7 @@ export const orders = pgTable("orders", {
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (t) => [index("idx_orders_userId").on(t.userId)]);
 
 export type Order = typeof orders.$inferSelect;
 export type InsertOrder = typeof orders.$inferInsert;
@@ -138,7 +139,7 @@ export const mpesaTransactions = pgTable("mpesaTransactions", {
   resultDesc: text("resultDesc"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-});
+}, (t) => [index("idx_mpesaTransactions_orderId").on(t.orderId)]);
 
 export type MpesaTransaction = typeof mpesaTransactions.$inferSelect;
 export type InsertMpesaTransaction = typeof mpesaTransactions.$inferInsert;

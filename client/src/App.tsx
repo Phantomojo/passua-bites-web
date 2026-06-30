@@ -22,21 +22,21 @@ import NairobiFoodFest from "./pages/NairobiFoodFest";
 function SpaPageviewTracker() {
   const [location] = useLocation();
   const prev = useRef(location);
+  const hasMounted = useRef(false);
   const record = trpc.analytics.recordPageview.useMutation();
   const { trackPageView } = useAnalytics();
 
   useEffect(() => {
-    if (prev.current === location) return;
+    if (hasMounted.current && prev.current === location) return;
+    hasMounted.current = true;
     prev.current = location;
 
-    // Backend tRPC analytics
     record.mutate({
       page: location,
       referrer: document.referrer || null,
       userAgent: navigator.userAgent || null,
     });
 
-    // GA4 page view
     trackPageView(location);
   }, [location, record, trackPageView]);
 
