@@ -4,6 +4,7 @@ import { PBNav, PBFooter } from "./Home";
 import { trpc } from "@/lib/trpc";
 import { trackGA4Event } from "@/hooks/useAnalytics";
 import { usePageMeta } from "@/hooks/usePageMeta";
+import { useLazyMedia } from "@/hooks/useLazyMedia";
 
 function MediaPreview({ item }: { item: any }) {
   const [isMuted, setIsMuted] = useState(true);
@@ -12,6 +13,7 @@ function MediaPreview({ item }: { item: any }) {
   const [showModal, setShowModal] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const modalVideoRef = useRef<HTMLVideoElement>(null);
+  const [mediaContainerRef, shouldLoadMedia] = useLazyMedia<HTMLDivElement>();
 
   useEffect(() => {
     if (videoRef.current) {
@@ -20,20 +22,21 @@ function MediaPreview({ item }: { item: any }) {
   }, [isMuted]);
 
   useEffect(() => {
-    if (videoRef.current) {
-      isPaused ? videoRef.current.pause() : videoRef.current.play();
-    }
-  }, [isPaused]);
+    if (!shouldLoadMedia || !videoRef.current) return;
+    if (isPaused) videoRef.current.pause();
+    else void videoRef.current.play().catch(() => undefined);
+  }, [isPaused, shouldLoadMedia]);
 
   useEffect(() => {
     if (showModal && modalVideoRef.current) {
-      modalVideoRef.current.play();
+      void modalVideoRef.current.play().catch(() => undefined);
     }
   }, [showModal]);
 
   return (
     <>
       <div
+        ref={mediaContainerRef}
         style={{
           height: 240,
           overflow: "hidden",
@@ -49,9 +52,9 @@ function MediaPreview({ item }: { item: any }) {
           <>
             <video
               ref={videoRef}
-              src={item.videoUrl}
+              src={shouldLoadMedia ? item.videoUrl : undefined}
               poster={item.imageUrl || undefined}
-              autoPlay
+              autoPlay={shouldLoadMedia}
               loop
               muted={isMuted}
               playsInline
@@ -201,6 +204,9 @@ function MediaPreview({ item }: { item: any }) {
               <img
                 src={item.imageUrl}
                 alt={item.name || "Food item"}
+                width={640}
+                height={480}
+                sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 33vw"
                 loading="lazy"
                 decoding="async"
                 className="pb-food-img"
@@ -398,7 +404,11 @@ interface CartItem {
 
 export default function Menu() {
   usePageMeta({ title: "Menu — Passua Bites", description: "Browse our full menu of Kenyan street food: smocha, chapati, ndengu, viazi karai, and ice-cold drinks." });
-  const { data: apiItems, isLoading, error } = trpc.menu.list.useQuery();
+  const { data: apiItems, isLoading, error } = trpc.menu.list.useQuery(undefined, {
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: 1,
+  });
   const menuItems = (apiItems && apiItems.length > 0) ? apiItems : FALLBACK_MENU;
 
   const [cart, setCart] = useState<CartItem[]>(() => {
