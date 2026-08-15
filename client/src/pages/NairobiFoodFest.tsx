@@ -1,666 +1,337 @@
-import { useState } from "react";
 import { Link } from "wouter";
 import { LazyImage } from "../LazyImage";
 import { usePageMeta } from "@/hooks/usePageMeta";
+import { PBNav, PBFooter } from "./Home";
 
-const LOGO =
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663257647439/2dcKibrZSdH6mbhicYbaoL/pasua_222967c7.jpeg";
+const EVENT = {
+  name: "Nairobi Street Food Festival",
+  edition: "11th Edition — Playtime",
+  date: "8 August 2026",
+  venue: "ASK Arena, Jamhuri Showground",
+  hours: "Morning until late",
+};
 
-function PBNav() {
-  const [menuOpen, setMenuOpen] = useState(false);
-  return (
-    <nav className="pb-nav">
-      <Link href="/" className="pb-nav-logo">
-        <div className="pb-nav-ring">
-          <img src={LOGO} alt="Passua Bites" />
-        </div>
-        <span className="pb-nav-brand">Passua Bites</span>
-      </Link>
-      <button
-        className="pb-hamburger"
-        style={{ display: "none" }}
-        onClick={() => setMenuOpen(!menuOpen)}
-        aria-label="Toggle menu"
-      >
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          {menuOpen ? (
-            <path d="M18 6L6 18M6 6l12 12" />
-          ) : (
-            <path d="M3 6h18M3 12h18M3 18h18" />
-          )}
-        </svg>
-      </button>
-      <div className={`pb-nav-links${menuOpen ? " open" : ""}`}>
-        <Link href="/menu" className="pb-nl">
-          Menu
-        </Link>
-        <Link href="/about" className="pb-nl">
-          About
-        </Link>
-        <Link
-          href="/nairobi-food-fest"
-          className="pb-nl"
-          style={{ color: "#FF8C00", fontWeight: "bold" }}
-        >
-          Nairobi Fest
-        </Link>
-        <Link href="/contact" className="pb-nl">
-          Contact
-        </Link>
-        <Link href="/menu" className="pb-btn-primary">
-          Order Now
-        </Link>
-      </div>
-    </nav>
-  );
-}
+const SOURCES = [
+  {
+    label: "Event guide",
+    href: "https://nairobieventsguide.com/event/nairobi-street-food-festival-playtime-edition/",
+  },
+  {
+    label: "Capital FM recap",
+    href: "https://capitalfm.africa/flavor-fashion-and-games-why-the-nairobi-street-food-festival-was-the-ultimate-weekend-hangout/",
+  },
+  {
+    label: "Passua Bites’ festival post",
+    href: "https://www.instagram.com/passuabites/reel/Dbqe6TkOfYN/",
+  },
+];
 
-function PBFooter() {
-  return (
-    <footer
-      className="pb-footer"
-      style={{ borderTop: "1px solid rgba(255, 140, 0, 0.2)" }}
-    >
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: "2rem",
-          padding: "2.5rem",
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontFamily: "'Playfair Display',serif",
-              fontSize: "1.2rem",
-              fontWeight: 700,
-              color: "var(--pb-ivory)",
-              marginBottom: "0.5rem",
-            }}
-          >
-            Passua Bites
-          </div>
-          <p
-            style={{
-              fontSize: "0.78rem",
-              color: "var(--pb-ivory3)",
-              lineHeight: 1.65,
-            }}
-          >
-            Celebrating the flavors of Nairobi, one bite at a time. Thank you
-            for making the Nairobi Street Food Festival 2026 unforgettable!
-          </p>
-        </div>
-        <div>
-          <div className="pb-footer-col-title" style={{ color: "#FF8C00" }}>
-            Follow the Vibe
-          </div>
-          <a
-            href="https://www.instagram.com/passuabites/"
-            className="pb-footer-link"
-          >
-            Instagram
-          </a>
-          <a
-            href="https://www.tiktok.com/@passuabites001"
-            className="pb-footer-link"
-          >
-            TikTok
-          </a>
-          <a
-            href="https://youtube.com/@passuabites?si=_QYhenyVQvo73eG4"
-            className="pb-footer-link"
-          >
-            YouTube
-          </a>
-        </div>
-        <div>
-          <div className="pb-footer-col-title" style={{ color: "#32CD32" }}>
-            Contact
-          </div>
-          <span className="pb-footer-link">Opp Rainbow Resort, Ruiru</span>
-          <a href="tel:0722473873" className="pb-footer-link">
-            0722 473 873
-          </a>
-        </div>
-      </div>
-      <div
-        style={{
-          padding: "1rem 2.5rem",
-          borderTop: "1px solid rgba(255, 140, 0, 0.1)",
-          textAlign: "center",
-        }}
-      >
-        <span
-          style={{
-            fontFamily: "'DM Mono',monospace",
-            fontSize: "0.58rem",
-            color: "var(--pb-ivory3)",
-            opacity: 0.5,
-          }}
-        >
-          © 2026 Passua Bites x Nairobi Food Fest
-        </span>
-      </div>
-    </footer>
-  );
+const eventDetails = [
+  { label: "Edition", value: "11th · Playtime" },
+  { label: "Date", value: EVENT.date },
+  { label: "Venue", value: EVENT.venue },
+  { label: "Format", value: "Food · music · games · community" },
+];
+
+const recapCards = [
+  {
+    index: "01",
+    title: "The stall came with us",
+    text: "Passua Bites took its Ruiru street-food spirit to Nairobi with the team, the counter, and the flavours that make a smocha stop feel like home.",
+    accent: "#FF6B1A",
+  },
+  {
+    index: "02",
+    title: "Playtime meant movement",
+    text: "The festival brought together food vendors, DJs, interactive games, street style, and a crowd ready to move between bites and new experiences.",
+    accent: "#FF8C42",
+  },
+  {
+    index: "03",
+    title: "A dry-day memory",
+    text: "Unlike the previous edition, there was no rain to plan around this time. Open ground, clean movement, and a full day to enjoy the stall made the difference.",
+    accent: "#E8C99B",
+  },
+];
+
+function Arrow() {
+  return <span aria-hidden="true" style={{ fontSize: "1.1em" }}>→</span>;
 }
 
 export default function NairobiFoodFest() {
-  usePageMeta({ title: "Nairobi Food Fest — Passua Bites", description: "Passua Bites at Nairobi Food Fest — come taste our award-winning smocha and chapo." });
+  usePageMeta({
+    title: "Nairobi Street Food Festival — Passua Bites",
+    description:
+      "Passua Bites at the Nairobi Street Food Festival Playtime Edition on 8 August 2026 at ASK Arena, Jamhuri Showground.",
+  });
+
   return (
-    <div
-      style={{
-        background: "var(--pb-bg)",
-        minHeight: "100vh",
-        color: "var(--pb-ivory)",
-      }}
-    >
+    <div style={{ minHeight: "100vh", background: "var(--pb-bg)", color: "var(--pb-ivory)" }}>
       <PBNav />
 
-      {/* Hero Section - Rainy Vibes & Fireworks */}
-      <section
-        style={{
-          padding: "8rem 2.5rem 6rem",
-          textAlign: "center",
-          background:
-            "linear-gradient(rgba(13, 9, 6, 0.7), rgba(13, 9, 6, 0.9)), url('/media/images/fireworks-rain.jpg') center/cover",
-          borderBottom: "4px solid #FF8C00",
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
-        {/* Rainy Overlay Effect */}
-        <div
+      <main>
+        <section
           style={{
-            position: "absolute",
-            inset: 0,
-            pointerEvents: "none",
+            position: "relative",
+            overflow: "hidden",
+            padding: "clamp(5rem, 12vw, 9rem) 2.5rem clamp(4rem, 9vw, 7rem)",
             background:
-              "url('https://www.transparenttextures.com/patterns/stardust.png')",
-            opacity: 0.2,
-          }}
-        ></div>
-
-        <div
-          className="pb-eyebrow"
-          style={{ color: "#FF8C00", justifyContent: "center" }}
-        >
-          10th Edition Recap
-        </div>
-        <h1
-          style={{
-            fontSize: "clamp(2.5rem, 8vw, 4.5rem)",
-            marginBottom: "1.5rem",
-            textShadow: "0 4px 12px rgba(0,0,0,0.5)",
-          }}
-        >
-          Rain, Mud & <span style={{ color: "#FF8C00" }}>Pure Magic</span>
-        </h1>
-        <p
-          style={{
-            maxWidth: "750px",
-            margin: "0 auto 2.5rem",
-            fontSize: "1.2rem",
-            color: "#f2e8d8",
-            lineHeight: "1.6",
-            textShadow: "0 2px 4px rgba(0,0,0,0.3)",
-          }}
-        >
-          The rain came down, the mud got deep, and the cold was real—but
-          Nairobi, you didn't miss a beat! We danced, we vibed, and we ate the
-          best street food in the city under the fireworks.
-        </p>
-        <div
-          style={{
-            display: "flex",
-            gap: "1rem",
-            justifyContent: "center",
-            flexWrap: "wrap",
-          }}
-        >
-          <Link
-            href="/menu"
-            className="pb-btn-primary"
-            style={{ background: "#FF8C00" }}
-          >
-            Craving a Smocha? Order Now
-          </Link>
-          <a
-            href="#artists"
-            className="pb-btn-ghost"
-            style={{ borderColor: "#32CD32", color: "#32CD32" }}
-          >
-            The Artist Lineup
-          </a>
-        </div>
-      </section>
-
-      {/* Street Style Illustrations Section */}
-      <section
-        style={{
-          padding: "4rem 2.5rem",
-          background: "rgba(255, 140, 0, 0.03)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            gap: "4rem",
-            flexWrap: "wrap",
-            maxWidth: "1000px",
-            margin: "0 auto",
-          }}
-        >
-          <div style={{ textAlign: "center", maxWidth: "300px" }}>
-            <LazyImage
-              src="/media/images/festival-doodle-1.png"
-              webpSrc="/media/images/festival-doodle-1.webp"
-              alt="Smocha Doodle"
-              width={180}
-              height={180}
-              style={{
-                width: "180px",
-                marginBottom: "1.5rem",
-                filter: "drop-shadow(0 10px 15px rgba(0,0,0,0.3))",
-              }}
-            />
-            <h3 style={{ color: "#FF8C00" }}>Hot Food, Cold Rain</h3>
-            <p style={{ fontSize: "0.9rem", color: "var(--pb-ivory2)" }}>
-              Nothing beats a steaming Hot Blazer when the rain is pouring and
-              the vibes are high.
-            </p>
-          </div>
-          <div style={{ textAlign: "center", maxWidth: "300px" }}>
-            <LazyImage
-              src="/media/images/festival-doodle-2.png"
-              webpSrc="/media/images/festival-doodle-2.webp"
-              alt="Dancing Doodle"
-              width={180}
-              height={180}
-              style={{
-                width: "180px",
-                marginBottom: "1.5rem",
-                filter: "drop-shadow(0 10px 15px rgba(0,0,0,0.3))",
-              }}
-            />
-            <h3 style={{ color: "#32CD32" }}>Dancing in the Mud</h3>
-            <p style={{ fontSize: "0.9rem", color: "var(--pb-ivory2)" }}>
-              Shoutout to everyone who kept the energy up and the dance floor
-              moving through the storm!
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Artist Shoutout Section */}
-      <section
-        id="artists"
-        style={{ padding: "6rem 2.5rem", maxWidth: "1100px", margin: "0 auto" }}
-      >
-        <div className="pb-eyebrow" style={{ color: "#32CD32" }}>
-          The Sound of the Fest
-        </div>
-        <h2 style={{ marginBottom: "3rem" }}>
-          Who Kept Us <span style={{ color: "#32CD32" }}>Vibing</span>
-        </h2>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: "2rem",
+              "radial-gradient(circle at 78% 22%, rgba(255,107,26,0.24), transparent 27%), linear-gradient(135deg, #160d08 0%, var(--pb-bg) 52%, #21150f 100%)",
+            borderBottom: "1px solid rgba(255,107,26,0.35)",
           }}
         >
           <div
+            aria-hidden="true"
             style={{
-              padding: "2.5rem",
-              background: "var(--pb-bg2)",
-              border: "1px solid rgba(50, 205, 50, 0.2)",
+              position: "absolute",
+              inset: 0,
+              opacity: 0.25,
+              backgroundImage:
+                "linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)",
+              backgroundSize: "44px 44px",
+              maskImage: "linear-gradient(to bottom, black, transparent)",
+            }}
+          />
+          <div
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              right: "-7rem",
+              top: "-7rem",
+              width: "24rem",
+              height: "24rem",
+              border: "1px solid rgba(255,140,66,0.35)",
+              borderRadius: "50%",
+              animation: "spin-slow 24s linear infinite",
+            }}
+          />
+
+          <div
+            className="pb-grid-mobile"
+            style={{
               position: "relative",
-              overflow: "hidden",
+              zIndex: 1,
+              display: "grid",
+              gridTemplateColumns: "1.08fr 0.92fr",
+              gap: "4rem",
+              alignItems: "center",
+              maxWidth: 1180,
+              margin: "0 auto",
             }}
           >
-            <div
-              style={{
-                position: "absolute",
-                top: "-10px",
-                right: "-10px",
-                fontSize: "4rem",
-                opacity: 0.1,
-                color: "#32CD32",
-              }}
-            >
-              ♫
-            </div>
-            <h3 style={{ fontSize: "1.8rem", marginBottom: "0.5rem" }}>
-              Watendawili
-            </h3>
-            <p
-              style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: "0.75rem",
-                color: "#32CD32",
-                textTransform: "uppercase",
-                marginBottom: "1.5rem",
-              }}
-            >
-              Live Performance
-            </p>
-            <p
-              style={{
-                fontSize: "0.95rem",
-                color: "var(--pb-ivory2)",
-                lineHeight: "1.6",
-              }}
-            >
-              The cinematic experience we were promised! Their performance
-              through the rain was legendary.
-            </p>
-          </div>
-          <div
-            style={{
-              padding: "2.5rem",
-              background: "var(--pb-bg2)",
-              border: "1px solid rgba(255, 140, 0, 0.2)",
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                position: "absolute",
-                top: "-10px",
-                right: "-10px",
-                fontSize: "4rem",
-                opacity: 0.1,
-                color: "#FF8C00",
-              }}
-            >
-              🎧
-            </div>
-            <h3 style={{ fontSize: "1.8rem", marginBottom: "0.5rem" }}>
-              DJ Joe Mfalme
-            </h3>
-            <p
-              style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: "0.75rem",
-                color: "#FF8C00",
-                textTransform: "uppercase",
-                marginBottom: "1.5rem",
-              }}
-            >
-              The Deck Master
-            </p>
-            <p
-              style={{
-                fontSize: "0.95rem",
-                color: "var(--pb-ivory2)",
-                lineHeight: "1.6",
-              }}
-            >
-              Keeping the LOUD and nonstop energy alive all night long. The
-              dance floor had no breaks!
-            </p>
-          </div>
-          <div
-            style={{
-              padding: "2.5rem",
-              background: "var(--pb-bg2)",
-              border: "1px solid rgba(204, 0, 0, 0.2)",
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                position: "absolute",
-                top: "-10px",
-                right: "-10px",
-                fontSize: "4rem",
-                opacity: 0.1,
-                color: "#CC0000",
-              }}
-            >
-              ✨
-            </div>
-            <h3 style={{ fontSize: "1.8rem", marginBottom: "0.5rem" }}>
-              And Many More...
-            </h3>
-            <p
-              style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: "0.75rem",
-                color: "#CC0000",
-                textTransform: "uppercase",
-                marginBottom: "1.5rem",
-              }}
-            >
-              Nairobi's Finest
-            </p>
-            <p
-              style={{
-                fontSize: "0.95rem",
-                color: "var(--pb-ivory2)",
-                lineHeight: "1.6",
-              }}
-            >
-              To every artist, DJ, and performer who shared their talent—thank
-              you for making the 10th edition special.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Fireworks & Vibes Ticker */}
-      <div className="pb-ticker" style={{ background: "#FF8C00" }}>
-        <div className="pb-ticker-inner">
-          {[1, 2, 3, 4, 5].map(i => (
-            <span key={i} className="pb-ticker-item" style={{ color: "white" }}>
-              FIREWORKS OVER JAMHURI <span className="pb-ticker-sep">★</span>{" "}
-              DANCING IN THE RAIN <span className="pb-ticker-sep">★</span>{" "}
-              SMOCHAS & VIBES <span className="pb-ticker-sep">★</span>
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Team Thank You Message - Main Section */}
-      <section
-        style={{
-          padding: "8rem 2.5rem",
-          background:
-            "linear-gradient(135deg, rgba(255, 140, 0, 0.15), rgba(50, 205, 50, 0.15))",
-        }}
-      >
-        <div style={{ maxWidth: "950px", margin: "0 auto" }}>
-          <div
-            className="pb-eyebrow"
-            style={{ color: "#FF8C00", justifyContent: "center" }}
-          >
-            From Our Hearts
-          </div>
-          <h2
-            style={{
-              fontSize: "2.5rem",
-              marginBottom: "3rem",
-              textAlign: "center",
-            }}
-          >
-            A Message from{" "}
-            <span style={{ color: "#32CD32" }}>Passua Bites</span>
-          </h2>
-
-          <div
-            style={{
-              padding: "3.5rem",
-              background: "var(--pb-bg2)",
-              border: "2px solid #FF8C00",
-              position: "relative",
-              marginBottom: "3rem",
-            }}
-          >
-            <div
-              style={{
-                position: "absolute",
-                top: "-15px",
-                left: "30px",
-                fontSize: "3rem",
-                color: "#FF8C00",
-                opacity: 0.3,
-              }}
-            >
-              "
+            <div>
+              <div className="pb-eyebrow animate-fade-in" style={{ color: "#FF8C42" }}>
+                {EVENT.name} · {EVENT.edition}
+              </div>
+              <h1
+                className="animate-letter-drop"
+                style={{
+                  margin: "1rem 0 1.5rem",
+                  fontSize: "clamp(2.8rem, 7vw, 6.4rem)",
+                  lineHeight: 0.98,
+                  letterSpacing: "-0.045em",
+                  maxWidth: 760,
+                }}
+              >
+                A dry day. A full stall. <span style={{ color: "#FF6B1A" }}>Pure Nairobi energy.</span>
+              </h1>
+              <p
+                className="animate-fade-in"
+                style={{
+                  animationDelay: "180ms",
+                  maxWidth: 690,
+                  color: "var(--pb-ivory2)",
+                  fontSize: "clamp(1rem, 2vw, 1.25rem)",
+                  lineHeight: 1.75,
+                  fontWeight: 300,
+                }}
+              >
+                On 8 August 2026, Passua Bites brought the stall to the Nairobi Street Food Festival’s Playtime Edition at ASK Arena, Jamhuri Showground. This time, there was no rain to negotiate—just open ground, good food, music, games, and people ready for a proper festival day.
+              </p>
+              <div className="animate-fade-in" style={{ animationDelay: "320ms", display: "flex", flexWrap: "wrap", gap: "0.85rem", marginTop: "2rem" }}>
+                <Link href="/menu" className="pb-btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: "0.6rem", textDecoration: "none" }}>
+                  Order the festival favourites <Arrow />
+                </Link>
+                <a href="#recap" className="pb-btn-ghost" style={{ display: "inline-flex", alignItems: "center", gap: "0.6rem", textDecoration: "none" }}>
+                  Read the recap <Arrow />
+                </a>
+              </div>
             </div>
 
-            <p
-              style={{
-                fontSize: "1.25rem",
-                lineHeight: "2",
-                color: "var(--pb-ivory)",
-                marginBottom: "2rem",
-                fontStyle: "italic",
-              }}
-            >
-              To everyone who came through for us at the Nairobi Street Food
-              Festival—rain, mud, cold, and all—<strong>thank you</strong>. You
-              showed up. You danced. You ate our smochas. You made it real.
-            </p>
-
-            <p
-              style={{
-                fontSize: "1.1rem",
-                lineHeight: "1.9",
-                color: "var(--pb-ivory2)",
-                marginBottom: "2.5rem",
-              }}
-            >
-              To the families who brought their kids despite the weather. To the
-              couples who didn't let the rain stop their date night. To the solo
-              vibers who came to celebrate life and good food. To everyone who
-              stood in the mud with us—this one's for you.
-            </p>
-
-            <p
-              style={{
-                fontSize: "1.1rem",
-                lineHeight: "1.9",
-                color: "var(--pb-ivory2)",
-                marginBottom: "2.5rem",
-              }}
-            >
-              Shoutout to <strong>Watendawili</strong> and{" "}
-              <strong>DJ Joe Mfalme</strong> for keeping the energy LOUD and
-              nonstop. Your performances turned that rainy night into something
-              magical. And to the{" "}
-              <strong>Nairobi Street Food Festival organizers</strong>—thank you
-              for creating a space where street vendors like us can shine and
-              connect with our community. The 10th edition will forever be in
-              our hearts.
-            </p>
-
-            <p
-              style={{
-                fontSize: "1.1rem",
-                lineHeight: "1.9",
-                color: "var(--pb-ivory2)",
-                marginBottom: "1rem",
-              }}
-            >
-              We're already counting down to the 11th edition. See you there!
-              Until then, come find us in Ruiru—we'll keep the smochas hot and
-              the vibes even hotter.
-            </p>
-
-            <div
-              style={{
-                position: "absolute",
-                bottom: "-15px",
-                right: "30px",
-                fontSize: "3rem",
-                color: "#FF8C00",
-                opacity: 0.3,
-              }}
-            >
-              "
+            <div className="animate-fade-in" style={{ animationDelay: "220ms", position: "relative", minHeight: 390 }}>
+              <div
+                style={{
+                  position: "absolute",
+                  inset: "1rem 0 0 1rem",
+                  border: "1px solid rgba(255,107,26,0.45)",
+                  transform: "rotate(3deg)",
+                }}
+              />
+              <div
+                style={{
+                  position: "relative",
+                  minHeight: 360,
+                  padding: "2rem",
+                  background: "linear-gradient(160deg, rgba(255,107,26,0.18), rgba(20,14,10,0.95) 64%)",
+                  border: "1px solid rgba(255,255,255,0.16)",
+                  boxShadow: "0 26px 80px rgba(0,0,0,0.32)",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", alignItems: "flex-start" }}>
+                  <div className="pb-eyebrow" style={{ color: "#E8C99B" }}>Field note / 02</div>
+                  <div style={{ color: "#FF6B1A", fontFamily: "'DM Mono',monospace", fontSize: "0.72rem", letterSpacing: "0.12em" }}>PB × NSF</div>
+                </div>
+                <div style={{ position: "relative", minHeight: 210, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <LazyImage
+                    src="/media/images/festival-doodle-1.png"
+                    webpSrc="/media/images/festival-doodle-1.webp"
+                    alt="Passua Bites illustrated festival serving"
+                    width={280}
+                    height={280}
+                    eager
+                    className="animate-float"
+                    style={{ width: "min(75%, 280px)", filter: "drop-shadow(0 20px 24px rgba(0,0,0,0.4))" }}
+                  />
+                  <div
+                    style={{
+                      position: "absolute",
+                      right: "2%",
+                      bottom: "5%",
+                      padding: "0.7rem 0.85rem",
+                      background: "var(--pb-ivory)",
+                      color: "var(--pb-bg)",
+                      fontFamily: "'DM Mono',monospace",
+                      fontSize: "0.58rem",
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      transform: "rotate(-5deg)",
+                    }}
+                  >
+                    No rain. All flavour.
+                  </div>
+                </div>
+                <div style={{ borderTop: "1px solid rgba(255,255,255,0.16)", paddingTop: "1rem" }}>
+                  <div style={{ fontFamily: "'Playfair Display',serif", fontSize: "1.65rem", fontWeight: 700 }}>Ruiru to Nairobi</div>
+                  <div style={{ color: "var(--pb-ivory3)", fontSize: "0.78rem", marginTop: "0.35rem" }}>The same street-food soul, a new crowd to feed.</div>
+                </div>
+              </div>
             </div>
           </div>
+        </section>
 
-          <div style={{ textAlign: "center" }}>
-            <div
-              style={{
-                fontSize: "1.2rem",
-                fontWeight: "bold",
-                color: "#FF8C00",
-                marginBottom: "0.5rem",
-              }}
-            >
-              The Passua Bites Crew
+        <section style={{ padding: "1rem 2.5rem", background: "#FF6B1A", color: "#160d08" }} aria-label="Festival details">
+          <div style={{ maxWidth: 1180, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1px", background: "rgba(22,13,8,0.22)" }}>
+            {eventDetails.map(detail => (
+              <div key={detail.label} style={{ padding: "1rem 1.1rem", background: "#FF6B1A" }}>
+                <div style={{ fontFamily: "'DM Mono',monospace", fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: "0.12em", opacity: 0.68, marginBottom: "0.35rem" }}>{detail.label}</div>
+                <div style={{ fontSize: "0.9rem", fontWeight: 700 }}>{detail.value}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section id="recap" style={{ padding: "clamp(4rem, 9vw, 7rem) 2.5rem", maxWidth: 1180, margin: "0 auto" }}>
+          <div style={{ maxWidth: 720, marginBottom: "3rem" }}>
+            <div className="pb-eyebrow" style={{ color: "#FF8C42" }}>The second FoodFest of 2026</div>
+            <h2 style={{ margin: "0.75rem 0 1.1rem", fontSize: "clamp(2.1rem, 5vw, 4rem)", lineHeight: 1.03 }}>
+              The stall was part of the <span style={{ color: "#FF6B1A" }}>story.</span>
+            </h2>
+            <p style={{ color: "var(--pb-ivory3)", lineHeight: 1.8, fontWeight: 300, fontSize: "1rem" }}>
+              The Playtime Edition was built around Nairobi’s food, culture, and social energy. For Passua Bites, it was another chance to take the Ruiru kitchen out into the city and meet people one order, one conversation, and one bite at a time.
+            </p>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1px", background: "var(--pb-rule2)" }}>
+            {recapCards.map(card => (
+              <article key={card.index} className="animate-fade-in" style={{ animationDelay: `${Number(card.index) * 100}ms`, minHeight: 285, padding: "2rem", background: "var(--pb-bg2)", borderTop: `3px solid ${card.accent}`, position: "relative", overflow: "hidden" }}>
+                <div style={{ fontFamily: "'DM Mono',monospace", color: card.accent, fontSize: "0.65rem", letterSpacing: "0.16em" }}>{card.index}</div>
+                <h3 style={{ margin: "2.6rem 0 0.85rem", fontSize: "1.45rem" }}>{card.title}</h3>
+                <p style={{ color: "var(--pb-ivory3)", lineHeight: 1.75, fontSize: "0.9rem", fontWeight: 300 }}>{card.text}</p>
+                <div aria-hidden="true" style={{ position: "absolute", right: "-1.5rem", bottom: "-2.5rem", width: 110, height: 110, border: `1px solid ${card.accent}`, borderRadius: "50%", opacity: 0.18 }} />
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section style={{ padding: "clamp(4rem, 9vw, 7rem) 2.5rem", background: "var(--pb-bg3)", borderTop: "1px solid var(--pb-rule2)", borderBottom: "1px solid var(--pb-rule2)" }}>
+          <div className="pb-grid-mobile" style={{ display: "grid", gridTemplateColumns: "0.85fr 1.15fr", gap: "4rem", maxWidth: 1180, margin: "0 auto", alignItems: "center" }}>
+            <div style={{ position: "relative", minHeight: 350 }}>
+              <LazyImage
+                src="/media/images/festival-doodle-2.png"
+                webpSrc="/media/images/festival-doodle-2.webp"
+                alt="Illustrated Passua Bites festival crowd moment"
+                width={300}
+                height={300}
+                className="animate-float"
+                style={{ width: "min(100%, 300px)", display: "block", margin: "0 auto", filter: "drop-shadow(0 20px 30px rgba(0,0,0,0.35))" }}
+              />
+              <div style={{ position: "absolute", right: "4%", bottom: "8%", padding: "0.7rem 0.9rem", background: "#E8C99B", color: "var(--pb-bg)", fontFamily: "'DM Mono',monospace", fontSize: "0.58rem", letterSpacing: "0.1em", textTransform: "uppercase", transform: "rotate(4deg)" }}>
+                Playtime edition
+              </div>
             </div>
-            <div
-              style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: "0.8rem",
-                color: "var(--pb-ivory3)",
-                letterSpacing: "0.1em",
-              }}
-            >
-              Opp Rainbow Resort, Ruiru
+            <div>
+              <div className="pb-eyebrow" style={{ color: "#FF8C42" }}>What the day felt like</div>
+              <h2 style={{ margin: "0.8rem 0 1.25rem", fontSize: "clamp(2rem, 5vw, 3.8rem)", lineHeight: 1.05 }}>
+                Food first. <span style={{ color: "#FF6B1A" }}>Community always.</span>
+              </h2>
+              <p style={{ color: "var(--pb-ivory2)", lineHeight: 1.85, fontWeight: 300, fontSize: "1rem" }}>
+                Public coverage of the event described a lively marketplace of street-food vendors, chefs, music, interactive games, and Nairobi street style. The dry weather made this edition feel open and easy: people could move, explore, eat, and stay in the moment.
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.7rem", marginTop: "2rem" }}>
+                {["Street food", "Live sound", "Open ground"].map((label, index) => (
+                  <div key={label} style={{ padding: "0.9rem 0.7rem", borderLeft: `2px solid ${index === 1 ? "#E8C99B" : "#FF6B1A"}`, background: "rgba(255,255,255,0.03)" }}>
+                    <div style={{ fontFamily: "'DM Mono',monospace", fontSize: "0.57rem", color: "var(--pb-ivory3)", textTransform: "uppercase", letterSpacing: "0.08em" }}>{label}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Special Message Section */}
-      <section
-        style={{
-          padding: "6rem 2.5rem",
-          textAlign: "center",
-          background: "var(--pb-bg3)",
-        }}
-      >
-        <div style={{ maxWidth: "800px", margin: "0 auto" }}>
-          <h2 style={{ marginBottom: "2rem" }}>To the Organizers</h2>
-          <p
-            style={{
-              fontSize: "1.1rem",
-              lineHeight: "1.8",
-              color: "var(--pb-ivory2)",
-              marginBottom: "3rem",
-            }}
-          >
-            Putting on the <strong>Nairobi Street Food Festival</strong> is no
-            small feat, especially with the weather throwing a curveball! Huge
-            respect to the team for keeping the show running and for giving us a
-            platform to serve the people of Nairobi. We're already counting down
-            to the next one!
-          </p>
-          <div
-            style={{
-              display: "inline-block",
-              padding: "1.5rem 3rem",
-              border: "1px solid #FF8C00",
-              color: "#FF8C00",
-              fontFamily: "'DM Mono', monospace",
-              fontSize: "0.8rem",
-              textTransform: "uppercase",
-              letterSpacing: "0.2em",
-            }}
-          >
-            See you at the 11th Edition!
+        <section style={{ padding: "clamp(4rem, 9vw, 7rem) 2.5rem", maxWidth: 980, margin: "0 auto" }}>
+          <div style={{ padding: "clamp(2rem, 6vw, 4rem)", border: "1px solid rgba(255,107,26,0.42)", background: "linear-gradient(145deg, rgba(255,107,26,0.08), rgba(255,255,255,0.02))", position: "relative" }}>
+            <div aria-hidden="true" style={{ position: "absolute", left: "1.4rem", top: "-1.4rem", fontFamily: "Georgia,serif", fontSize: "5rem", lineHeight: 1, color: "#FF6B1A", opacity: 0.35 }}>“</div>
+            <div className="pb-eyebrow" style={{ color: "#FF8C42" }}>A note from the crew</div>
+            <blockquote style={{ margin: "1.2rem 0 2rem", fontFamily: "'Playfair Display',serif", fontSize: "clamp(1.45rem, 3vw, 2.15rem)", lineHeight: 1.45, color: "var(--pb-ivory)" }}>
+              We came with the stall and left with another reminder that good food travels. This time there was no rain—just a clear day, open space, and the kind of energy that makes you want to do the next one even bigger.
+            </blockquote>
+            <div style={{ fontFamily: "'DM Mono',monospace", fontSize: "0.65rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--pb-ivory3)" }}>Passua Bites · Ruiru to Nairobi</div>
           </div>
-        </div>
-      </section>
+        </section>
 
+        <section style={{ padding: "clamp(4rem, 8vw, 6rem) 2.5rem", textAlign: "center", background: "#FF6B1A", color: "#160d08" }}>
+          <div style={{ maxWidth: 780, margin: "0 auto" }}>
+            <div style={{ fontFamily: "'DM Mono',monospace", fontSize: "0.63rem", letterSpacing: "0.16em", textTransform: "uppercase", opacity: 0.72, marginBottom: "1rem" }}>Back to the kitchen</div>
+            <h2 style={{ marginBottom: "1rem", fontSize: "clamp(2.1rem, 5vw, 4rem)", color: "#160d08" }}>Still craving the stall?</h2>
+            <p style={{ maxWidth: 600, margin: "0 auto 2rem", lineHeight: 1.7, color: "rgba(22,13,8,0.78)" }}>
+              The festival ended, but the Ruiru kitchen is still serving the same street-food soul. Browse the menu or reach out for the next event update.
+            </p>
+            <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: "0.8rem" }}>
+              <Link href="/menu" className="pb-btn-primary" style={{ background: "#160d08", color: "#E8C99B", borderColor: "#160d08" }}>Browse the menu <Arrow /></Link>
+              <a href="https://wa.me/254722473873?text=Hi%20Passua%20Bites%2C%20tell%20me%20about%20the%20next%20FoodFest" target="_blank" rel="noopener noreferrer" className="pb-btn-ghost" style={{ borderColor: "#160d08", color: "#160d08" }}>Ask about the next FoodFest <Arrow /></a>
+            </div>
+          </div>
+        </section>
+
+        <section style={{ padding: "2.5rem", background: "var(--pb-bg2)", borderTop: "1px solid var(--pb-rule2)" }}>
+          <div style={{ maxWidth: 1180, margin: "0 auto" }}>
+            <div className="pb-eyebrow" style={{ color: "#FF8C42", marginBottom: "0.8rem" }}>Event details checked against public sources</div>
+            <p style={{ maxWidth: 720, color: "var(--pb-ivory3)", fontSize: "0.78rem", lineHeight: 1.7, marginBottom: "1rem" }}>
+              Dates, venue, edition, and public event framing were cross-checked against the links below. The dry-weather note and Passua Bites’ stall experience are part of the team’s own recap.
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
+              {SOURCES.map(source => (
+                <a key={source.href} href={source.href} target="_blank" rel="noopener noreferrer" style={{ color: "#FF8C42", fontFamily: "'DM Mono',monospace", fontSize: "0.62rem", letterSpacing: "0.05em", textDecoration: "none" }}>
+                  {source.label} ↗
+                </a>
+              ))}
+            </div>
+          </div>
+        </section>
+      </main>
       <PBFooter />
     </div>
   );

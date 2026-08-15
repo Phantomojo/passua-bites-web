@@ -4,7 +4,7 @@ import { Link } from "wouter";
 import { usePageMeta } from "@/hooks/usePageMeta";
 
 export default function Contact() {
-  usePageMeta({ title: "Contact — Passua Bites", description: "Get in touch with Passua Bites. Visit us opposite Rainbow Resort in Ruiru, or reach out on WhatsApp." });
+  usePageMeta({ title: "Contact — Passua Bites", description: "Get in touch with Passua Bites in Ruiru, confirm the current pickup point, or reach out on WhatsApp." });
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -86,7 +86,7 @@ export default function Contact() {
           >
             <div style={infoStyle}>
               <div style={labelStyle}>Location</div>
-              <div style={valueStyle}>Opp Rainbow Resort, Ruiru</div>
+              <div style={valueStyle}>Ruiru, Kenya — confirm current pickup point</div>
               <div
                 style={{
                   fontSize: "0.78rem",
@@ -95,8 +95,7 @@ export default function Contact() {
                   fontWeight: 300,
                 }}
               >
-                Find us opposite Rainbow Resort in Ruiru. Easy to locate —
-                always ready to serve.
+                Our pickup point can change during relocation and road works. Message us for the latest directions and delivery options.
               </div>
             </div>
             <div style={infoStyle}>
@@ -410,7 +409,7 @@ export default function Contact() {
             letterSpacing: "0.05em",
           }}
         >
-          Opp Rainbow Resort, Ruiru — call or WhatsApp for precise directions.
+          Ruiru, Kenya — call or WhatsApp for the current pickup directions.
         </p>
       </section>
 

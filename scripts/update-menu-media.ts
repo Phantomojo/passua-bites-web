@@ -51,7 +51,7 @@ async function updateMenuItems() {
         "https://ptewdrb0fmlmvmtc.public.blob.vercel-storage.com/sultan.mp4",
     },
     {
-      name: "Pasua Corn",
+      name: "Passua Corn",
       imageUrl:
         "https://ptewdrb0fmlmvmtc.public.blob.vercel-storage.com/pasua-corn.jpg",
       videoUrl: "",

@@ -108,7 +108,7 @@ async function uploadMedia() {
       video: results.find(r => r.name === "sultan.mp4")?.url || "",
     },
     {
-      name: "Pasua Corn",
+      name: "Passua Corn",
       image: results.find(r => r.name === "pasua-corn.jpg")?.url || "",
       video: "",
     },
