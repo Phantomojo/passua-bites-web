@@ -13,7 +13,7 @@ export default function PrivacyPolicy() {
           Privacy Policy
         </h1>
         <div style={{ fontSize: "0.78rem", color: "var(--pb-ivory3)", marginBottom: "2rem" }}>
-          Last updated: April 10, 2026
+          Last updated: August 15, 2026
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "2rem", fontSize: "0.88rem", color: "var(--pb-ivory2)", lineHeight: 1.7 }}>
@@ -22,8 +22,8 @@ export default function PrivacyPolicy() {
               1. Who We Are
             </h2>
             <p>
-              Passua Bites ("we", "our", "us") is a food business located at Opp Rainbow Resort, Ruiru, Kenya.
-              We operate a website at passua-bites-web.vercel.app where customers can browse our menu, place orders, and submit reviews.
+              Passua Bites ("we", "our", "us") is a food business based in Ruiru, Kenya. Our current pickup and delivery point may change during relocation and road works, so please contact us for the latest directions.
+              We operate a website at passua-bites-web.vercel.app where customers can browse our menu, place orders, track orders with a private token, and submit reviews.
               Our contact number is 0722 473 873.
             </p>
           </section>
@@ -75,8 +75,7 @@ export default function PrivacyPolicy() {
               5. How We Store Your Data
             </h2>
             <p>
-              Your data is stored securely in a TiDB Cloud database (hosted on AWS, Frankfurt region).
-              We use HTTPS encryption for all data transmission. Access to your data is limited to authorized personnel only.
+              Order, review, and operational data is stored in a Neon PostgreSQL database hosted on AWS. The frontend is deployed on Vercel and the API is deployed on Render. We use HTTPS for data in transit and restrict database and administrative access to authorized personnel and service accounts.
             </p>
           </section>
 
@@ -86,10 +85,11 @@ export default function PrivacyPolicy() {
             </h2>
             <p>We do NOT sell or share your personal data with third parties for marketing purposes.</p>
             <p style={{ marginTop: "0.5rem" }}>
-              Your data may be shared only with:
+              Your data may be shared only with service providers and people required to operate the business:
             </p>
             <ul style={{ marginLeft: "1.5rem", marginTop: "0.5rem" }}>
-              <li><strong>Our staff:</strong> To prepare and deliver your order</li>
+              <li><strong>Our staff:</strong> To prepare, deliver, and support your order</li>
+              <li><strong>Hosting providers:</strong> Neon, Render, and Vercel process data as needed to host the database, API, and website</li>
               <li><strong>M-Pesa / Safaricom:</strong> For payment processing (we do not control their privacy practices)</li>
               <li><strong>Legal authorities:</strong> If required by Kenyan law</li>
             </ul>
@@ -100,8 +100,7 @@ export default function PrivacyPolicy() {
               7. How Long We Keep Your Data
             </h2>
             <p>
-              We retain your order information for up to <strong>2 years</strong> from the date of your last order.
-              Reviews remain stored until you request deletion or we remove them during moderation.
+              We retain order and payment records only for as long as they are needed to fulfill orders, resolve disputes, support accounting, prevent fraud, and meet legal obligations. Reviews remain stored while they are useful for moderation and service feedback. Server-side analytics records are used for security and service improvement and are reviewed for removal as part of operational maintenance. The current deletion process is manual rather than an automatic self-service control.
             </p>
           </section>
 
@@ -118,7 +117,7 @@ export default function PrivacyPolicy() {
               <li><strong>Withdraw consent:</strong> Withdraw consent at any time (this does not affect past processing)</li>
             </ul>
             <p style={{ marginTop: "0.5rem" }}>
-              To exercise these rights, contact us at <strong>0722 473 873</strong> or via WhatsApp.
+              To exercise these rights, contact us at <strong>0722 473 873</strong> or via WhatsApp. We will verify the request, locate records using the contact details you provide, remove or anonymize data that we are not required to retain, and explain any records that must remain for legal, payment, security, or dispute-resolution reasons.
             </p>
           </section>
 
@@ -127,8 +126,7 @@ export default function PrivacyPolicy() {
               9. Cookies
             </h2>
             <p>
-              Our website uses essential cookies to remember your cart contents and login session.
-              We do NOT use tracking cookies, analytics cookies, or advertising cookies.
+              Our website uses essential browser storage for cart contents and an HTTP-only session cookie for administrative login. We do not use advertising cookies. We do collect limited server-side analytics such as request IP address, browser or user-agent details, device information, page views, referrer data, and approximate city/country derived from IP addresses for security, reliability, and service improvement. This server-side analytics is not sold for advertising.
             </p>
           </section>
 
@@ -159,7 +157,7 @@ export default function PrivacyPolicy() {
             </p>
             <p style={{ marginTop: "0.5rem" }}>
               <strong>Passua Bites</strong><br />
-              Opp Rainbow Resort, Ruiru, Kenya<br />
+              Ruiru, Kenya — contact us for the current pickup point<br />
               Phone: 0722 473 873<br />
               WhatsApp: <a href="https://wa.me/254722473873" style={{ color: "var(--pb-ember)" }}>wa.me/254722473873</a>
             </p>

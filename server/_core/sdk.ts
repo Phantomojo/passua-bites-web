@@ -223,7 +223,7 @@ class SDKServer {
       return {
         openId,
         appId,
-        name,
+        name: typeof name === "string" && name.trim() ? name : "User",
       };
     } catch (error) {
       logger.warn({ err: error }, "[Auth] Session verification failed");

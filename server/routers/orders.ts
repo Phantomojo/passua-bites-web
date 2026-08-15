@@ -1,51 +1,121 @@
+import { nanoid } from "nanoid";
 import { z } from "zod";
 import { publicProcedure, adminProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { orders, orderItems } from "../../drizzle/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { orders, orderItems, menuItems } from "../../drizzle/schema";
+import { eq, desc } from "drizzle-orm";
 
 // Phone validation for Kenyan numbers
 const phoneRegex = /^(?:\+254|0)[7][0-9]{8}$/;
+const trackingTokenRegex = /^[A-Za-z0-9_-]{32}$/;
+
+const DELIVERY_FEES = {
+  ruiru: 0,
+  environs: 50,
+  other: null,
+} as const;
+
+type DeliveryZone = keyof typeof DELIVERY_FEES;
+
+export function maskPhone(phone: string): string {
+  return `••••••${phone.slice(-4)}`;
+}
+
+export function maskName(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return "Customer";
+  const parts = trimmed.split(/\s+/);
+  return parts.length > 1
+    ? `${parts[0].charAt(0)}••• ${parts[parts.length - 1].charAt(0)}•••`
+    : `${trimmed.charAt(0)}•••`;
+}
+
+async function getPublicOrderByTrackingToken(
+  trackingToken: string,
+  db: Awaited<ReturnType<typeof getDb>>
+) {
+  if (!db) return undefined;
+
+  const orderResult = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.trackingToken, trackingToken))
+    .limit(1)
+    .execute();
+
+  if (orderResult.length === 0) return undefined;
+  const order = orderResult[0];
+
+  const items = await db
+    .select({
+      id: orderItems.id,
+      quantity: orderItems.quantity,
+      priceAtTime: orderItems.priceAtTime,
+      name: menuItems.name,
+    })
+    .from(orderItems)
+    .leftJoin(menuItems, eq(orderItems.menuItemId, menuItems.id))
+    .where(eq(orderItems.orderId, order.id))
+    .execute();
+
+  return {
+    id: order.id,
+    trackingToken: order.trackingToken,
+    customerName: maskName(order.customerName),
+    customerPhone: maskPhone(order.customerPhone),
+    deliveryAddress: order.deliveryAddress ? "Delivery address on file" : null,
+    subtotal: order.subtotal,
+    deliveryFee: order.deliveryFee,
+    totalPrice: order.totalPrice,
+    status: order.status,
+    paymentMethod: order.paymentMethod,
+    paymentStatus: order.paymentStatus,
+    createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
+    items,
+  };
+}
 
 export const ordersRouter = router({
-  // Create a new order
+  // Create a new order. Prices and delivery fees are calculated from server-side data.
   create: publicProcedure
     .input(
       z.object({
-        customerName: z.string().min(2).max(255),
+        customerName: z.string().trim().min(2).max(255),
         customerPhone: z
           .string()
           .regex(phoneRegex, "Invalid Kenyan phone number"),
         customerEmail: z.string().email().optional(),
-        deliveryAddress: z.string().min(5).max(500),
+        deliveryAddress: z.string().trim().min(5).max(500),
+        deliveryZone: z.enum(["ruiru", "environs", "other"]),
         items: z
           .array(
             z.object({
-              menuItemId: z.number(),
-              quantity: z.number().min(1).max(50),
+              menuItemId: z.number().int().positive(),
+              quantity: z.number().int().min(1).max(50),
             })
           )
           .min(1)
           .max(20),
-        paymentMethod: z.enum(["mpesa", "cash"]).default("mpesa"),
-        notes: z.string().max(500).optional(),
+        paymentMethod: z.enum(["pochi", "cash", "mpesa"]).default("pochi"),
+        notes: z.string().trim().max(500).optional(),
       })
     )
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
-      // Fetch menu items to calculate total and verify availability
-      // Get actual menu items
-      const { menuItems: menuItemsTable } =
-        await import("../../drizzle/schema");
+      if (input.deliveryZone === "other") {
+        throw new Error("Orders outside Ruiru require a delivery quote via WhatsApp");
+      }
+
       const availableItems = await db
         .select()
-        .from(menuItemsTable)
-        .where(eq(menuItemsTable.available, 1))
+        .from(menuItems)
+        .where(eq(menuItems.available, 1))
         .execute();
 
-      let totalPrice = 0;
+      let subtotal = 0;
       const orderItemsData: Array<{
         menuItemId: number;
         quantity: number;
@@ -60,7 +130,7 @@ export const ordersRouter = router({
           );
         }
         const lineTotal = Number(menuItem.price) * item.quantity;
-        totalPrice += lineTotal;
+        subtotal += lineTotal;
         orderItemsData.push({
           menuItemId: item.menuItemId,
           quantity: item.quantity,
@@ -68,93 +138,61 @@ export const ordersRouter = router({
         });
       }
 
-      // Create order
-      const [inserted] = await db
-        .insert(orders)
-        .values({
-          customerName: input.customerName,
-          customerPhone: input.customerPhone,
-          customerEmail: input.customerEmail || null,
-          deliveryAddress: input.deliveryAddress,
-          totalPrice: totalPrice.toFixed(2),
-          status: "pending",
-          paymentMethod: input.paymentMethod,
-          paymentStatus: "pending",
-          notes: input.notes || null,
-        })
-        .returning({ id: orders.id });
+      const deliveryFee = DELIVERY_FEES[input.deliveryZone as DeliveryZone];
+      if (deliveryFee === null) {
+        throw new Error("A delivery quote is required for this location");
+      }
+      const totalPrice = subtotal + deliveryFee;
+      const trackingToken = nanoid(32);
 
-      const orderId = inserted.id;
-
-      // Create order items
-      for (const oi of orderItemsData) {
-        await db
-          .insert(orderItems)
+      const orderId = await db.transaction(async tx => {
+        const [inserted] = await tx
+          .insert(orders)
           .values({
-            orderId,
+            customerName: input.customerName,
+            customerPhone: input.customerPhone,
+            customerEmail: input.customerEmail || null,
+            deliveryAddress: input.deliveryAddress,
+            trackingToken,
+            subtotal: subtotal.toFixed(2),
+            deliveryFee: deliveryFee.toFixed(2),
+            deliveryZone: input.deliveryZone,
+            totalPrice: totalPrice.toFixed(2),
+            status: "pending",
+            paymentMethod: input.paymentMethod,
+            paymentStatus: "pending",
+            notes: input.notes || null,
+          })
+          .returning({ id: orders.id });
+
+        for (const oi of orderItemsData) {
+          await tx.insert(orderItems).values({
+            orderId: inserted.id,
             menuItemId: oi.menuItemId,
             quantity: oi.quantity,
             priceAtTime: oi.priceAtTime,
-          })
-          .execute();
-      }
+          });
+        }
+
+        return inserted.id;
+      });
 
       return {
         success: true,
         orderId,
+        trackingToken,
+        subtotal,
+        deliveryFee,
         totalPrice,
       };
     }),
 
-  // Track order by ID
-  getById: publicProcedure
-    .input(z.object({ id: z.number() }))
+  // Public tracking requires a high-entropy token. The response is intentionally masked.
+  getByTrackingToken: publicProcedure
+    .input(z.object({ trackingToken: z.string().regex(trackingTokenRegex) }))
     .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) return undefined;
-
-      const orderResult = await db
-        .select()
-        .from(orders)
-        .where(eq(orders.id, input.id))
-        .limit(1)
-        .execute();
-
-      if (orderResult.length === 0) return undefined;
-
-      const order = orderResult[0];
-
-      // Get order items with menu item names
-      const { menuItems: menuItemsTable } =
-        await import("../../drizzle/schema");
-      const items = await db
-        .select({
-          id: orderItems.id,
-          quantity: orderItems.quantity,
-          priceAtTime: orderItems.priceAtTime,
-          name: menuItemsTable.name,
-        })
-        .from(orderItems)
-        .leftJoin(menuItemsTable, eq(orderItems.menuItemId, menuItemsTable.id))
-        .where(eq(orderItems.orderId, input.id))
-        .execute();
-
-      return { ...order, items };
-    }),
-
-  // List orders by phone number
-  listByPhone: publicProcedure
-    .input(z.object({ phone: z.string() }))
-    .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return [];
-      return db
-        .select()
-        .from(orders)
-        .where(eq(orders.customerPhone, input.phone))
-        .orderBy(desc(orders.createdAt))
-        .limit(50)
-        .execute();
+      return getPublicOrderByTrackingToken(input.trackingToken, db);
     }),
 
   // Admin: List all orders
@@ -204,7 +242,7 @@ export const ordersRouter = router({
   updateStatus: adminProcedure
     .input(
       z.object({
-        id: z.number(),
+        id: z.number().int().positive(),
         status: z.enum([
           "pending",
           "confirmed",
@@ -218,9 +256,24 @@ export const ordersRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
+      const [order] = await db
+        .select({ paymentMethod: orders.paymentMethod, paymentStatus: orders.paymentStatus })
+        .from(orders)
+        .where(eq(orders.id, input.id))
+        .limit(1)
+        .execute();
+      if (!order) throw new Error("Order not found");
+      if (
+        ["confirmed", "preparing", "ready", "delivered"].includes(input.status) &&
+        order.paymentMethod === "pochi" &&
+        order.paymentStatus !== "completed"
+      ) {
+        throw new Error("Verify the Pochi receipt before fulfillment can begin");
+      }
+
       await db
         .update(orders)
-        .set({ status: input.status })
+        .set({ status: input.status, updatedAt: new Date() })
         .where(eq(orders.id, input.id))
         .execute();
       return { success: true };

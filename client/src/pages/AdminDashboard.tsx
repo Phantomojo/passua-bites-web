@@ -24,55 +24,50 @@ type Tab =
 
 export default function AdminDashboard() {
   usePageMeta({ title: "Admin Dashboard — Passua Bites", description: "Passua Bites admin dashboard — manage orders, menu, reviews, and analytics." });
-  const [token, setToken] = useState<string | null>(null);
+  const adminMe = trpc.admin.me.useQuery();
+  const isAuthenticated = !!adminMe.data;
   const [password, setPassword] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [prevOrderCount, setPrevOrderCount] = useState(0);
   const [playSound, setPlaySound] = useState(false);
-  const [pendingReviews, setPendingReviews] = useState<any[]>([]);
 
   const login = trpc.admin.login.useMutation();
+  const logout = trpc.admin.logout.useMutation();
   const stats = trpc.orders.getStats.useQuery(undefined, {
-    enabled: !!token,
+    enabled: isAuthenticated,
     refetchInterval: 60000,
   });
   const orders = trpc.orders.listAll.useQuery(undefined, {
-    enabled: !!token,
+    enabled: isAuthenticated,
     refetchInterval: 30000,
   });
-  const menuItems = trpc.menu.list.useQuery(undefined, { enabled: !!token });
+  const menuItems = trpc.menu.list.useQuery(undefined, { enabled: isAuthenticated });
   const updateOrderStatus = trpc.orders.updateStatus.useMutation();
+  const verifyPochiReceipt = trpc.payments.verifyPochiReceipt.useMutation();
   const createMenuItem = trpc.menu.create.useMutation();
   const updateMenuItem = trpc.menu.update.useMutation();
   const deleteMenuItem = trpc.menu.delete.useMutation();
   const toggleAvailability = trpc.menu.toggleAvailability.useMutation();
   const updateLocation = trpc.location.update.useMutation();
+  const { data: paymentInstructions } = trpc.payments.getInstructions.useQuery(undefined, { enabled: isAuthenticated });
+  const pendingReviewsQuery = trpc.reviews.listPending.useQuery(undefined, { enabled: isAuthenticated });
+  const moderateReview = trpc.reviews.moderate.useMutation();
+  const deleteReview = trpc.reviews.delete.useMutation();
 
   const { data: currentLocation, refetch: refetchLocation } =
-    trpc.location.get.useQuery(undefined, { enabled: !!token });
+    trpc.location.get.useQuery(undefined, { enabled: isAuthenticated });
   const { data: allSettings } = trpc.location.getAll.useQuery(undefined, {
-    enabled: !!token,
+    enabled: isAuthenticated,
   });
 
-  // Fetch pending reviews (same-origin)
-  useEffect(() => {
-    if (!token) return;
-    fetch(`/api/trpc/reviews.listPending`)
-      .then(r => r.json())
-      .then(d => setPendingReviews(d.result?.data?.json || []))
-      .catch(() => {});
-  }, [token, activeTab]);
+  const pendingReviews = pendingReviewsQuery.data || [];
 
   const handleReviewAction = async (id: number, approved: boolean) => {
     try {
-      await fetch(`/api/trpc/reviews.moderate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ json: { id, approved } }),
-      });
+      await moderateReview.mutateAsync({ id, approved });
       toast.success(approved ? "Review approved" : "Review rejected");
-      setPendingReviews(prev => prev.filter(r => r.id !== id));
+      await pendingReviewsQuery.refetch();
     } catch (err: any) {
       toast.error(err.message || "Failed to moderate");
     }
@@ -81,13 +76,9 @@ export default function AdminDashboard() {
   const handleDeleteReview = async (id: number) => {
     if (!confirm("Delete this review?")) return;
     try {
-      await fetch(`/api/trpc/reviews.delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ json: { id } }),
-      });
+      await deleteReview.mutateAsync({ id });
       toast.success("Review deleted");
-      setPendingReviews(prev => prev.filter(r => r.id !== id));
+      await pendingReviewsQuery.refetch();
     } catch (err: any) {
       toast.error(err.message || "Failed to delete");
     }
@@ -138,9 +129,9 @@ export default function AdminDashboard() {
     e.preventDefault();
     setIsLoggingIn(true);
     try {
-      const result = await login.mutateAsync({ password });
-      setToken(result.token);
-      localStorage.setItem("pb_admin_token", result.token);
+      await login.mutateAsync({ password });
+      setPassword("");
+      await adminMe.refetch();
       toast.success("Logged in successfully");
     } catch (err: any) {
       toast.error(err.message || "Invalid password");
@@ -149,10 +140,36 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleLogout = () => {
-    setToken(null);
-    localStorage.removeItem("pb_admin_token");
+  const handleLogout = async () => {
+    await logout.mutateAsync();
+    await adminMe.refetch();
     toast.info("Logged out");
+  };
+
+  const receiptHint = (order: any): string => {
+    if (order.paymentReference) return order.paymentReference;
+    const match = String(order.notes || "").match(/(?:Pochi receipt submitted|M-Pesa Code):\s*([A-Za-z0-9]{8,20})/i);
+    return match?.[1] || "";
+  };
+
+  const handleVerifyPochiReceipt = async (order: any) => {
+    const suggested = receiptHint(order);
+    const receiptCode = window.prompt(
+      `Verify Pochi receipt for order #${order.id}. Enter the code from the customer’s M-Pesa SMS:`,
+      suggested,
+    );
+    if (!receiptCode?.trim()) return;
+
+    try {
+      await verifyPochiReceipt.mutateAsync({
+        orderId: order.id,
+        receiptCode: receiptCode.trim(),
+      });
+      toast.success(`Pochi payment verified; order #${order.id} is confirmed`);
+      await Promise.all([orders.refetch(), stats.refetch()]);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to verify Pochi receipt");
+    }
   };
 
   const handleStatusChange = async (orderId: number, status: string) => {
@@ -219,7 +236,7 @@ export default function AdminDashboard() {
   };
 
   // Login screen
-  if (!token) {
+  if (!isAuthenticated) {
     return (
       <div
         style={{
@@ -641,15 +658,20 @@ export default function AdminDashboard() {
                       >
                         Ksh {Number(o.totalPrice)}
                       </span>
-                      {o.status === "pending" && (
+                      {o.status === "pending" && o.paymentMethod === "pochi" && o.paymentStatus !== "completed" && (
+                        <button
+                          onClick={() => handleVerifyPochiReceipt(o)}
+                          className="pb-btn-primary"
+                          style={{ fontSize: "0.58rem", padding: "0.3rem 0.75rem", minHeight: 32 }}
+                        >
+                          Verify Pochi
+                        </button>
+                      )}
+                      {o.status === "pending" && (o.paymentMethod !== "pochi" || o.paymentStatus === "completed") && (
                         <button
                           onClick={() => handleStatusChange(o.id, "confirmed")}
                           className="pb-btn-primary"
-                          style={{
-                            fontSize: "0.58rem",
-                            padding: "0.3rem 0.75rem",
-                            minHeight: 32,
-                          }}
+                          style={{ fontSize: "0.58rem", padding: "0.3rem 0.75rem", minHeight: 32 }}
                         >
                           ✓ Confirm
                         </button>
@@ -724,7 +746,7 @@ export default function AdminDashboard() {
                       "Customer",
                       "Phone",
                       "Amount",
-                      "M-Pesa",
+                      "Receipt",
                       "Payment",
                       "Action",
                       "Date",
@@ -804,7 +826,7 @@ export default function AdminDashboard() {
                             : "var(--pb-ivory3)",
                         }}
                       >
-                        {o.notes ? o.notes.replace("M-Pesa Code: ", "") : "—"}
+                        {o.paymentReference || receiptHint(o) || "—"}
                       </td>
                       <td
                         style={{
@@ -819,17 +841,20 @@ export default function AdminDashboard() {
                         {o.paymentStatus}
                       </td>
                       <td style={{ padding: "0.85rem 1rem" }}>
-                        {o.status === "pending" && (
+                        {o.status === "pending" && o.paymentMethod === "pochi" && o.paymentStatus !== "completed" && (
                           <button
-                            onClick={() =>
-                              handleStatusChange(o.id, "confirmed")
-                            }
+                            onClick={() => handleVerifyPochiReceipt(o)}
                             className="pb-btn-primary"
-                            style={{
-                              fontSize: "0.58rem",
-                              padding: "0.3rem 0.75rem",
-                              minHeight: 32,
-                            }}
+                            style={{ fontSize: "0.58rem", padding: "0.3rem 0.75rem", minHeight: 32 }}
+                          >
+                            Verify Receipt
+                          </button>
+                        )}
+                        {o.status === "pending" && (o.paymentMethod !== "pochi" || o.paymentStatus === "completed") && (
+                          <button
+                            onClick={() => handleStatusChange(o.id, "confirmed")}
+                            className="pb-btn-primary"
+                            style={{ fontSize: "0.58rem", padding: "0.3rem 0.75rem", minHeight: 32 }}
                           >
                             ✓ Confirm Payment
                           </button>
@@ -1579,6 +1604,28 @@ export default function AdminDashboard() {
             >
               {updateLocation.isPending ? "Saving..." : "Save Message"}
             </button>
+          </div>
+
+          <div className="pb-panel" style={{ padding: "1.5rem", marginBottom: "1rem", borderLeft: "3px solid var(--pb-ember)" }}>
+            <div style={{ fontSize: "0.85rem", color: "var(--pb-ivory)", marginBottom: "0.5rem", fontWeight: 600 }}>
+              Payment operations — {paymentInstructions?.label || "Pochi la Biashara"}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
+              <span style={{ fontFamily: "'DM Mono',monospace", fontSize: "1.15rem", color: "var(--pb-ember)" }}>
+                {paymentInstructions?.businessNumber || "0725619991"}
+              </span>
+              <button
+                type="button"
+                className="pb-btn-ghost"
+                style={{ fontSize: "0.58rem", padding: "0.35rem 0.7rem" }}
+                onClick={() => navigator.clipboard?.writeText(paymentInstructions?.businessNumber || "0725619991")}
+              >
+                Copy number
+              </button>
+            </div>
+            <p style={{ margin: 0, color: "var(--pb-ivory3)", fontSize: "0.78rem", lineHeight: 1.7 }}>
+              Pochi payments are not auto-confirmed by the phone number alone. Ask the customer for the M-Pesa receipt code, verify it against the business account, then use “Verify Receipt” in the Orders tab. The server blocks confirmation until this verification is recorded.
+            </p>
           </div>
 
           {/* Other settings from allSettings */}

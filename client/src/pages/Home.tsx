@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { usePageMeta } from "@/hooks/usePageMeta";
+import { useLazyMedia } from "@/hooks/useLazyMedia";
 
 function MediaPreview({ item }: { item: any }) {
   const [isMuted, setIsMuted] = useState(true);
@@ -10,6 +11,7 @@ function MediaPreview({ item }: { item: any }) {
   const [showModal, setShowModal] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const modalVideoRef = useRef<HTMLVideoElement>(null);
+  const [mediaContainerRef, shouldLoadMedia] = useLazyMedia<HTMLDivElement>();
 
   useEffect(() => {
     if (videoRef.current) {
@@ -18,20 +20,21 @@ function MediaPreview({ item }: { item: any }) {
   }, [isMuted]);
 
   useEffect(() => {
-    if (videoRef.current) {
-      isPaused ? videoRef.current.pause() : videoRef.current.play();
-    }
-  }, [isPaused]);
+    if (!shouldLoadMedia || !videoRef.current) return;
+    if (isPaused) videoRef.current.pause();
+    else void videoRef.current.play().catch(() => undefined);
+  }, [isPaused, shouldLoadMedia]);
 
   useEffect(() => {
     if (showModal && modalVideoRef.current) {
-      modalVideoRef.current.play();
+      void modalVideoRef.current.play().catch(() => undefined);
     }
   }, [showModal]);
 
   return (
     <>
       <div
+        ref={mediaContainerRef}
         style={{
           height: 170,
           overflow: "hidden",
@@ -47,9 +50,9 @@ function MediaPreview({ item }: { item: any }) {
           <>
             <video
               ref={videoRef}
-              src={item.videoUrl}
+              src={shouldLoadMedia ? item.videoUrl : undefined}
               poster={item.imageUrl || undefined}
-              autoPlay
+              autoPlay={shouldLoadMedia}
               loop
               muted={isMuted}
               playsInline
@@ -201,6 +204,9 @@ function MediaPreview({ item }: { item: any }) {
               <img
                 src={item.imageUrl}
                 alt={item.name || "Food item"}
+                width={640}
+                height={480}
+                sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 33vw"
                 loading="lazy"
                 decoding="async"
                 className="pb-food-img"
@@ -433,7 +439,7 @@ const MENU = [
     videoUrl: "/media/videos/Sultan.mp4",
   },
   {
-    name: "Pasua Corn",
+    name: "Passua Corn",
     category: "Sides",
     price: 300,
     desc: "One beef burger + masala chips (spicy or non-spicy)",
@@ -624,7 +630,8 @@ function PBFooter() {
           <a href="tel:0722473873" className="pb-footer-link">
             0722 473 873
           </a>
-          <span className="pb-footer-link">Opp Rainbow Resort, Ruiru</span>
+                      <span className="pb-footer-link">Ruiru, Kenya — confirm current pickup point</span>
+
           <a
             href="https://wa.me/254722473873?text=Hi%20Passua%20Bites%2C%20I%27d%20like%20to%20place%20an%20order"
             target="_blank"
@@ -730,11 +737,15 @@ function PBFooter() {
 export { PBNav, PBFooter };
 
 export default function Home() {
-  usePageMeta({ title: "Passua Bites — Smocha, Chapo & Kenyan Street Food in Ruiru", description: "Order authentic Kenyan street food — smocha, chapo, ndengu, and more. Passua Bites serves Ruiru, opposite Rainbow Resort." });
+  usePageMeta({ title: "Passua Bites — Smocha, Chapo & Kenyan Street Food in Ruiru", description: "Order authentic Kenyan street food — smocha, chapo, ndengu, and more from Passua Bites in Ruiru. Contact us for the current pickup point." });
   const { data: displacementMessage } = trpc.location.get.useQuery(undefined, {
     staleTime: 1000 * 60 * 5,
   });
-  const { data: menuItems = [] } = trpc.menu.list.useQuery();
+  const { data: menuItems = [] } = trpc.menu.list.useQuery(undefined, {
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: 1,
+  });
 
   const { data: avgRating } = trpc.reviews.getAverageRating.useQuery({});
   const { data: latestReviews = [] } = trpc.reviews.list.useQuery(undefined, {
@@ -751,7 +762,7 @@ export default function Home() {
           "Masala Chips — KSH 150",
           "Hot Blazer — KSH 200",
           "Sultan — KSH 270",
-          "Pasua Corn — KSH 300",
+          "Passua Corn — KSH 300",
           "Mega Sultan — KSH 560",
         ];
 
@@ -760,14 +771,14 @@ export default function Home() {
     "@type": "FoodEstablishment",
     name: "Passua Bites",
     description:
-      "Authentic Kenyan street food — smocha, chapo, ndengu, viazi karai, and more. Serving Ruiru opposite Rainbow Resort.",
+      "Authentic Kenyan street food — smocha, chapo, ndengu, viazi karai, and more. Serving Ruiru, Kenya; contact us for the current pickup point.",
     url: "https://passua-bites-web.vercel.app",
     telephone: "+254722473873",
     servesCuisine: "Kenyan",
     priceRange: "KES 110–560",
     address: {
       "@type": "PostalAddress",
-      streetAddress: "Opposite Rainbow Resort",
+      streetAddress: "Current pickup point confirmed by phone or WhatsApp",
       addressLocality: "Ruiru",
       addressCountry: "KE",
     },
@@ -905,7 +916,7 @@ export default function Home() {
             paddingLeft: "0.8rem",
             marginBottom: "1.8rem",
           }}>
-            Opp Rainbow Resort, Ruiru — 0722 473 873
+            Ruiru, Kenya — confirm current pickup point · 0722 473 873
           </div>
 
           {/* CTA buttons */}
@@ -1145,7 +1156,7 @@ export default function Home() {
           className="pb-eyebrow"
           style={{ color: "#FF8C00", justifyContent: "center" }}
         >
-          Recent Event
+          Recent Event · 11th Edition · Playtime
         </div>
         <h2
           style={{
@@ -1155,7 +1166,7 @@ export default function Home() {
           }}
         >
           Nairobi Street <span style={{ color: "#FF8C00" }}>Food Festival</span>{" "}
-          2026
+          · 8 August 2026
         </h2>
         <p
           style={{
@@ -1166,16 +1177,14 @@ export default function Home() {
             lineHeight: "1.6",
           }}
         >
-          Thank you to everyone who visited our booth! It was an incredible
-          weekend of flavors, music, and community. Missed it? Check out our
-          festival recap.
+          Passua Bites took the stall to ASK Arena at Jamhuri Showground for a dry, high-energy day of food, music, games, and community. Read the recap of our second FoodFest appearance this year.
         </p>
         <Link
           href="/nairobi-food-fest"
           className="pb-btn-primary"
           style={{ background: "#FF8C00" }}
         >
-          View Festival Recap
+          Read the Playtime recap
         </Link>
       </section>
 
