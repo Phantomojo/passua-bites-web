@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+Allow: /menu
+Allow: /reviews
+Allow: /about
+Allow: /contact
+Allow: /privacy
+Allow: /terms
+
+Disallow: /admin
+Disallow: /api/
+Disallow: /checkout
+Disallow: /__manus__/
+
+Sitemap: https://passua-bites-web.vercel.app/sitemap.xml

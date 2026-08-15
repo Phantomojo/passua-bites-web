@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pasua Bites — Kenyan Culture Hero Concept</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=DM+Mono:wght@400;500;700&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #1a0f0a;
+    font-family: 'DM Mono', monospace;
+    overflow-x: hidden;
+    color: #f2e8d8;
+  }
+
+  /* MAASAI SHUKA PATTERN BORDER */
+  .shuka-border {
+    height: 12px;
+    background:
+      repeating-linear-gradient(
+        90deg,
+        #cc0000 0px, #cc0000 20px,
+        #000000 20px, #000000 24px,
+        #006633 24px, #006633 44px,
+        #000000 44px, #000000 48px
+      );
+  }
+
+  /* HERO */
+  .hero {
+    position: relative;
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    overflow: hidden;
+  }
+
+  /* LEFT */
+  .hero-left {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 4rem 3rem;
+    z-index: 10;
+  }
+
+  /* Kanga pattern background */
+  .hero-left::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0.04;
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 30px, #f2e8d8 30px, #f2e8d8 31px),
+      repeating-linear-gradient(90deg, transparent, transparent 30px, #f2e8d8 30px, #f2e8d8 31px);
+    pointer-events: none;
+  }
+
+  /* Beadwork accent dots */
+  .beadwork {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 1.5rem;
+  }
+  .bead {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    animation: bead-pulse 3s ease-in-out infinite;
+  }
+  .bead:nth-child(1) { background: #cc0000; animation-delay: 0s; }
+  .bead:nth-child(2) { background: #006633; animation-delay: 0.2s; }
+  .bead:nth-child(3) { background: #f2c800; animation-delay: 0.4s; }
+  .bead:nth-child(4) { background: #ffffff; animation-delay: 0.6s; }
+  .bead:nth-child(5) { background: #cc0000; animation-delay: 0.8s; }
+  .bead:nth-child(6) { background: #006633; animation-delay: 1.0s; }
+  .bead:nth-child(7) { background: #f2c800; animation-delay: 1.2s; }
+  .bead:nth-child(8) { background: #ffffff; animation-delay: 1.4s; }
+  .bead:nth-child(9) { background: #cc0000; animation-delay: 1.6s; }
+  .bead:nth-child(10) { background: #006633; animation-delay: 1.8s; }
+  @keyframes bead-pulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 rgba(255,255,255,0); }
+    50% { transform: scale(1.2); box-shadow: 0 0 8px rgba(255,255,255,0.3); }
+  }
+
+  /* Kanga proverb */
+  .kanga-proverb {
+    display: inline-block;
+    background: #cc0000;
+    color: #f2e8d8;
+    padding: 0.6rem 1.5rem;
+    font-family: 'Playfair Display', serif;
+    font-size: 0.8rem;
+    font-style: italic;
+    letter-spacing: 0.05em;
+    margin-bottom: 1.5rem;
+    position: relative;
+    border-left: 4px solid #f2c800;
+  }
+  .kanga-proverb::after {
+    content: '— Kanga';
+    display: block;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.55rem;
+    font-style: normal;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-top: 0.3rem;
+    opacity: 0.6;
+  }
+
+  /* Title */
+  .title {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(3rem, 6vw, 5.5rem);
+    font-weight: 900;
+    line-height: 0.92;
+    margin-bottom: 0.5rem;
+  }
+  .title .pasua {
+    color: #f2c800;
+    display: block;
+    text-shadow: 2px 2px 0 #cc0000;
+  }
+  .title .bites {
+    color: #f2e8d8;
+    display: block;
+    font-style: italic;
+  }
+
+  /* Shield icon (SVG inline) */
+  .shield-icon {
+    width: 60px;
+    height: 80px;
+    margin: 1.5rem 0;
+    position: relative;
+  }
+  .shield-icon svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Tagline */
+  .tagline {
+    font-size: 0.85rem;
+    color: #c4a882;
+    line-height: 1.7;
+    max-width: 360px;
+    margin-bottom: 1rem;
+  }
+
+  /* Location */
+  .location {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: 0.75rem;
+    color: #a08060;
+    margin-bottom: 2rem;
+    padding: 0.8rem 0;
+    border-top: 1px solid rgba(242,232,216,0.1);
+    border-bottom: 1px solid rgba(242,232,216,0.1);
+  }
+  .location .dot {
+    width: 8px;
+    height: 8px;
+    background: #cc0000;
+    border-radius: 50%;
+    animation: location-pulse 2s ease-in-out infinite;
+  }
+  @keyframes location-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(204,0,0,0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(204,0,0,0); }
+  }
+
+  /* CTAs */
+  .cta-group {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .cta {
+    display: inline-block;
+    padding: 0.8rem 2rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    text-decoration: none;
+    border: 2px solid;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  .cta.primary {
+    background: #cc0000;
+    border-color: #cc0000;
+    color: #f2e8d8;
+  }
+  .cta.primary:hover {
+    background: #aa0000;
+    box-shadow: 0 0 20px rgba(204,0,0,0.4);
+  }
+  .cta.secondary {
+    background: transparent;
+    border-color: #f2c800;
+    color: #f2c800;
+  }
+  .cta.secondary:hover {
+    background: #f2c800;
+    color: #1a0f0a;
+  }
+
+  /* RIGHT: KENYAN SHIELD + SPEARS */
+  .hero-right {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  /* Shield background glow */
+  .hero-right::before {
+    content: '';
+    position: absolute;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(204,0,0,0.15) 0%, transparent 70%);
+    border-radius: 50%;
+    animation: shield-glow 4s ease-in-out infinite;
+  }
+  @keyframes shield-glow {
+    0%, 100% { transform: scale(1); opacity: 0.6; }
+    50% { transform: scale(1.1); opacity: 1; }
+  }
+
+  /* Large shield SVG */
+  .shield-display {
+    position: relative;
+    z-index: 10;
+  }
+
+  /* Beadwork ring */
+  .bead-ring {
+    position: absolute;
+    width: 320px;
+    height: 320px;
+    border: 3px dashed rgba(242,200,0,0.2);
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    animation: ring-spin 30s linear infinite;
+  }
+  @keyframes ring-spin {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+  }
+
+  /* Floating beads */
+  .floating-bead {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    animation: float-bead 6s ease-in-out infinite;
+  }
+  .floating-bead:nth-child(1) { background: #cc0000; top: 15%; left: 20%; animation-delay: 0s; }
+  .floating-bead:nth-child(2) { background: #006633; top: 25%; right: 15%; animation-delay: 1s; }
+  .floating-bead:nth-child(3) { background: #f2c800; bottom: 30%; left: 10%; animation-delay: 2s; }
+  .floating-bead:nth-child(4) { background: #ffffff; bottom: 20%; right: 20%; animation-delay: 3s; }
+  .floating-bead:nth-child(5) { background: #cc0000; top: 60%; left: 25%; animation-delay: 4s; }
+  .floating-bead:nth-child(6) { background: #006633; top: 40%; right: 25%; animation-delay: 5s; }
+  @keyframes float-bead {
+    0%, 100% { transform: translateY(0) scale(1); opacity: 0.6; }
+    50% { transform: translateY(-20px) scale(1.3); opacity: 1; }
+  }
+
+  /* Bottom border */
+  .shuka-border-bottom {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 12px;
+    z-index: 100;
+    background:
+      repeating-linear-gradient(
+        90deg,
+        #cc0000 0px, #cc0000 20px,
+        #000000 20px, #000000 24px,
+        #006633 24px, #006633 44px,
+        #000000 44px, #000000 48px
+      );
+  }
+
+  /* Bottom ticker */
+  .ticker {
+    position: fixed;
+    bottom: 12px;
+    left: 0;
+    right: 0;
+    z-index: 99;
+    background: rgba(26,15,10,0.95);
+    border-top: 1px solid rgba(242,232,216,0.1);
+    padding: 0.6rem 0;
+    overflow: hidden;
+  }
+  .ticker-track {
+    display: flex;
+    gap: 2rem;
+    white-space: nowrap;
+    animation: ticker-scroll 25s linear infinite;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .ticker-item { color: #888; }
+  .ticker-item .gold { color: #f2c800; }
+  .ticker-item .red { color: #cc0000; }
+  .ticker-sep { color: #006633; }
+  @keyframes ticker-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  /* Mobile */
+  @media (max-width: 768px) {
+    .hero { grid-template-columns: 1fr; }
+    .hero-right { display: none; }
+    .title { font-size: 2.8rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="shuka-border"></div>
+
+<section class="hero">
+  <div class="hero-left">
+    <div class="beadwork">
+      <div class="bead"></div><div class="bead"></div><div class="bead"></div>
+      <div class="bead"></div><div class="bead"></div><div class="bead"></div>
+      <div class="bead"></div><div class="bead"></div><div class="bead"></div>
+      <div class="bead"></div>
+    </div>
+
+    <div class="kanga-proverb">
+      "Haraka haraka haina baraka"
+    </div>
+
+    <h1 class="title">
+      <span class="pasua">Pasua</span>
+      <span class="bites">Bites</span>
+    </h1>
+
+    <div class="shield-icon">
+      <svg viewBox="0 0 60 80" fill="none">
+        <path d="M30 5 L55 20 L55 45 Q55 65 30 78 Q5 65 5 45 L5 20 Z"
+              fill="none" stroke="#cc0000" stroke-width="2"/>
+        <path d="M30 15 L45 25 L45 42 Q45 58 30 68 Q15 58 15 42 L15 25 Z"
+              fill="#cc0000" opacity="0.3"/>
+        <line x1="30" y1="5" x2="30" y2="78" stroke="#f2c800" stroke-width="1.5"/>
+        <line x1="5" y1="40" x2="55" y2="40" stroke="#f2c800" stroke-width="1.5"/>
+        <circle cx="30" cy="40" r="8" fill="none" stroke="#f2c800" stroke-width="1"/>
+      </svg>
+    </div>
+
+    <p class="tagline">
+      Street food with soul — smoked, wrapped, served fresh. Born in Ruiru. Now online, always around.
+    </p>
+
+    <div class="location">
+      <div class="dot"></div>
+      <span><strong style="color:#f2c800">Opp Rainbow Resort, Ruiru</strong> — 0722 473 873 — Also on Bolt Food</span>
+    </div>
+
+    <div class="cta-group">
+      <a href="#" class="cta primary">View Menu</a>
+      <a href="#" class="cta secondary">Order on WhatsApp</a>
+    </div>
+  </div>
+
+  <div class="hero-right">
+    <div class="floating-bead"></div>
+    <div class="floating-bead"></div>
+    <div class="floating-bead"></div>
+    <div class="floating-bead"></div>
+    <div class="floating-bead"></div>
+    <div class="floating-bead"></div>
+
+    <div class="bead-ring"></div>
+
+    <div class="shield-display">
+      <svg width="200" height="280" viewBox="0 0 200 280" fill="none">
+        <!-- Shield body -->
+        <path d="M100 10 L185 60 L185 160 Q185 230 100 270 Q15 230 15 160 L15 60 Z"
+              fill="#1a0f0a" stroke="#cc0000" stroke-width="4"/>
+        <!-- Inner shield -->
+        <path d="M100 30 L165 70 L165 155 Q165 210 100 245 Q35 210 35 155 L35 70 Z"
+              fill="#cc0000" opacity="0.2"/>
+        <!-- Center cross (Maasai shield pattern) -->
+        <line x1="100" y1="10" x2="100" y2="270" stroke="#f2c800" stroke-width="3"/>
+        <line x1="15" y1="120" x2="185" y2="120" stroke="#f2c800" stroke-width="3"/>
+        <!-- Diamond pattern -->
+        <path d="M100 60 L140 120 L100 180 L60 120 Z" fill="none" stroke="#f2c800" stroke-width="2"/>
+        <path d="M100 80 L125 120 L100 160 L75 120 Z" fill="#f2c800" opacity="0.15"/>
+        <!-- Horizontal stripes -->
+        <line x1="35" y1="90" x2="165" y2="90" stroke="#006633" stroke-width="2" opacity="0.5"/>
+        <line x1="35" y1="150" x2="165" y2="150" stroke="#006633" stroke-width="2" opacity="0.5"/>
+        <!-- Spear left -->
+        <line x1="45" y1="0" x2="45" y2="280" stroke="#8b7355" stroke-width="2"/>
+        <polygon points="45,0 38,25 52,25" fill="#a0a0a0"/>
+        <!-- Spear right -->
+        <line x1="155" y1="0" x2="155" y2="280" stroke="#8b7355" stroke-width="2"/>
+        <polygon points="155,0 148,25 162,25" fill="#a0a0a0"/>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<div class="ticker">
+  <div class="ticker-track">
+    <span class="ticker-item"><span class="gold">HARAKA HARAKA</span> — HAINA BARAKA</span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item"><span class="red">SMOCHAS WORTH FINDING</span></span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">BORN IN <span class="gold">RUIRU</span></span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">ALSO ON <span class="red">BOLT FOOD</span></span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item"><span class="gold">STREET FOOD WITH SOUL</span></span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item"><span class="gold">HARAKA HARAKA</span> — HAINA BARAKA</span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item"><span class="red">SMOCHAS WORTH FINDING</span></span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">BORN IN <span class="gold">RUIRU</span></span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">ALSO ON <span class="red">BOLT FOOD</span></span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item"><span class="gold">STREET FOOD WITH SOUL</span></span>
+    <span class="ticker-sep">◆</span>
+  </div>
+</div>
+
+<div class="shuka-border-bottom"></div>
+
+</body>
+</html>
