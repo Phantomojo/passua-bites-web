@@ -10,6 +10,12 @@ import "./index.css";
 
 const queryClient = new QueryClient();
 
+const trpcApiUrl = import.meta.env.VITE_API_URL?.trim() ||
+  (import.meta.env.DEV ? "http://localhost:3000/api/trpc" : "");
+if (!trpcApiUrl) {
+  throw new Error("VITE_API_URL must be configured for production builds");
+}
+
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;
@@ -43,10 +49,7 @@ queryClient.getMutationCache().subscribe(event => {
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url:
-        process.env.NODE_ENV === "development"
-          ? "http://localhost:3000/api/trpc"
-          : "https://passua-api.onrender.com/api/trpc",
+      url: trpcApiUrl,
       transformer: superjson,
       fetch(input, init) {
         return globalThis.fetch(input, {

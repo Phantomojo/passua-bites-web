@@ -3,7 +3,7 @@ import { useEffect } from "react";
 const SITE_NAME = "Passua Bites";
 const DEFAULT_DESC = "Best smochas, burgers, and combos in Ruiru. Order via M-Pesa STK Push or WhatsApp.";
 const DEFAULT_OG_IMAGE = ""; // set when you have a hero image URL
-const SITE_URL = "https://passuabites.vercel.app";
+const SITE_URL = "https://passua-bites-web.vercel.app";
 
 export interface PageMeta {
   title: string;

@@ -40,7 +40,7 @@ const FALLBACK_MENU = [
   },
   {
     id: 4,
-    name: "Pasua Corn",
+    name: "Passua Corn",
     price: "300.00",
     imageUrl: "/media/images/pasua-corn.jpg",
     description: "One beef burger + masala chips (spicy or non-spicy)",

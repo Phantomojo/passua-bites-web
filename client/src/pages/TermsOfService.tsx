@@ -32,7 +32,7 @@ export default function TermsOfService() {
               2. Our Service
             </h2>
             <p>
-              Passua Bites is a food business located at Opp Rainbow Resort, Ruiru, Kenya.
+              Passua Bites serves customers in Ruiru and nearby areas. Because our pickup point can change, please confirm the current directions with us before travelling.
               Our website allows you to:
             </p>
             <ul style={{ marginLeft: "1.5rem", marginTop: "0.5rem" }}>
@@ -61,10 +61,10 @@ export default function TermsOfService() {
               4. Payment
             </h2>
             <ul style={{ marginLeft: "1.5rem" }}>
-              <li><strong>M-Pesa Paybill:</strong> Business No. 400200, Account No. 1053125</li>
+              <li><strong>Pochi la Biashara:</strong> Send payment to 0725 619 991 and keep the receipt code from the M-Pesa SMS</li>
               <li><strong>Cash on Delivery:</strong> Pay when your order is delivered</li>
-              <li>Orders are prepared after payment is confirmed</li>
-              <li>We are not responsible for incorrect M-Pesa payments</li>
+              <li>Pochi orders remain pending until the Passua Bites team verifies the receipt code</li>
+              <li>We are not responsible for payments sent to the wrong number or with an incorrect amount</li>
             </ul>
           </section>
 
@@ -165,7 +165,7 @@ export default function TermsOfService() {
             </h2>
             <p>
               <strong>Passua Bites</strong><br />
-              Opp Rainbow Resort, Ruiru, Kenya<br />
+              Ruiru, Kenya — confirm the current pickup point before visiting<br />
               Phone: 0722 473 873<br />
               WhatsApp: <a href="https://wa.me/254722473873" style={{ color: "var(--pb-ember)" }}>wa.me/254722473873</a>
             </p>

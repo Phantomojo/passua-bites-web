@@ -51,24 +51,35 @@ export type InsertMenuItem = typeof menuItems.$inferInsert;
  */
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
-  userId: integer("userId"),
+  userId: integer("userId").references(() => users.id, { onDelete: "set null" }),
   customerName: varchar("customerName", { length: 255 }).notNull(),
   customerPhone: varchar("customerPhone", { length: 20 }).notNull(),
   customerEmail: varchar("customerEmail", { length: 320 }),
   deliveryAddress: text("deliveryAddress"),
+  trackingToken: varchar("trackingToken", { length: 64 }).notNull().unique(),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+  deliveryFee: decimal("deliveryFee", { precision: 10, scale: 2 }).notNull(),
+  deliveryZone: varchar("deliveryZone", { length: 20 }).notNull(),
   totalPrice: decimal("totalPrice", { precision: 10, scale: 2 }).notNull(),
   status: varchar("status", { length: 20 }).default("pending").notNull(),
   paymentMethod: varchar("paymentMethod", { length: 50 })
-    .default("mpesa")
+    .default("pochi")
     .notNull(),
   paymentStatus: varchar("paymentStatus", { length: 20 })
     .default("pending")
     .notNull(),
   mpesaTransactionId: varchar("mpesaTransactionId", { length: 255 }),
+  paymentReference: varchar("paymentReference", { length: 255 }),
+  paymentSubmittedAt: timestamp("paymentSubmittedAt"),
+  paymentVerifiedAt: timestamp("paymentVerifiedAt"),
+  paymentVerifiedBy: varchar("paymentVerifiedBy", { length: 320 }),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-}, (t) => [index("idx_orders_userId").on(t.userId)]);
+}, (t) => [
+  index("idx_orders_userId").on(t.userId),
+  index("idx_orders_trackingToken").on(t.trackingToken),
+]);
 
 export type Order = typeof orders.$inferSelect;
 export type InsertOrder = typeof orders.$inferInsert;
@@ -78,8 +89,12 @@ export type InsertOrder = typeof orders.$inferInsert;
  */
 export const orderItems = pgTable("orderItems", {
   id: serial("id").primaryKey(),
-  orderId: integer("orderId").notNull(),
-  menuItemId: integer("menuItemId").notNull(),
+  orderId: integer("orderId")
+    .notNull()
+    .references(() => orders.id, { onDelete: "cascade" }),
+  menuItemId: integer("menuItemId")
+    .notNull()
+    .references(() => menuItems.id, { onDelete: "restrict" }),
   quantity: integer("quantity").notNull(),
   priceAtTime: decimal("priceAtTime", { precision: 10, scale: 2 }).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -125,7 +140,9 @@ export type InsertSiteSetting = typeof siteSettings.$inferInsert;
  */
 export const mpesaTransactions = pgTable("mpesaTransactions", {
   id: serial("id").primaryKey(),
-  orderId: integer("orderId").notNull(),
+  orderId: integer("orderId")
+    .notNull()
+    .references(() => orders.id, { onDelete: "cascade" }),
   checkoutRequestID: varchar("checkoutRequestID", { length: 255 })
     .notNull()
     .unique(),

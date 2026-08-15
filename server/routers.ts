@@ -36,7 +36,7 @@ export const appRouter = router({
       const setting = await getSiteSetting("displacementMessage");
       return (
         setting?.value ??
-        "We're currently displaced. Order via Bolt Food or WhatsApp!"
+        "Our pickup point is currently changing due to road works. Order via Bolt Food or WhatsApp and contact us for the latest directions."
       );
     }),
     update: adminProcedure

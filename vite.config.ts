@@ -167,6 +167,19 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("/client/src/pages/AdminDashboard")) return "admin";
+          if (id.includes("/client/src/pages/NairobiFoodFest")) return "foodfest";
+          if (id.includes("node_modules/recharts")) return "charts";
+          if (id.includes("node_modules/framer-motion")) return "motion";
+          if (id.includes("node_modules/@radix-ui")) return "ui-vendor";
+          if (id.includes("node_modules/")) return "vendor";
+          return undefined;
+        },
+      },
+    },
   },
   server: {
     host: true,

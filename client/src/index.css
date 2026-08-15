@@ -761,3 +761,45 @@
     display: none !important;
   }
 }
+
+/* ===== HARDENED VISUAL SYSTEM ===== */
+
+.pb-panel {
+  background: var(--pb-bg2);
+  border: 1px solid var(--pb-rule2);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.12);
+}
+
+.pb-card-lift {
+  transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+}
+
+.pb-card-lift:hover {
+  transform: translateY(-4px);
+  border-color: rgba(196, 92, 40, 0.55) !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
+}
+
+.pb-btn-primary:focus-visible,
+.pb-btn-ghost:focus-visible,
+.pb-nl:focus-visible,
+.pb-nav-logo:focus-visible,
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--pb-ivory);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

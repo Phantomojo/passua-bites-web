@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch, useLocation } from "wouter";
-import { useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -13,7 +13,7 @@ import Checkout from "./pages/Checkout";
 import OrderTracking from "./pages/OrderTracking";
 import Contact from "./pages/Contact";
 import Reviews from "./pages/Reviews";
-import AdminDashboard from "./pages/AdminDashboard";
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 import About from "./pages/About";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
@@ -43,6 +43,20 @@ function SpaPageviewTracker() {
   return null;
 }
 
+function AdminRoute() {
+  return (
+    <Suspense
+      fallback={
+        <div className="pb-panel" style={{ margin: "5rem auto", maxWidth: 420, padding: "2rem", textAlign: "center" }}>
+          Loading admin workspace…
+        </div>
+      }
+    >
+      <AdminDashboard />
+    </Suspense>
+  );
+}
+
 function Router() {
   return (
     <>
@@ -54,7 +68,7 @@ function Router() {
         <Route path={"/orders"} component={OrderTracking} />
         <Route path={"/contact"} component={Contact} />
         <Route path={"/reviews"} component={Reviews} />
-        <Route path="/admin" component={AdminDashboard} />
+        <Route path="/admin" component={AdminRoute} />
         <Route path="/about" component={About} />
         <Route path="/privacy" component={PrivacyPolicy} />
         <Route path="/terms" component={TermsOfService} />

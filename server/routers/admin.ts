@@ -1,40 +1,43 @@
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "../_core/cookies";
 import { sdk } from "../_core/sdk";
+import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { users } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 
-const getAdminPassword = () => {
-  const password = process.env.ADMIN_PASSWORD;
-  if (!password) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error(
-        "ADMIN_PASSWORD environment variable is required in production"
-      );
-    }
-    return "passua2026";
-  }
-  return password;
-};
+const ADMIN_SESSION_MS = 8 * 60 * 60 * 1000;
 
-const ADMIN_PASSWORD = getAdminPassword();
+function getAdminPassword(): string | null {
+  const password = process.env.ADMIN_PASSWORD?.trim();
+  return password ? password : null;
+}
+
+function passwordsMatch(candidate: string, expected: string): boolean {
+  const candidateBytes = Buffer.from(candidate);
+  const expectedBytes = Buffer.from(expected);
+  if (candidateBytes.length !== expectedBytes.length) return false;
+  return timingSafeEqual(candidateBytes, expectedBytes);
+}
 
 export const adminRouter = router({
-  // Login with password
+  // Login with a server-configured password. The session token is never returned to JavaScript.
   login: publicProcedure
-    .input(z.object({ password: z.string() }))
+    .input(z.object({ password: z.string().min(1).max(256) }))
     .mutation(async ({ input, ctx }) => {
-      if (input.password !== ADMIN_PASSWORD) {
+      const adminPassword = getAdminPassword();
+      if (!adminPassword) {
+        throw new Error("Admin login is not configured");
+      }
+      if (!passwordsMatch(input.password, adminPassword)) {
         throw new Error("Invalid password");
       }
 
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
-      // Find or create admin user
       let adminUser = await db
         .select()
         .from(users)
@@ -64,18 +67,30 @@ export const adminRouter = router({
       const admin = adminUser[0];
       const token = await sdk.createSessionToken(admin.openId, {
         name: admin.name || "Admin",
-        expiresInMs: ONE_YEAR_MS,
+        expiresInMs: ADMIN_SESSION_MS,
       });
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.cookie(COOKIE_NAME, token, {
         ...cookieOptions,
-        maxAge: ONE_YEAR_MS,
+        maxAge: ADMIN_SESSION_MS,
       });
 
       return {
         success: true,
-        token,
         userId: admin.id,
+        name: admin.name || "Admin",
+        expiresInMs: ADMIN_SESSION_MS,
       };
     }),
+
+  // Session discovery uses the HTTP-only cookie and does not expose the token.
+  me: publicProcedure.query(({ ctx }) => {
+    if (!ctx.user || ctx.user.role !== "admin") return null;
+    return { userId: ctx.user.id, name: ctx.user.name || "Admin" };
+  }),
+
+  logout: publicProcedure.mutation(({ ctx }) => {
+    ctx.res.clearCookie(COOKIE_NAME, getSessionCookieOptions(ctx.req));
+    return { success: true };
+  }),
 });

@@ -382,7 +382,7 @@ const FALLBACK_MENU = [
   { id: 4, name: "Masala Chips", category: "Sides", price: 150, description: "Crunchy outside, soft inside fries, well marinated — spicy or non-spicy", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: null },
   { id: 5, name: "Hot Blazer", category: "Specials", price: 200, description: "Two chapatis (wrapped), lettuce, kachumbari, boerewors, indomie, avocado, gravy sauce", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: null },
   { id: 6, name: "Sultan", category: "Combos", price: 270, description: "Two chapatis (wrapped), lettuce, kachumbari, one beef pattie, masala chips, avocado, sauces — comes with a soda", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: "/media/videos/Sultan.mp4" },
-  { id: 7, name: "Pasua Corn", category: "Sides", price: 300, description: "One beef burger + masala chips (spicy or non-spicy)", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: null },
+  { id: 7, name: "Passua Corn", category: "Sides", price: 300, description: "One beef burger + masala chips (spicy or non-spicy)", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: null },
   { id: 8, name: "Mega Sultan", category: "Combos", price: 560, description: "Two chapatis (wrapped), lettuce, kachumbari, two beef patties, cheese, masala chips, avocado, sauces — comes with a soda", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: "/media/videos/megasultan.mp4" },
 ];
 

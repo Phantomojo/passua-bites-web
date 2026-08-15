@@ -14,7 +14,7 @@ interface CartItem {
 }
 
 export default function Checkout() {
-  usePageMeta({ title: "Checkout — Passua Bites", description: "Review your cart and pay with M-Pesa for delivery or pickup from Passua Bites in Ruiru." });
+  usePageMeta({ title: "Checkout — Passua Bites", description: "Review your cart and pay securely to Passua Bites via Pochi la Biashara or cash on delivery." });
   const [cart, setCart] = useState<CartItem[]>([]);
   const [formData, setFormData] = useState({
     customerName: "",
@@ -22,56 +22,21 @@ export default function Checkout() {
     customerEmail: "",
     deliveryAddress: "",
   });
-  const [paymentMethod, setPaymentMethod] = useState<"mpesa" | "cash">("mpesa");
-  const [mpesaCode, setMpesaCode] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"pochi" | "cash">("pochi");
+  const [receiptCode, setReceiptCode] = useState("");
+  const [receiptSubmitted, setReceiptSubmitted] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderId, setOrderId] = useState<number | null>(null);
-  const [stkSent, setStkSent] = useState(false);
-  const [stkChecking, setStkChecking] = useState(false);
-
+  const [trackingToken, setTrackingToken] = useState<string | null>(null);
+  const [serverTotals, setServerTotals] = useState<{
+    subtotal: number;
+    deliveryFee: number;
+    totalPrice: number;
+  } | null>(null);
   const createOrder = trpc.orders.create.useMutation();
-  const initiateStk = trpc.payments.initiateStkPush.useMutation();
-  const [pollingId, setPollingId] = useState<string>("");
-
-  const queryPayment = trpc.payments.queryStatus.useQuery(
-    { checkoutRequestID: pollingId },
-    {
-      enabled: !!pollingId,
-      retry: false,
-      refetchInterval: 5000,
-      throwOnError: false,
-    }
-  );
-
-  // Watch for payment completion
-  useEffect(() => {
-    if (queryPayment.error) {
-      setStkChecking(false);
-      setPollingId("");
-      return;
-    }
-    if (!queryPayment.data) return;
-    if (queryPayment.data.status === "completed") {
-      setStkChecking(false);
-      setPollingId("");
-      toast.success("Payment confirmed! Your order is being prepared.");
-    } else if (
-      queryPayment.data.status === "failed" ||
-      queryPayment.data.status === "cancelled"
-    ) {
-      setStkChecking(false);
-      setPollingId("");
-      toast.error(
-        "Payment was not completed. You can retry or pay cash on delivery."
-      );
-    }
-  }, [queryPayment.data]);
-
-  const startPaymentPolling = (checkoutRequestID: string) => {
-    setPollingId(checkoutRequestID);
-    setStkChecking(true);
-  };
+  const submitPochiReceipt = trpc.payments.submitPochiReceipt.useMutation();
+  const { data: pochiInstructions } = trpc.payments.getInstructions.useQuery();
 
   useEffect(() => {
     const stored = localStorage.getItem("passua_cart");
@@ -88,10 +53,17 @@ export default function Checkout() {
     other: { fee: null, label: "Outside Ruiru - Chat with us" },
   };
 
+  function maskPhoneForDisplay(phone: string): string {
+    return phone.replace(/\d(?=\d{4})/g, "•");
+  }
+
   const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
   const deliveryFee =
     deliveryZone === "other" ? null : deliveryZone === "ruiru" ? 0 : 50;
   const grandTotal = deliveryFee !== null ? total + deliveryFee : null;
+  const authoritativeTotal = serverTotals?.totalPrice ?? grandTotal;
+  const authoritativeSubtotal = serverTotals?.subtotal ?? total;
+  const authoritativeDeliveryFee = serverTotals?.deliveryFee ?? deliveryFee;
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -99,6 +71,10 @@ export default function Checkout() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (deliveryZone === "other") {
+      toast.info("Please contact us on WhatsApp for a delivery quote outside Ruiru.");
+      return;
+    }
     if (
       !formData.customerName ||
       !formData.customerPhone ||
@@ -131,37 +107,40 @@ export default function Checkout() {
         customerPhone: formData.customerPhone,
         customerEmail: formData.customerEmail || undefined,
         deliveryAddress: formData.deliveryAddress,
+        deliveryZone,
         items: cart.map(item => ({
           menuItemId: item.id,
           quantity: item.quantity,
         })),
         paymentMethod,
-        notes: mpesaCode ? `M-Pesa Code: ${mpesaCode}` : undefined,
+        notes: receiptCode ? `Pochi receipt submitted: ${receiptCode}` : undefined,
       });
 
       const newOrderId = orderResult.orderId;
       setOrderId(newOrderId);
+      setTrackingToken(orderResult.trackingToken);
+      setServerTotals({
+        subtotal: orderResult.subtotal,
+        deliveryFee: orderResult.deliveryFee,
+        totalPrice: orderResult.totalPrice,
+      });
 
-      if (paymentMethod === "mpesa") {
-        // Trigger M-Pesa STK Push
-        try {
-          const stkResult = await initiateStk.mutateAsync({
-            orderId: newOrderId,
-            phoneNumber: formData.customerPhone,
-          });
-          setStkSent(true);
-          toast.success(stkResult.message);
-
-          // Start polling for payment status
-          startPaymentPolling(stkResult.checkoutRequestID);
-        } catch (stkError: any) {
-          // STK Push failed but order was created
-          toast.warning(
-            `Order created but M-Pesa prompt failed: ${stkError.message}. You can pay cash on delivery.`
-          );
+      if (paymentMethod === "pochi") {
+        if (receiptCode) {
+          try {
+            await submitPochiReceipt.mutateAsync({
+              trackingToken: orderResult.trackingToken,
+              receiptCode,
+            });
+            setReceiptSubmitted(true);
+            toast.success("Receipt submitted. We will verify your Pochi payment.");
+          } catch (receiptError: any) {
+            toast.warning(`Order created, but receipt submission needs retry: ${receiptError.message}`);
+          }
+        } else {
+          toast.success("Order placed. Pay to Pochi and send the receipt code for confirmation.");
         }
       } else {
-        // Cash payment - order confirmed
         toast.success("Order placed! Pay cash on delivery.");
       }
 
@@ -169,7 +148,7 @@ export default function Checkout() {
       trackGA4Event("purchase", {
         transaction_id: String(newOrderId),
         currency: "KES",
-        value: grandTotal,
+        value: orderResult.totalPrice,
         items: cart.map(i => ({ item_id: String(i.id), item_name: i.name, price: i.price, quantity: i.quantity })),
       });
 
@@ -181,6 +160,24 @@ export default function Checkout() {
       toast.error(error.message || "Failed to place order");
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleReceiptSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!trackingToken || !receiptCode.trim()) {
+      toast.error("Enter the receipt code from your Pochi payment SMS");
+      return;
+    }
+    try {
+      await submitPochiReceipt.mutateAsync({
+        trackingToken,
+        receiptCode,
+      });
+      setReceiptSubmitted(true);
+      toast.success("Receipt submitted. Staff verification is still required.");
+    } catch (error: any) {
+      toast.error(error.message || "Could not submit receipt");
     }
   };
 
@@ -201,7 +198,7 @@ export default function Checkout() {
   };
 
   // Order confirmation screen
-  if (orderPlaced && orderId) {
+  if (orderPlaced && orderId && trackingToken) {
     return (
       <div style={{ minHeight: "100vh", background: "var(--pb-bg)" }}>
         <PBNav />
@@ -263,7 +260,7 @@ export default function Checkout() {
                   marginBottom: "0.3rem",
                 }}
               >
-                Order ID
+                Private tracking token
               </div>
               <div
                 style={{
@@ -272,14 +269,15 @@ export default function Checkout() {
                   fontWeight: 700,
                 }}
               >
-                PB-{orderId}
+                {trackingToken}
               </div>
             </div>
 
             {[
               ["Name", formData.customerName],
-              ["Phone", formData.customerPhone],
-              ["Delivery address", formData.deliveryAddress],
+              ["Phone", maskPhoneForDisplay(formData.customerPhone)],
+              ["Delivery zone", DELIVERY_ZONES[deliveryZone].label],
+              ["Address", "Recorded securely for delivery"],
             ].map(([k, v]) => (
               <div
                 key={k}
@@ -341,11 +339,11 @@ export default function Checkout() {
                   color: "var(--pb-ember)",
                 }}
               >
-                Ksh {grandTotal}
+                Ksh {authoritativeTotal?.toFixed(2)}
               </span>
             </div>
 
-            {paymentMethod === "mpesa" ? (
+            {paymentMethod === "pochi" ? (
               <div
                 style={{
                   background: "rgba(196,92,40,0.05)",
@@ -378,11 +376,11 @@ export default function Checkout() {
                 >
                   Pay{" "}
                   <strong style={{ color: "var(--pb-ember)" }}>
-                    Ksh {grandTotal}
+                    Ksh {authoritativeTotal?.toFixed(2)}
                   </strong>{" "}
                   to:
                   <br />
-                  <strong>Paybill:</strong>{" "}
+                  <strong>Pochi number:</strong>{" "}
                   <span
                     style={{
                       fontFamily: "'DM Mono',monospace",
@@ -390,10 +388,10 @@ export default function Checkout() {
                       color: "var(--pb-ivory)",
                     }}
                   >
-                    400200
+                    {pochiInstructions?.businessNumber ?? "0725619991"}
                   </span>
                   <br />
-                  <strong>Account:</strong>{" "}
+                  <strong>Reference:</strong>{" "}
                   <span
                     style={{
                       fontFamily: "'DM Mono',monospace",
@@ -401,10 +399,10 @@ export default function Checkout() {
                       color: "var(--pb-ivory)",
                     }}
                   >
-                    1053125
+                    Order tracking token shown below
                   </span>
                 </div>
-                {mpesaCode && (
+                {receiptCode && (
                   <div
                     style={{
                       fontSize: "0.78rem",
@@ -419,7 +417,7 @@ export default function Checkout() {
                         fontFamily: "'DM Mono',monospace",
                       }}
                     >
-                      {mpesaCode}
+                      {receiptCode}
                     </strong>
                   </div>
                 )}
@@ -457,6 +455,39 @@ export default function Checkout() {
               </div>
             )}
 
+            {paymentMethod === "pochi" && (
+              <div
+                style={{
+                  background: "rgba(196,92,40,0.05)",
+                  border: "1px solid var(--pb-rule2)",
+                  padding: "1rem",
+                  marginBottom: "1.5rem",
+                }}
+              >
+                <div style={{ fontFamily: "'DM Mono',monospace", fontSize: "0.6rem", color: "var(--pb-ember)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
+                  Receipt verification
+                </div>
+                {receiptSubmitted ? (
+                  <div style={{ color: "#E8C99B", fontSize: "0.8rem", lineHeight: 1.6 }}>
+                    Receipt submitted. Your order remains pending until the Passua Bites team verifies the payment.
+                  </div>
+                ) : (
+                  <form onSubmit={handleReceiptSubmit} style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
+                    <input
+                      value={receiptCode}
+                      onChange={e => setReceiptCode(e.target.value.toUpperCase())}
+                      placeholder="Receipt code"
+                      aria-label="Pochi receipt code"
+                      style={{ ...inputStyle, flex: "1 1 190px", fontFamily: "'DM Mono',monospace", fontSize: "0.75rem" }}
+                    />
+                    <button type="submit" className="pb-btn-primary" disabled={submitPochiReceipt.isPending} style={{ minHeight: 44 }}>
+                      {submitPochiReceipt.isPending ? "Submitting…" : "Submit receipt"}
+                    </button>
+                  </form>
+                )}
+              </div>
+            )}
+
             <div
               style={{
                 background: "rgba(37,211,102,0.05)",
@@ -479,7 +510,8 @@ export default function Checkout() {
                 Notify us on WhatsApp so we can confirm your order
               </div>
               <a
-                href={`https://wa.me/254722473873?text=${encodeURIComponent(`Hi! I just placed order PB-${orderId} on your website.\n\nName: ${formData.customerName}\nPhone: ${formData.customerPhone}\nTotal: Ksh ${grandTotal}\nPayment: ${paymentMethod === "mpesa" ? (mpesaCode ? `M-Pesa (${mpesaCode})` : "M-Pesa (paying now)") : "Cash on delivery"}\nAddress: ${formData.deliveryAddress}`)}`}
+                href={`https://wa.me/254722473873?text=${encodeURIComponent(`Hi! I just placed an order on your website.\n\nTracking token: ${trackingToken}\nTotal: Ksh ${authoritativeTotal?.toFixed(2)}\nPayment: ${paymentMethod === "pochi" ? (receiptCode ? `Pochi receipt (${receiptCode})` : "Pochi payment pending verification") : "Cash on delivery"}
+`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="pb-btn-primary"
@@ -636,7 +668,7 @@ export default function Checkout() {
                 },
                 {
                   name: "customerPhone",
-                  label: "Phone number (M-Pesa)",
+                  label: "Phone number for order updates",
                   type: "tel",
                   placeholder: "0712 345 678",
                   required: true,
@@ -675,23 +707,45 @@ export default function Checkout() {
                 />
               </div>
 
+              <div>
+                <label htmlFor="delivery-zone" style={labelStyle}>Delivery zone</label>
+                <select
+                  id="delivery-zone"
+                  value={deliveryZone}
+                  onChange={e => {
+                    setDeliveryZone(e.target.value as "ruiru" | "environs" | "other");
+                    setServerTotals(null);
+                  }}
+                  style={{ ...inputStyle, background: "var(--pb-bg)", color: "var(--pb-ivory)" }}
+                >
+                  <option value="ruiru">Ruiru Town — free delivery</option>
+                  <option value="environs">Ruiru environs — Ksh 50</option>
+                  <option value="other">Outside Ruiru — request a quote</option>
+                </select>
+                {deliveryZone === "other" && (
+                  <div style={{ color: "var(--pb-ember)", fontSize: "0.72rem", marginTop: "0.4rem" }}>
+                    Please use WhatsApp for a delivery quote outside Ruiru.
+                  </div>
+                )}
+              </div>
+
               {/* Payment method */}
               <div>
                 <label style={labelStyle}>Payment method</label>
                 <div style={{ display: "flex", gap: "0.75rem" }}>
                   <button
                     type="button"
-                    onClick={() => setPaymentMethod("mpesa")}
+                    onClick={() => setPaymentMethod("pochi")}
                     style={{
                       flex: 1,
                       padding: "0.75rem",
-                      border: `1px solid ${paymentMethod === "mpesa" ? "var(--pb-ember)" : "var(--pb-rule)"}`,
+                      border: `1px solid ${paymentMethod === "pochi" ? "var(--pb-ember)" : "var(--pb-rule)"}`,
                       background:
-                        paymentMethod === "mpesa"
+                        paymentMethod === "pochi"
                           ? "rgba(196,92,40,0.1)"
                           : "transparent",
                       color:
-                        paymentMethod === "mpesa"
+                        paymentMethod === "pochi"
                           ? "var(--pb-ember)"
                           : "var(--pb-ivory3)",
                       fontFamily: "'DM Mono',monospace",
@@ -702,7 +756,7 @@ export default function Checkout() {
                       minHeight: 44,
                     }}
                   >
-                    M-Pesa
+                    Pochi
                   </button>
                   <button
                     type="button"
@@ -732,7 +786,7 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {paymentMethod === "mpesa" && (
+              {paymentMethod === "pochi" && (
                 <div
                   style={{
                     background: "rgba(196,92,40,0.05)",
@@ -751,7 +805,7 @@ export default function Checkout() {
                       marginBottom: "0.5rem",
                     }}
                   >
-                    Pay via M-Pesa
+                    Pay via Pochi la Biashara
                   </div>
                   <div
                     style={{
@@ -764,32 +818,23 @@ export default function Checkout() {
                   >
                     <strong style={{ color: "var(--pb-ivory)" }}>Steps:</strong>
                     <br />
-                    1. Go to M-Pesa on your phone
+                    1. Open M-Pesa or dial <strong>*334#</strong>
                     <br />
-                    2. Select <strong>Lipa Na M-Pesa</strong>
+                    2. Select <strong>Pay</strong>, then <strong>Pochi la Biashara</strong>
                     <br />
-                    3. Select <strong>Paybill</strong>
-                    <br />
-                    4. Business No:{" "}
+                    3. Business number:{" "}
                     <strong
                       style={{ color: "var(--pb-ember)", fontSize: "1rem" }}
                     >
-                      400200
+                      {pochiInstructions?.businessNumber ?? "0725619991"}
                     </strong>
                     <br />
-                    5. Account No:{" "}
-                    <strong
-                      style={{ color: "var(--pb-ember)", fontSize: "1rem" }}
-                    >
-                      1053125
-                    </strong>
-                    <br />
-                    6. Amount:{" "}
+                    4. Amount:{" "}
                     <strong style={{ color: "var(--pb-ember)" }}>
-                      Ksh {grandTotal}
+                      Ksh {authoritativeTotal?.toFixed(2) ?? "—"}
                     </strong>
                     <br />
-                    7. Enter PIN and confirm
+                    5. Enter your PIN and confirm. Keep the SMS receipt code.
                   </div>
                   <div
                     style={{
@@ -798,12 +843,12 @@ export default function Checkout() {
                     }}
                   >
                     <label style={{ ...labelStyle, marginBottom: "0.3rem" }}>
-                      M-Pesa Confirmation Code (optional)
+                      Pochi receipt code (optional)
                     </label>
                     <input
                       type="text"
-                      value={mpesaCode}
-                      onChange={e => setMpesaCode(e.target.value)}
+                      value={receiptCode}
+                      onChange={e => setReceiptCode(e.target.value.toUpperCase())}
                       placeholder="e.g. QJK7XXXXXXXX"
                       style={{
                         ...inputStyle,
@@ -819,7 +864,7 @@ export default function Checkout() {
                         marginTop: "0.3rem",
                       }}
                     >
-                      Enter the code from your M-Pesa SMS confirmation
+                      Enter the code from your Pochi payment SMS. Staff verification is required before the order is confirmed.
                     </div>
                   </div>
                 </div>
@@ -870,7 +915,9 @@ export default function Checkout() {
               >
                 {isProcessing
                   ? "Processing..."
-                  : `Place Order — Ksh ${grandTotal}`}
+                  : deliveryZone === "other"
+                    ? "Get a delivery quote on WhatsApp"
+                    : `Place Order — Ksh ${authoritativeTotal?.toFixed(2) ?? "—"}`}
               </button>
 
               <div style={{ textAlign: "center", marginTop: "0.5rem" }}>
@@ -881,7 +928,7 @@ export default function Checkout() {
                 </span>
                 <br />
                 <a
-                  href={`https://wa.me/254722473873?text=${encodeURIComponent(`Hi Passua Bites! I'd like to order:\n${cart.map(i => `${i.name} x${i.quantity}`).join("\n")}\nTotal: Ksh ${grandTotal}\nDelivery: ${formData.deliveryAddress || "TBD"}`)}`}
+                  href={`https://wa.me/254722473873?text=${encodeURIComponent(`Hi Passua Bites! I'd like to order:\n${cart.map(i => `${i.name} x${i.quantity}`).join("\n")}\nEstimated total: Ksh ${authoritativeTotal?.toFixed(2) ?? "To be quoted"}\nDelivery zone: ${DELIVERY_ZONES[deliveryZone].label}`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{
@@ -960,8 +1007,8 @@ export default function Checkout() {
             </div>
             <div style={{ paddingTop: "1rem", marginTop: "0.25rem" }}>
               {[
-                ["Subtotal", `Ksh ${total}`],
-                ["Delivery", deliveryFee === 0 ? "Free" : `Ksh ${deliveryFee}`],
+                ["Subtotal", `Ksh ${authoritativeSubtotal.toFixed(2)}`],
+                ["Delivery", authoritativeDeliveryFee === 0 ? "Free" : authoritativeDeliveryFee === null ? "Quote needed" : `Ksh ${authoritativeDeliveryFee.toFixed(2)}`],
               ].map(([k, v]) => (
                 <div
                   key={k}
@@ -1006,10 +1053,10 @@ export default function Checkout() {
                     color: "var(--pb-ember)",
                   }}
                 >
-                  Ksh {grandTotal}
+                  Ksh {authoritativeTotal?.toFixed(2) ?? "—"}
                 </span>
               </div>
-              {deliveryFee === 0 && (
+              {authoritativeDeliveryFee === 0 && (
                 <div
                   style={{
                     marginTop: "0.5rem",

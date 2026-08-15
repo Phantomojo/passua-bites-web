@@ -31,6 +31,14 @@ const generalLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const trackingLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 30,
+  message: { error: "Too many tracking lookups, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 const authLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 5,
@@ -44,17 +52,26 @@ const authLimiter = rateLimit({
 });
 
 app.use("/api/", generalLimiter);
+app.use("/api/trpc/orders.getByTrackingToken", trackingLimiter);
 app.use("/api/trpc/admin.login", authLimiter);
 
-// CORS for cross-origin requests
+// CORS for the known frontend origins only. Credentialed requests must never reflect arbitrary origins.
+const allowedOrigins = new Set([
+  "https://passua-bites-web.vercel.app",
+  "http://localhost:3000",
+  "http://localhost:5173",
+]);
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  res.setHeader("Access-Control-Allow-Origin", origin || "*");
+  if (origin && allowedOrigins.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   res.setHeader("Access-Control-Allow-Credentials", "true");
   if (req.method === "OPTIONS") {
-    res.status(204).end();
+    res.status(origin && allowedOrigins.has(origin) ? 204 : 403).end();
     return;
   }
   next();

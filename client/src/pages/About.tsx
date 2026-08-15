@@ -127,7 +127,7 @@ export default function About() {
                 fontWeight: 300,
               }}
             >
-              Opp Rainbow Resort, Ruiru
+              Ruiru, Kenya — contact us for the current pickup point
             </div>
           </div>
         </div>

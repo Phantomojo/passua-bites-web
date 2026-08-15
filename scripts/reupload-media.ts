@@ -74,7 +74,7 @@ async function uploadMedia() {
     `  WHEN name = 'Sultan' THEN 'https://ptewdrb0fmlmvmtc.public.blob.vercel-storage.com/sultan-fallback.jpg'`
   );
   console.log(
-    `  WHEN name = 'Pasua Corn' THEN 'https://ptewdrb0fmlmvmtc.public.blob.vercel-storage.com/pasua-corn.jpg'`
+    `  WHEN name = 'Passua Corn' THEN 'https://ptewdrb0fmlmvmtc.public.blob.vercel-storage.com/pasua-corn.jpg'`
   );
   console.log(
     `  WHEN name = 'Mega Sultan' THEN 'https://ptewdrb0fmlmvmtc.public.blob.vercel-storage.com/sultan-fallback.jpg'`
@@ -86,7 +86,7 @@ async function uploadMedia() {
     `  WHEN name = 'Zigizaga' THEN 'https://ptewdrb0fmlmvmtc.public.blob.vercel-storage.com/masala-chips.jpg'`
   );
   console.log(
-    `END WHERE name IN ('Burger', 'Masala Chips', 'Hot Blazer', 'Sultan', 'Pasua Corn', 'Mega Sultan', 'Passua Smocha', 'Zigizaga');`
+    `END WHERE name IN ('Burger', 'Masala Chips', 'Hot Blazer', 'Sultan', 'Passua Corn', 'Mega Sultan', 'Passua Smocha', 'Zigizaga');`
   );
 
   console.log(`\nUPDATE menuItems SET videoUrl = CASE`);
