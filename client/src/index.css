@@ -904,3 +904,5 @@
 .pb-kitchen-error span{color:var(--pb-ivory3);font-size:.72rem}
 .pb-kitchen-error button{display:inline-flex;align-items:center;gap:.4rem;min-height:36px;padding:.35rem .65rem;border:1px solid var(--pb-rule);background:var(--pb-bg2);color:var(--pb-ember2);font:.6rem "DM Mono",monospace;text-transform:uppercase;white-space:nowrap}
 @media(max-width:560px){.pb-kitchen-error{align-items:flex-start;flex-direction:column}.pb-kitchen-error button{width:100%;justify-content:center}}
+
+.pb-kitchen-complete-label.is-held{color:var(--pb-ember2);border:1px solid var(--pb-rule);padding:.42rem .5rem;line-height:1.35;text-align:center}
