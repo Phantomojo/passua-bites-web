@@ -201,7 +201,7 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
         status: status as any,
       });
       toast.success(`Order #${orderId} updated to ${status}`);
-      orders.refetch();
+      if (activeTab === "orders") orders.refetch();
       kitchenOrders.refetch();
     } catch (err: any) {
       toast.error(err.message || "Failed to update order");
