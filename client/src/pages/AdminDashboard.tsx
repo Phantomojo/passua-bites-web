@@ -58,6 +58,11 @@ const [orderStatusFilter, setOrderStatusFilter] = useState<string>("");
   });
 
   const login = trpc.admin.login.useMutation();
+  // Keep the Kitchen feed independent from the Orders page filter.
+  const kitchenOrders = trpc.orders.listAll.useQuery(
+    { limit: 100 },
+    { enabled: !!token, refetchInterval: 30000 }
+  );
   const orders = trpc.orders.listAll.useQuery(
     orderStatusFilter ? { status: orderStatusFilter as any, limit: 100 } : { limit: 100 },
     { enabled: !!token, refetchInterval: 30000 }
@@ -126,13 +131,13 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
     }
   };
 
-  // Sound notification for new orders
+  // Sound notification follows the unfiltered Kitchen feed, not the Orders page filter.
   useEffect(() => {
-    if (!orders.data || prevOrderCount === 0) {
-      if (orders.data) setPrevOrderCount(orders.data.length);
+    if (!kitchenOrders.data || prevOrderCount === 0) {
+      if (kitchenOrders.data) setPrevOrderCount(kitchenOrders.data.length);
       return;
     }
-    if (orders.data.length > prevOrderCount) {
+    if (kitchenOrders.data.length > prevOrderCount) {
       // Play notification sound
       const audio = new Audio(
         "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2LkpGKgHRpaGx2g42UlI2BesJYZ3J9iZGTjoh+dG5uc3qEi5OTjIF1amhsdoGMlJOMgHRnaW14g46Vk4x/c2dmbnqFj5aUjYF0ZmdueIOOlZSMfnNmZm56hY+WlI2BdGZnbniDjpWUjH5zZmZueoWPlpSNgXRmZ254g46VlIx+c2dmbnqFj5aUjYF0ZmdueIOOlZSMfnNmZm56hY+WlI2BdA=="
@@ -142,8 +147,8 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
       setPlaySound(true);
       setTimeout(() => setPlaySound(false), 3000);
     }
-    setPrevOrderCount(orders.data.length);
-  }, [orders.data?.length]);
+    setPrevOrderCount(kitchenOrders.data.length);
+  }, [kitchenOrders.data?.length]);
 
   // New menu item form
   const [showAddItem, setShowAddItem] = useState(false);
@@ -196,6 +201,7 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
       });
       toast.success(`Order #${orderId} updated to ${status}`);
       orders.refetch();
+      kitchenOrders.refetch();
     } catch (err: any) {
       toast.error(err.message || "Failed to update order");
     }
@@ -377,13 +383,14 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
 
   // Dashboard
   const orderList = orders.data || [];
+  const kitchenOrderList = kitchenOrders.data || [];
   const menuList = menuItems.data || [];
 
   return (
     <OwnerWorkspaceShell
       activeTab={activeTab}
       onNavigate={setActiveTab}
-      pendingOrders={orderList.filter((order: any) => order.status === "pending").length}
+      pendingOrders={kitchenOrderList.filter((order: any) => order.status === "pending").length}
       pendingReviews={pendingReviews.length}
       playSound={playSound}
       onLogout={handleLogout}
@@ -392,15 +399,15 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
         {/* ===== KITCHEN / OVERVIEW ===== */}
         {activeTab === "overview" && (
           <OwnerKitchenBoard
-            orders={orderList}
-            isLoading={orders.isLoading}
-            isError={orders.isError}
-            errorMessage={orders.error?.message}
+            orders={kitchenOrderList}
+            isLoading={kitchenOrders.isLoading}
+            isError={kitchenOrders.isError}
+            errorMessage={kitchenOrders.error?.message}
             pendingReviews={pendingReviews.length}
             onStatusChange={handleStatusChange}
             onNavigate={setActiveTab}
             onRefresh={() => {
-              orders.refetch();
+              kitchenOrders.refetch();
             }}
           />
         )}
