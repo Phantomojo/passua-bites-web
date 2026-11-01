@@ -24,7 +24,13 @@ var init_logger = __esm({
         }
       },
       timestamp: pino.stdTimeFunctions.isoTime,
-      redact: ["req.headers.authorization", "req.headers.cookie", "*.password", "*.token", "*.secret"]
+      redact: [
+        "req.headers.authorization",
+        "req.headers.cookie",
+        "*.password",
+        "*.token",
+        "*.secret"
+      ]
     });
   }
 });
@@ -450,12 +456,18 @@ async function notifyOwner(payload) {
     });
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
-      logger.warn({ status: response.status, statusText: response.statusText, detail }, "[Notification] Failed to notify owner");
+      logger.warn(
+        { status: response.status, statusText: response.statusText, detail },
+        "[Notification] Failed to notify owner"
+      );
       return false;
     }
     return true;
   } catch (error) {
-    logger.warn({ err: error }, "[Notification] Error calling notification service");
+    logger.warn(
+      { err: error },
+      "[Notification] Error calling notification service"
+    );
     return false;
   }
 }
@@ -1431,7 +1443,10 @@ var SDKServer = class {
       });
       const { openId, appId, name } = payload;
       if (!isNonEmptyString2(openId) || typeof appId !== "string" || name !== void 0 && typeof name !== "string") {
-        logger.warn({ openId, appId, name }, "[Auth] Session payload missing required fields");
+        logger.warn(
+          { openId, appId, name },
+          "[Auth] Session payload missing required fields"
+        );
         return null;
       }
       return {
@@ -1593,7 +1608,8 @@ function parseDevice(ua) {
   return "desktop";
 }
 function parseBrowser(ua) {
-  if (/curl|headlesschrome|playwright|bot|spider|crawl|wget|postman/i.test(ua)) return "Bot/Crawler";
+  if (/curl|headlesschrome|playwright|bot|spider|crawl|wget|postman/i.test(ua))
+    return "Bot/Crawler";
   if (/edg\//i.test(ua)) return "Edge";
   if (/opr\/|opera/i.test(ua)) return "Opera";
   if (/chrome\/\d/i.test(ua) && !/chromium/i.test(ua)) return "Chrome";
@@ -1622,11 +1638,13 @@ function makeSessionId(ip, ua) {
   return createHash("sha256").update(`${ip}:${ua}:${day}`).digest("hex").slice(0, 32);
 }
 var analyticsRouter = router({
-  recordPageview: publicProcedure.input(z7.object({
-    page: z7.string().max(500),
-    referrer: z7.string().max(500).nullable().optional(),
-    userAgent: z7.string().max(512).nullable().optional()
-  })).mutation(async ({ input, ctx }) => {
+  recordPageview: publicProcedure.input(
+    z7.object({
+      page: z7.string().max(500),
+      referrer: z7.string().max(500).nullable().optional(),
+      userAgent: z7.string().max(512).nullable().optional()
+    })
+  ).mutation(async ({ input, ctx }) => {
     const db = await getDb();
     if (!db) return { success: false };
     const ua = input.userAgent || "";
@@ -1656,7 +1674,16 @@ var analyticsRouter = router({
   getTraffic: adminProcedure.query(async () => {
     const db = await getDb();
     if (!db) return null;
-    const [summaryRes, dailyRes, pagesRes, devicesRes, countriesRes, citiesRes, browsersRes, referrersRes] = await Promise.all([
+    const [
+      summaryRes,
+      dailyRes,
+      pagesRes,
+      devicesRes,
+      countriesRes,
+      citiesRes,
+      browsersRes,
+      referrersRes
+    ] = await Promise.all([
       db.execute(sql`
           SELECT
             SUM(CASE WHEN "browser" != 'Bot/Crawler' THEN 1 ELSE 0 END) AS total_pageviews,
@@ -1855,7 +1882,9 @@ var analyticsRouter = router({
     const total = Number(repeat.total_customers ?? 0);
     const rpt = Number(repeat.repeat_customers ?? 0);
     const peakMap = /* @__PURE__ */ new Map();
-    rows(peakRes).forEach((r) => peakMap.set(Number(r.hour), Number(r.orders)));
+    rows(peakRes).forEach(
+      (r) => peakMap.set(Number(r.hour), Number(r.orders))
+    );
     const peakHours = Array.from({ length: 24 }, (_, h) => ({
       hour: h,
       label: `${String(h).padStart(2, "0")}:00`,
