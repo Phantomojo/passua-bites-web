@@ -550,19 +550,26 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
                       </td>
                       <td style={{ padding: "0.85rem 1rem" }}>
                         {o.status === "pending" && (
-                          <button
-                            onClick={() =>
-                              handleStatusChange(o.id, "confirmed")
-                            }
-                            className="pb-btn-primary"
-                            style={{
-                              fontSize: "0.58rem",
-                              padding: "0.3rem 0.75rem",
-                              minHeight: 32,
-                            }}
-                          >
-                            ✓ Confirm Payment
-                          </button>
+                          o.paymentMethod === "mpesa" && o.paymentStatus !== "completed" ? (
+                            <span
+                              className="pb-kitchen-complete-label is-held"
+                              title="M-Pesa payment must be confirmed before the order can be accepted."
+                            >
+                              Awaiting M-Pesa
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleStatusChange(o.id, "confirmed")}
+                              className="pb-btn-primary"
+                              style={{
+                                fontSize: "0.58rem",
+                                padding: "0.3rem 0.75rem",
+                                minHeight: 32,
+                              }}
+                            >
+                              Accept order
+                            </button>
+                          )
                         )}
                         {o.status === "confirmed" && (
                           <button
