@@ -56,6 +56,7 @@ var init_env = __esm({
 // drizzle/schema.ts
 var schema_exports = {};
 __export(schema_exports, {
+  adminUsers: () => adminUsers,
   analyticsEvents: () => analyticsEvents,
   announcements: () => announcements,
   menuItems: () => menuItems,
@@ -76,7 +77,7 @@ import {
   varchar,
   integer
 } from "drizzle-orm/pg-core";
-var users, menuItems, orders, orderItems, reviews, siteSettings, mpesaTransactions, analyticsEvents, announcements;
+var users, menuItems, orders, orderItems, reviews, siteSettings, mpesaTransactions, analyticsEvents, announcements, adminUsers;
 var init_schema = __esm({
   "drizzle/schema.ts"() {
     "use strict";
@@ -186,6 +187,15 @@ var init_schema = __esm({
       active: integer("active").default(1).notNull(),
       startsAt: timestamp("startsAt"),
       endsAt: timestamp("endsAt"),
+      createdAt: timestamp("createdAt").defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt").defaultNow().notNull()
+    });
+    adminUsers = pgTable("adminUsers", {
+      id: serial("id").primaryKey(),
+      username: varchar("username", { length: 64 }).notNull().unique(),
+      passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
+      name: text("name"),
+      role: varchar("role", { length: 20 }).default("admin").notNull(),
       createdAt: timestamp("createdAt").defaultNow().notNull(),
       updatedAt: timestamp("updatedAt").defaultNow().notNull()
     });
@@ -755,6 +765,11 @@ var ordersRouter = router({
   ).mutation(async ({ input }) => {
     const db = await getDb();
     if (!db) throw new Error("Database not available");
+    const { getSiteSetting: getSiteSetting2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    const paused = await getSiteSetting2("orders_paused");
+    if (paused?.value === "true") {
+      throw new Error("Ordering is currently paused. Please try again later.");
+    }
     const { menuItems: menuItemsTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
     const availableItems = await db.select().from(menuItemsTable).where(eq3(menuItemsTable.available, 1)).execute();
     let totalPrice = 0;
@@ -1030,6 +1045,16 @@ var ordersRouter = router({
       todayRevenue: todayOrders.filter((o) => o.paymentStatus === "completed").reduce((sum, o) => sum + Number(o.totalPrice), 0),
       totalRevenue: allOrders.filter((o) => o.paymentStatus === "completed").reduce((sum, o) => sum + Number(o.totalPrice), 0)
     };
+  }),
+  isPaused: publicProcedure.query(async () => {
+    const { getSiteSetting: getSiteSetting2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    const setting = await getSiteSetting2("orders_paused");
+    return setting?.value === "true";
+  }),
+  setPaused: adminProcedure.input(z3.object({ paused: z3.boolean() })).mutation(async ({ input }) => {
+    const { setSiteSetting: setSiteSetting2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    await setSiteSetting2("orders_paused", input.paused ? "true" : "false");
+    return { success: true, paused: input.paused };
   })
 });
 
@@ -1580,9 +1605,33 @@ var sdk = new SDKServer();
 // server/routers/admin.ts
 import { z as z6 } from "zod";
 init_db();
+init_db();
 init_schema();
 import { eq as eq6 } from "drizzle-orm";
-var getAdminPassword = () => {
+
+// server/_core/password.ts
+import crypto from "crypto";
+var SCRYPT_KEYLEN = 64;
+var SCRYPT_COST = 16384;
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16);
+  const derived = crypto.scryptSync(password, salt, SCRYPT_KEYLEN, {
+    N: SCRYPT_COST
+  });
+  return `scrypt$${SCRYPT_COST}$${salt.toString("hex")}$${derived.toString("hex")}`;
+}
+function verifyPassword(password, hash) {
+  const parts = hash.split("$");
+  if (parts.length !== 4 || parts[0] !== "scrypt") return false;
+  const cost = Number(parts[1]);
+  const salt = Buffer.from(parts[2], "hex");
+  const stored = Buffer.from(parts[3], "hex");
+  const derived = crypto.scryptSync(password, salt, stored.length, { N: cost });
+  return crypto.timingSafeEqual(stored, derived);
+}
+
+// server/routers/admin.ts
+var getAdminSeedPassword = () => {
   const password = process.env.ADMIN_PASSWORD;
   if (!password) {
     if (process.env.NODE_ENV === "production") {
@@ -1594,34 +1643,33 @@ var getAdminPassword = () => {
   }
   return password;
 };
-var ADMIN_PASSWORD = getAdminPassword();
 var adminRouter = router({
-  // Login with password
-  login: publicProcedure.input(z6.object({ password: z6.string() })).mutation(async ({ input, ctx }) => {
-    if (input.password !== ADMIN_PASSWORD) {
-      throw new Error("Invalid password");
-    }
-    const db = await getDb();
-    if (!db) throw new Error("Database not available");
-    let adminUser = await db.select().from(users).where(eq6(users.role, "admin")).limit(1).execute();
-    if (adminUser.length === 0) {
-      const result = await db.insert(users).values({
-        openId: "admin-local",
+  login: publicProcedure.input(z6.object({ username: z6.string().min(1), password: z6.string().min(1) })).mutation(async ({ input, ctx }) => {
+    const database = await getDb();
+    if (!database) throw new Error("Database not available");
+    const existing = await database.select().from(adminUsers).limit(1).execute();
+    if (existing.length === 0) {
+      const seedPassword = getAdminSeedPassword();
+      await database.insert(adminUsers).values({
+        username: "admin",
+        passwordHash: hashPassword(seedPassword),
         name: "Passua Bites Admin",
         role: "admin"
-      }).execute();
-      adminUser = [
-        {
-          id: Number(result.insertId || 0),
-          openId: "admin-local",
-          name: "Passua Bites Admin",
-          role: "admin"
-        }
-      ];
+      });
     }
-    const admin = adminUser[0];
-    const token = await sdk.createSessionToken(admin.openId, {
-      name: admin.name || "Admin",
+    const [user] = await database.select().from(adminUsers).where(eq6(adminUsers.username, input.username)).limit(1).execute();
+    if (!user || !verifyPassword(input.password, user.passwordHash)) {
+      throw new Error("Invalid username or password");
+    }
+    const openId = `admin:${user.username}`;
+    await upsertUser({
+      openId,
+      name: user.name || user.username,
+      role: "admin",
+      lastSignedIn: /* @__PURE__ */ new Date()
+    });
+    const token = await sdk.createSessionToken(openId, {
+      name: user.name || user.username,
       expiresInMs: ONE_YEAR_MS
     });
     const cookieOptions = getSessionCookieOptions(ctx.req);
@@ -1632,8 +1680,33 @@ var adminRouter = router({
     return {
       success: true,
       token,
-      userId: admin.id
+      userId: user.id,
+      username: user.username
     };
+  }),
+  createAccount: publicProcedure.input(
+    z6.object({
+      bootstrapPassword: z6.string(),
+      username: z6.string().min(3).max(64),
+      password: z6.string().min(8),
+      name: z6.string().optional()
+    })
+  ).mutation(async ({ input }) => {
+    const seedPassword = getAdminSeedPassword();
+    if (input.bootstrapPassword !== seedPassword) {
+      throw new Error("Invalid bootstrap password");
+    }
+    const database = await getDb();
+    if (!database) throw new Error("Database not available");
+    const [existing] = await database.select().from(adminUsers).where(eq6(adminUsers.username, input.username)).limit(1).execute();
+    if (existing) throw new Error("Username already exists");
+    await database.insert(adminUsers).values({
+      username: input.username,
+      passwordHash: hashPassword(input.password),
+      name: input.name || input.username,
+      role: "admin"
+    });
+    return { success: true };
   })
 });
 

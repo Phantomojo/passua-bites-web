@@ -35,7 +35,12 @@ export const ordersRouter = router({
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
-      // Fetch menu items to calculate total and verify availability
+      // Respect pause-orders toggle
+      const { getSiteSetting } = await import("../db");
+      const paused = await getSiteSetting("orders_paused");
+      if (paused?.value === "true") {
+        throw new Error("Ordering is currently paused. Please try again later.");
+      }
       // Get actual menu items
       const { menuItems: menuItemsTable } = await import(
         "../../drizzle/schema"
@@ -482,4 +487,16 @@ export const ordersRouter = router({
         .reduce((sum, o) => sum + Number(o.totalPrice), 0),
     };
   }),
+  isPaused: publicProcedure.query(async () => {
+    const { getSiteSetting } = await import("../db");
+    const setting = await getSiteSetting("orders_paused");
+    return setting?.value === "true";
+  }),
+  setPaused: adminProcedure
+    .input(z.object({ paused: z.boolean() }))
+    .mutation(async ({ input }) => {
+      const { setSiteSetting } = await import("../db");
+      await setSiteSetting("orders_paused", input.paused ? "true" : "false");
+      return { success: true, paused: input.paused };
+    }),
 });

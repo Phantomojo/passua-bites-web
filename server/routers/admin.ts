@@ -4,10 +4,12 @@ import { sdk } from "../_core/sdk";
 import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { users } from "../../drizzle/schema";
+import * as db from "../db";
+import { adminUsers } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
+import { hashPassword, verifyPassword } from "../_core/password";
 
-const getAdminPassword = () => {
+const getAdminSeedPassword = () => {
   const password = process.env.ADMIN_PASSWORD;
   if (!password) {
     if (process.env.NODE_ENV === "production") {
@@ -20,50 +22,50 @@ const getAdminPassword = () => {
   return password;
 };
 
-const ADMIN_PASSWORD = getAdminPassword();
-
 export const adminRouter = router({
-  // Login with password
   login: publicProcedure
-    .input(z.object({ password: z.string() }))
+    .input(z.object({ username: z.string().min(1), password: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
-      if (input.password !== ADMIN_PASSWORD) {
-        throw new Error("Invalid password");
+      const database = await getDb();
+      if (!database) throw new Error("Database not available");
+
+      // Seed a default admin account on first use.
+      const existing = await database
+        .select()
+        .from(adminUsers)
+        .limit(1)
+        .execute();
+      if (existing.length === 0) {
+        const seedPassword = getAdminSeedPassword();
+        await database.insert(adminUsers).values({
+          username: "admin",
+          passwordHash: hashPassword(seedPassword),
+          name: "Passua Bites Admin",
+          role: "admin",
+        });
       }
 
-      const db = await getDb();
-      if (!db) throw new Error("Database not available");
-
-      // Find or create admin user
-      let adminUser = await db
+      const [user] = await database
         .select()
-        .from(users)
-        .where(eq(users.role, "admin"))
+        .from(adminUsers)
+        .where(eq(adminUsers.username, input.username))
         .limit(1)
         .execute();
 
-      if (adminUser.length === 0) {
-        const result = await db
-          .insert(users)
-          .values({
-            openId: "admin-local",
-            name: "Passua Bites Admin",
-            role: "admin",
-          })
-          .execute();
-        adminUser = [
-          {
-            id: Number((result as any).insertId || 0),
-            openId: "admin-local",
-            name: "Passua Bites Admin",
-            role: "admin",
-          } as any,
-        ];
+      if (!user || !verifyPassword(input.password, user.passwordHash)) {
+        throw new Error("Invalid username or password");
       }
 
-      const admin = adminUser[0];
-      const token = await sdk.createSessionToken(admin.openId, {
-        name: admin.name || "Admin",
+      const openId = `admin:${user.username}`;
+      await db.upsertUser({
+        openId,
+        name: user.name || user.username,
+        role: "admin",
+        lastSignedIn: new Date(),
+      });
+
+      const token = await sdk.createSessionToken(openId, {
+        name: user.name || user.username,
         expiresInMs: ONE_YEAR_MS,
       });
       const cookieOptions = getSessionCookieOptions(ctx.req);
@@ -75,7 +77,40 @@ export const adminRouter = router({
       return {
         success: true,
         token,
-        userId: admin.id,
+        userId: user.id,
+        username: user.username,
       };
+    }),
+
+  createAccount: publicProcedure
+    .input(
+      z.object({
+        bootstrapPassword: z.string(),
+        username: z.string().min(3).max(64),
+        password: z.string().min(8),
+        name: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const seedPassword = getAdminSeedPassword();
+      if (input.bootstrapPassword !== seedPassword) {
+        throw new Error("Invalid bootstrap password");
+      }
+      const database = await getDb();
+      if (!database) throw new Error("Database not available");
+      const [existing] = await database
+        .select()
+        .from(adminUsers)
+        .where(eq(adminUsers.username, input.username))
+        .limit(1)
+        .execute();
+      if (existing) throw new Error("Username already exists");
+      await database.insert(adminUsers).values({
+        username: input.username,
+        passwordHash: hashPassword(input.password),
+        name: input.name || input.username,
+        role: "admin",
+      });
+      return { success: true };
     }),
 });

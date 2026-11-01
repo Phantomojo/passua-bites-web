@@ -181,6 +181,20 @@ export const announcements = pgTable("announcements", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
+/**
+ * Admin users table (individual accounts)
+ */
+export const adminUsers = pgTable("adminUsers", {
+  id: serial("id").primaryKey(),
+  username: varchar("username", { length: 64 }).notNull().unique(),
+  passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
+  name: text("name"),
+  role: varchar("role", { length: 20 }).default("admin").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type AdminUser = typeof adminUsers.$inferSelect;
 export type Announcement = typeof announcements.$inferSelect;
 export type InsertAnnouncement = typeof announcements.$inferInsert;
 export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;

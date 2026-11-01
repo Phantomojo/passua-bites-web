@@ -16,6 +16,7 @@ export default function AdminDashboard() {
     typeof window !== "undefined" ? localStorage.getItem("pb_admin_token") : null
   );
   const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("admin");
   const [installGuideComplete, setInstallGuideComplete] = useState(() => {
     try { return localStorage.getItem("pb_owner_install_guide_v1") === "1"; } catch { return false; }
   });
@@ -70,6 +71,8 @@ const [orderStatusFilter, setOrderStatusFilter] = useState<string>("");
   const menuItems = trpc.menu.list.useQuery(undefined, { enabled: !!token });
   const updateOrderStatus = trpc.orders.updateStatus.useMutation();
   const markOrderPaid = trpc.orders.markPaid.useMutation();
+  const isPaused = trpc.orders.isPaused.useQuery(undefined, { enabled: !!token });
+  const setPaused = trpc.orders.setPaused.useMutation();
   const createMenuItem = trpc.menu.create.useMutation();
   const updateMenuItem = trpc.menu.update.useMutation();
   const deleteMenuItem = trpc.menu.delete.useMutation();
@@ -178,7 +181,7 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
     e.preventDefault();
     setIsLoggingIn(true);
     try {
-      const result = await login.mutateAsync({ password });
+      const result = await login.mutateAsync({ username, password });
       setToken(result.token);
       localStorage.setItem("pb_admin_token", result.token);
       toast.success("Logged in successfully");
@@ -340,6 +343,34 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
                   display: "block",
                 }}
               >
+                Username
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                placeholder="admin"
+                required
+                style={{
+                  width: "100%",
+                  padding: "0.65rem 0.8rem",
+                  fontFamily: "'DM Sans',sans-serif",
+                  fontSize: "0.85rem",
+                }}
+              />
+            </div>
+            <div>
+              <label
+                style={{
+                  fontFamily: "'DM Mono',monospace",
+                  fontSize: "0.6rem",
+                  letterSpacing: "0.15em",
+                  color: "var(--pb-ember)",
+                  textTransform: "uppercase",
+                  marginBottom: "0.4rem",
+                  display: "block",
+                }}
+              >
                 Password
               </label>
               <input
@@ -451,6 +482,15 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
                             <option key={s} value={s}>{s}</option>
                           ))}
                         </select>
+                        <button
+                          onClick={async () => {
+                            await setPaused.mutateAsync({ paused: !isPaused.data });
+                            toast.success(isPaused.data ? "Orders resumed" : "Orders paused");
+                          }}
+                          style={{ padding: "0.4rem 0.6rem", marginBottom: "1rem", marginLeft: "0.5rem" }}
+                        >
+                          {isPaused.data ? "Resume orders" : "Pause orders"}
+                        </button>
             <div
               style={{
                 background: "var(--pb-bg2)",
