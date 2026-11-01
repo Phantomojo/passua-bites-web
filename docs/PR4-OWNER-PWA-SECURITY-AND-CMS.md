@@ -149,3 +149,12 @@ Automated access to Instagram and TikTok post content was restricted during this
 ## Validation
 
 Run `pnpm run check`, `pnpm run test`, `pnpm run build` and manual PWA checks on Android Chrome and iOS Safari. Verify the manifest is not attached to public pages, `/admin` is noindex, the service worker scope is only `/admin`, and no API response enters Cache Storage. This PR has not been deployed and does not run migrations.
+
+
+## Builder handoff
+
+The detailed implementation and design principles are maintained in [PR4-BUILDER-DESIGN-AND-IMPLEMENTATION-BRIEF.md](./PR4-BUILDER-DESIGN-AND-IMPLEMENTATION-BRIEF.md).
+
+That brief makes the existing Pasua Bites storefront palette and design system a hard constraint. Builders must inspect and reuse the actual source tokens; they must not substitute a generic dashboard theme or invent a new palette. It also provides repository reconnaissance steps, kitchen-first UX principles, the three-identity permission model, typed CMS boundaries, messaging consent requirements, security principles, PR scope discipline and definition-of-done checks.
+
+The brief is guidance for implementation planning, not evidence that future account, CMS or campaign features are already shipped. Keep this PR's implemented scope distinct from follow-up work that requires separate migrations, authorization changes or release validation.
