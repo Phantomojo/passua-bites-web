@@ -8,19 +8,10 @@ import OwnerWorkspaceShell, { type OwnerTab } from "@/components/OwnerWorkspaceS
 import OwnerKitchenBoard from "@/components/OwnerKitchenBoard";
 import { usePageMeta } from "@/hooks/usePageMeta";
 
-const STATUS_COLORS: Record<string, string> = {
-  pending: "var(--pb-ivory3)",
-  confirmed: "#60a5fa",
-  preparing: "var(--pb-ember2)",
-  ready: "#4ade80",
-  delivered: "#a78bfa",
-  cancelled: "#f87171",
-};
-
 type Tab = OwnerTab;
 
 export default function AdminDashboard() {
-  usePageMeta({ title: "Admin Dashboard — Passua Bites", description: "Passua Bites admin dashboard — manage orders, menu, reviews, and analytics." });
+  usePageMeta({ title: "Owner Operations — Pasua Bites", description: "Pasua Bites owner workspace for kitchen operations, orders, menu management, and business reporting." });
   const [token, setToken] = useState<string | null>(() =>
     typeof window !== "undefined" ? localStorage.getItem("pb_admin_token") : null
   );
@@ -67,10 +58,6 @@ const [orderStatusFilter, setOrderStatusFilter] = useState<string>("");
   });
 
   const login = trpc.admin.login.useMutation();
-  const stats = trpc.orders.getStats.useQuery(undefined, {
-    enabled: !!token,
-    refetchInterval: 60000,
-  });
   const orders = trpc.orders.listAll.useQuery(
     orderStatusFilter ? { status: orderStatusFilter as any, limit: 100 } : { limit: 100 },
     { enabled: !!token, refetchInterval: 30000 }
@@ -391,12 +378,6 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
   // Dashboard
   const orderList = orders.data || [];
   const menuList = menuItems.data || [];
-  const statsData = stats.data || {
-    totalOrders: 0,
-    pendingOrders: 0,
-    todayRevenue: 0,
-    totalRevenue: 0,
-  };
 
   return (
     <OwnerWorkspaceShell
@@ -413,12 +394,13 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
           <OwnerKitchenBoard
             orders={orderList}
             isLoading={orders.isLoading}
+            isError={orders.isError}
+            errorMessage={orders.error?.message}
             pendingReviews={pendingReviews.length}
             onStatusChange={handleStatusChange}
             onNavigate={setActiveTab}
             onRefresh={() => {
               orders.refetch();
-              stats.refetch();
             }}
           />
         )}
