@@ -23,7 +23,11 @@ type Tab =
   | "analytics";
 
 export default function AdminDashboard() {
-  usePageMeta({ title: "Admin Dashboard — Passua Bites", description: "Passua Bites admin dashboard — manage orders, menu, reviews, and analytics." });
+  usePageMeta({
+    title: "Admin Dashboard — Passua Bites",
+    description:
+      "Passua Bites admin dashboard — manage orders, menu, reviews, and analytics.",
+  });
   const [token, setToken] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);

@@ -14,7 +14,11 @@ interface CartItem {
 }
 
 export default function Checkout() {
-  usePageMeta({ title: "Checkout — Passua Bites", description: "Review your cart and pay with M-Pesa for delivery or pickup from Passua Bites in Ruiru." });
+  usePageMeta({
+    title: "Checkout — Passua Bites",
+    description:
+      "Review your cart and pay with M-Pesa for delivery or pickup from Passua Bites in Ruiru.",
+  });
   const [cart, setCart] = useState<CartItem[]>([]);
   const [formData, setFormData] = useState({
     customerName: "",
@@ -121,7 +125,12 @@ export default function Checkout() {
     trackGA4Event("begin_checkout", {
       currency: "KES",
       value: cart.reduce((s, i) => s + i.price * i.quantity, 0),
-      items: cart.map(i => ({ item_id: String(i.id), item_name: i.name, price: i.price, quantity: i.quantity })),
+      items: cart.map(i => ({
+        item_id: String(i.id),
+        item_name: i.name,
+        price: i.price,
+        quantity: i.quantity,
+      })),
     });
 
     try {
@@ -170,7 +179,12 @@ export default function Checkout() {
         transaction_id: String(newOrderId),
         currency: "KES",
         value: grandTotal,
-        items: cart.map(i => ({ item_id: String(i.id), item_name: i.name, price: i.price, quantity: i.quantity })),
+        items: cart.map(i => ({
+          item_id: String(i.id),
+          item_name: i.name,
+          price: i.price,
+          quantity: i.quantity,
+        })),
       });
 
       // Clear cart

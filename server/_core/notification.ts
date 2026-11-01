@@ -15,9 +15,7 @@ const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
 
 const buildEndpointUrl = (baseUrl: string): string => {
-  const normalizedBase = baseUrl.endsWith("/")
-    ? baseUrl
-    : `${baseUrl}/`;
+  const normalizedBase = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
   return new URL(
     "webdevtoken.v1.WebDevService/SendNotification",
     normalizedBase
@@ -99,13 +97,19 @@ export async function notifyOwner(
 
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
-      logger.warn({ status: response.status, statusText: response.statusText, detail }, "[Notification] Failed to notify owner");
+      logger.warn(
+        { status: response.status, statusText: response.statusText, detail },
+        "[Notification] Failed to notify owner"
+      );
       return false;
     }
 
     return true;
   } catch (error) {
-    logger.warn({ err: error }, "[Notification] Error calling notification service");
+    logger.warn(
+      { err: error },
+      "[Notification] Error calling notification service"
+    );
     return false;
   }
 }

@@ -16,7 +16,7 @@ Let me know if you're open to it — I just need your real menu details and a fe
 
 ## Follow-Up: Details Needed
 
-*(Send this after they respond positively)*
+_(Send this after they respond positively)_
 
 Thank you so much, I really appreciate that 🙏 I know how hard it is to build something and then have it taken away — you guys didn't deserve that. I'm just glad I could help.
 

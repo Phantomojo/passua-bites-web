@@ -6,6 +6,7 @@
 ---
 
 ## Table of Contents
+
 1. [tRPC Architecture](#1-trpc-architecture)
 2. [Database & Performance](#2-database--performance)
 3. [Security Requirements](#3-security-requirements)
@@ -54,7 +55,7 @@ server/routers.ts (main router)
 ### Input Validation with Zod v4
 
 ```typescript
-import { z } from 'zod';
+import { z } from "zod";
 
 // Menu item validation
 const menuItemSchema = z.object({
@@ -72,11 +73,16 @@ const orderSchema = z.object({
   customerPhone: z.string().regex(/^(?:\+254|0)[17][0-9]{8}$/),
   customerEmail: z.string().email().optional(),
   deliveryAddress: z.string().max(500).optional(),
-  items: z.array(z.object({
-    menuItemId: z.number(),
-    quantity: z.number().min(1).max(50),
-  })).min(1).max(20),
-  paymentMethod: z.enum(['mpesa', 'cash']),
+  items: z
+    .array(
+      z.object({
+        menuItemId: z.number(),
+        quantity: z.number().min(1).max(50),
+      })
+    )
+    .min(1)
+    .max(20),
+  paymentMethod: z.enum(["mpesa", "cash"]),
   notes: z.string().max(500).optional(),
 });
 
@@ -94,8 +100,8 @@ const reviewSchema = z.object({
 
 ```typescript
 // server/_core/trpc.ts
-import { initTRPC, TRPCError } from '@trpc/server';
-import { Context } from './context';
+import { initTRPC, TRPCError } from "@trpc/server";
+import { Context } from "./context";
 
 const t = initTRPC.context<Context>().create();
 
@@ -107,15 +113,15 @@ export const publicProcedure = t.procedure;
 const isAdmin = t.middleware(async ({ ctx, next }) => {
   if (!ctx.user) {
     throw new TRPCError({
-      code: 'UNAUTHORIZED',
-      message: 'You must be logged in',
+      code: "UNAUTHORIZED",
+      message: "You must be logged in",
     });
   }
 
-  if (ctx.user.role !== 'admin') {
+  if (ctx.user.role !== "admin") {
     throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Admin access required',
+      code: "FORBIDDEN",
+      message: "Admin access required",
     });
   }
 
@@ -133,31 +139,31 @@ export const adminProcedure = t.procedure.use(isAdmin);
 
 ```typescript
 // shared/_core/errors.ts
-import { TRPCError } from '@trpc/server';
+import { TRPCError } from "@trpc/server";
 
 export class AppError {
-  static notFound(message = 'Resource not found') {
-    return new TRPCError({ code: 'NOT_FOUND', message });
+  static notFound(message = "Resource not found") {
+    return new TRPCError({ code: "NOT_FOUND", message });
   }
 
-  static badRequest(message = 'Invalid request') {
-    return new TRPCError({ code: 'BAD_REQUEST', message });
+  static badRequest(message = "Invalid request") {
+    return new TRPCError({ code: "BAD_REQUEST", message });
   }
 
-  static unauthorized(message = 'Unauthorized') {
-    return new TRPCError({ code: 'UNAUTHORIZED', message });
+  static unauthorized(message = "Unauthorized") {
+    return new TRPCError({ code: "UNAUTHORIZED", message });
   }
 
-  static forbidden(message = 'Forbidden') {
-    return new TRPCError({ code: 'FORBIDDEN', message });
+  static forbidden(message = "Forbidden") {
+    return new TRPCError({ code: "FORBIDDEN", message });
   }
 
-  static internal(message = 'Internal server error') {
-    return new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message });
+  static internal(message = "Internal server error") {
+    return new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
   }
 
-  static conflict(message = 'Resource conflict') {
-    return new TRPCError({ code: 'CONFLICT', message });
+  static conflict(message = "Resource conflict") {
+    return new TRPCError({ code: "CONFLICT", message });
   }
 }
 ```
@@ -168,11 +174,11 @@ For food images (admin uploading new menu item images):
 
 ```typescript
 // Use AWS S3 presigned URLs
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const s3Client = new S3Client({
-  region: process.env.AWS_REGION || 'af-south-1',
+  region: process.env.AWS_REGION || "af-south-1",
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
@@ -181,13 +187,15 @@ const s3Client = new S3Client({
 
 export const uploadRouter = router({
   getPresignedUrl: adminProcedure
-    .input(z.object({
-      fileName: z.string(),
-      contentType: z.string(),
-    }))
+    .input(
+      z.object({
+        fileName: z.string(),
+        contentType: z.string(),
+      })
+    )
     .mutation(async ({ input }) => {
       const key = `menu-items/${Date.now()}-${input.fileName}`;
-      
+
       const command = new PutObjectCommand({
         Bucket: process.env.AWS_S3_BUCKET,
         Key: key,
@@ -214,16 +222,16 @@ export const uploadRouter = router({
 
 ```typescript
 // server/db.ts
-import { drizzle } from 'drizzle-orm/mysql2';
-import mysql from 'mysql2/promise';
-import * as schema from '../drizzle/schema';
+import { drizzle } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
+import * as schema from "../drizzle/schema";
 
 const poolConnection = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '3306'),
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'passua_bites',
+  host: process.env.DB_HOST || "localhost",
+  port: parseInt(process.env.DB_PORT || "3306"),
+  user: process.env.DB_USER || "root",
+  password: process.env.DB_PASSWORD || "",
+  database: process.env.DB_NAME || "passua_bites",
   waitForConnections: true,
   connectionLimit: 10, // Adjust based on expected load
   queueLimit: 0,
@@ -231,7 +239,7 @@ const poolConnection = mysql.createPool({
   keepAliveInitialDelay: 0,
 });
 
-export const db = drizzle(poolConnection, { schema, mode: 'default' });
+export const db = drizzle(poolConnection, { schema, mode: "default" });
 ```
 
 ### Indexing Strategy
@@ -331,18 +339,18 @@ const badQuery = await db.select().from(orders);
 
 ### OWASP Top 10 Mitigations
 
-| Vulnerability | Mitigation |
-|---------------|-----------|
-| **A01: Broken Access Control** | Role-based middleware (isAdmin), tRPC procedures with auth |
-| **A02: Cryptographic Failures** | HTTPS everywhere, encrypt sensitive data, secure API keys |
-| **A03: Injection** | Drizzle ORM parameterized queries (prevents SQL injection), input validation with Zod |
-| **A04: Insecure Design** | Rate limiting, payment verification before order fulfillment |
-| **A05: Security Misconfiguration** | Environment variables, disable error details in production |
-| **A06: Vulnerable Components** | Regular dependency updates, `pnpm audit` |
-| **A07: Auth Failures** | Secure session management, JWT with short expiry |
-| **A08: Data Integrity Failures** | Verify M-Pesa callbacks, validate all inputs |
-| **A09: Logging Failures** | Log security events, don't log sensitive data |
-| **A10: SSRF** | Validate callback URLs, restrict outbound requests |
+| Vulnerability                      | Mitigation                                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------------------- |
+| **A01: Broken Access Control**     | Role-based middleware (isAdmin), tRPC procedures with auth                            |
+| **A02: Cryptographic Failures**    | HTTPS everywhere, encrypt sensitive data, secure API keys                             |
+| **A03: Injection**                 | Drizzle ORM parameterized queries (prevents SQL injection), input validation with Zod |
+| **A04: Insecure Design**           | Rate limiting, payment verification before order fulfillment                          |
+| **A05: Security Misconfiguration** | Environment variables, disable error details in production                            |
+| **A06: Vulnerable Components**     | Regular dependency updates, `pnpm audit`                                              |
+| **A07: Auth Failures**             | Secure session management, JWT with short expiry                                      |
+| **A08: Data Integrity Failures**   | Verify M-Pesa callbacks, validate all inputs                                          |
+| **A09: Logging Failures**          | Log security events, don't log sensitive data                                         |
+| **A10: SSRF**                      | Validate callback URLs, restrict outbound requests                                    |
 
 ### Input Sanitization
 
@@ -351,36 +359,33 @@ const badQuery = await db.select().from(orders);
 const phoneRegex = /^(?:\+254|0)[17][0-9]{8}$/;
 
 function sanitizePhone(phone: string): string {
-  return phone.replace(/[\s\-\+]/g, '');
+  return phone.replace(/[\s\-\+]/g, "");
 }
 
 // Name sanitization (prevent XSS)
 function sanitizeName(name: string): string {
   return name
-    .replace(/[<>]/g, '') // Remove < and >
+    .replace(/[<>]/g, "") // Remove < and >
     .trim()
     .slice(0, 255);
 }
 
 // Address sanitization
 function sanitizeAddress(address: string): string {
-  return address
-    .replace(/[<>]/g, '')
-    .trim()
-    .slice(0, 500);
+  return address.replace(/[<>]/g, "").trim().slice(0, 500);
 }
 ```
 
 ### Rate Limiting
 
 ```typescript
-import rateLimit from 'express-rate-limit';
+import rateLimit from "express-rate-limit";
 
 // Payment initiation rate limit
 const paymentLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10, // 10 payment attempts per window
-  message: 'Too many payment attempts. Please try again later.',
+  message: "Too many payment attempts. Please try again later.",
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -389,25 +394,25 @@ const paymentLimiter = rateLimit({
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100, // 100 requests per 15 minutes
-  message: 'Too many requests. Please try again later.',
+  message: "Too many requests. Please try again later.",
 });
 
 // Apply in Express
-app.use('/api/trpc/', apiLimiter);
-app.use('/api/mpesa/stkpush', paymentLimiter);
+app.use("/api/trpc/", apiLimiter);
+app.use("/api/mpesa/stkpush", paymentLimiter);
 ```
 
 ### CSRF Protection
 
 ```typescript
-import csrf from 'csurf';
+import csrf from "csurf";
 
 // For web forms (not tRPC which uses JSON)
 const csrfProtection = csrf({
   cookie: {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
   },
 });
 ```
@@ -415,7 +420,7 @@ const csrfProtection = csrf({
 ### Secure Session Management
 
 ```typescript
-import { SignJWT, jwtVerify } from 'jose';
+import { SignJWT, jwtVerify } from "jose";
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET!);
 
@@ -424,9 +429,9 @@ async function createSession(user: User) {
     userId: user.id,
     role: user.role,
   })
-    .setProtectedHeader({ alg: 'HS256' })
+    .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime('24h')
+    .setExpirationTime("24h")
     .sign(JWT_SECRET);
 
   return token;
@@ -498,38 +503,39 @@ dist/
 
 ### Hosting Options for Kenya
 
-| Option | Cost/Month | Latency to Kenya | Best For |
-|--------|-----------|------------------|----------|
-| **AWS Africa (Cape Town)** | $20-50 | ~80ms | Production, scaling |
-| **DigitalOcean (NYC/LON)** | $6-20 | ~150-200ms | Budget, simplicity |
-| **Vultr (Johannesburg)** | $6-20 | ~60ms | Good Kenya latency |
-| **Local Kenyan Host** | Varies | ~20-40ms | Lowest latency |
-| **VPS (Hetzner, OVH)** | $5-15 | ~180ms | Budget option |
+| Option                     | Cost/Month | Latency to Kenya | Best For            |
+| -------------------------- | ---------- | ---------------- | ------------------- |
+| **AWS Africa (Cape Town)** | $20-50     | ~80ms            | Production, scaling |
+| **DigitalOcean (NYC/LON)** | $6-20      | ~150-200ms       | Budget, simplicity  |
+| **Vultr (Johannesburg)**   | $6-20      | ~60ms            | Good Kenya latency  |
+| **Local Kenyan Host**      | Varies     | ~20-40ms         | Lowest latency      |
+| **VPS (Hetzner, OVH)**     | $5-15      | ~180ms           | Budget option       |
 
 **Recommendation:** Start with **Vultr Johannesburg** or **DigitalOcean** for cost-effectiveness. Migrate to **AWS Africa (Cape Town)** when scaling.
 
 ### Database Hosting
 
-| Option | Cost/Month | Management | Best For |
-|--------|-----------|------------|----------|
-| **Self-hosted on VPS** | Included in VPS cost | Manual | Budget, control |
-| **AWS RDS** | $15-50 | Managed | Production, scaling |
-| **DigitalOcean Managed MySQL** | $15-30 | Managed | Simplicity |
-| **PlanetScale** | Free tier | Managed | Serverless MySQL |
+| Option                         | Cost/Month           | Management | Best For            |
+| ------------------------------ | -------------------- | ---------- | ------------------- |
+| **Self-hosted on VPS**         | Included in VPS cost | Manual     | Budget, control     |
+| **AWS RDS**                    | $15-50               | Managed    | Production, scaling |
+| **DigitalOcean Managed MySQL** | $15-30               | Managed    | Simplicity          |
+| **PlanetScale**                | Free tier            | Managed    | Serverless MySQL    |
 
 **Recommendation:** Start with **self-hosted MySQL** on same VPS. Migrate to **managed MySQL** when you need reliability guarantees.
 
 ### Domain Registration
 
-| TLD | Cost/Year | Best For |
-|-----|-----------|----------|
-| **.co.ke** | Ksh 1,000-2,000 | Kenyan businesses (local trust) |
-| **.com** | Ksh 1,200-1,500 | Global recognition |
-| **.ke** | Ksh 5,000-10,000 | Premium Kenyan |
+| TLD        | Cost/Year        | Best For                        |
+| ---------- | ---------------- | ------------------------------- |
+| **.co.ke** | Ksh 1,000-2,000  | Kenyan businesses (local trust) |
+| **.com**   | Ksh 1,200-1,500  | Global recognition              |
+| **.ke**    | Ksh 5,000-10,000 | Premium Kenyan                  |
 
 **Recommendation:** Register **both** `.co.ke` and `.com`. Redirect `.com` to `.co.ke` or vice versa.
 
 **Registrars:**
+
 - Kenya: Kenya Web Experts, HostPinnacle, Sasahost
 - Global: Namecheap, Cloudflare, Google Domains
 
@@ -668,30 +674,31 @@ pm2 logs passua-bites
 
 ```typescript
 // vite.config.ts - Add PWA plugin
-import { VitePWA } from 'vite-plugin-pwa';
+import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: "autoUpdate",
       manifest: {
-        name: 'Passua Bites',
-        short_name: 'Passua Bites',
-        description: "Ruiru's best street food - Smokies, Chapati, Eggs & Smochas",
-        theme_color: '#F59E0B',
-        background_color: '#FFFFFF',
-        display: 'standalone',
+        name: "Passua Bites",
+        short_name: "Passua Bites",
+        description:
+          "Ruiru's best street food - Smokies, Chapati, Eggs & Smochas",
+        theme_color: "#F59E0B",
+        background_color: "#FFFFFF",
+        display: "standalone",
         icons: [
           {
-            src: '/icon-192.png',
-            sizes: '192x192',
-            type: 'image/png',
+            src: "/icon-192.png",
+            sizes: "192x192",
+            type: "image/png",
           },
           {
-            src: '/icon-512.png',
-            sizes: '512x512',
-            type: 'image/png',
+            src: "/icon-512.png",
+            sizes: "512x512",
+            type: "image/png",
           },
         ],
       },
@@ -704,26 +711,21 @@ export default defineConfig({
 
 ```typescript
 // public/sw.js
-const CACHE_NAME = 'passua-bites-v1';
-const OFFLINE_URL = '/offline.html';
+const CACHE_NAME = "passua-bites-v1";
+const OFFLINE_URL = "/offline.html";
 
-const STATIC_ASSETS = [
-  '/',
-  '/menu',
-  '/offline.html',
-  '/icon-192.png',
-];
+const STATIC_ASSETS = ["/", "/menu", "/offline.html", "/icon-192.png"];
 
-self.addEventListener('install', (event) => {
+self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
+    caches.open(CACHE_NAME).then(cache => {
       return cache.addAll(STATIC_ASSETS);
     })
   );
 });
 
-self.addEventListener('fetch', (event) => {
-  if (event.request.mode === 'navigate') {
+self.addEventListener("fetch", event => {
+  if (event.request.mode === "navigate") {
     event.respondWith(
       fetch(event.request).catch(() => {
         return caches.match(OFFLINE_URL);
@@ -768,11 +770,11 @@ npx vite-bundle-analyzer dist
 
 ### Core Web Vitals
 
-| Metric | Target | How to Achieve |
-|--------|--------|----------------|
-| **LCP** (Largest Contentful Paint) | < 2.5s | Optimize hero images, use WebP, CDN |
-| **FID** (First Input Delay) | < 100ms | Minimize JS, defer non-critical scripts |
-| **CLS** (Cumulative Layout Shift) | < 0.1 | Set image dimensions, avoid layout shifts |
+| Metric                              | Target  | How to Achieve                            |
+| ----------------------------------- | ------- | ----------------------------------------- |
+| **LCP** (Largest Contentful Paint)  | < 2.5s  | Optimize hero images, use WebP, CDN       |
+| **FID** (First Input Delay)         | < 100ms | Minimize JS, defer non-critical scripts   |
+| **CLS** (Cumulative Layout Shift)   | < 0.1   | Set image dimensions, avoid layout shifts |
 | **INP** (Interaction to Next Paint) | < 200ms | Optimize event handlers, avoid long tasks |
 
 ---
@@ -783,31 +785,34 @@ npx vite-bundle-analyzer dist
 
 ```typescript
 // server/payment.test.ts
-import { describe, it, expect, vi } from 'vitest';
-import { formatPhoneNumber, generatePassword } from './_core/mpesa';
+import { describe, it, expect, vi } from "vitest";
+import { formatPhoneNumber, generatePassword } from "./_core/mpesa";
 
-describe('M-Pesa Utilities', () => {
-  describe('formatPhoneNumber', () => {
-    it('converts 07XX format to 2547XX', () => {
-      expect(formatPhoneNumber('0712345678')).toBe('254712345678');
+describe("M-Pesa Utilities", () => {
+  describe("formatPhoneNumber", () => {
+    it("converts 07XX format to 2547XX", () => {
+      expect(formatPhoneNumber("0712345678")).toBe("254712345678");
     });
 
-    it('handles +254 format', () => {
-      expect(formatPhoneNumber('+254712345678')).toBe('254712345678');
+    it("handles +254 format", () => {
+      expect(formatPhoneNumber("+254712345678")).toBe("254712345678");
     });
 
-    it('removes spaces and dashes', () => {
-      expect(formatPhoneNumber('0712 345 678')).toBe('254712345678');
+    it("removes spaces and dashes", () => {
+      expect(formatPhoneNumber("0712 345 678")).toBe("254712345678");
     });
 
-    it('throws on invalid format', () => {
-      expect(() => formatPhoneNumber('12345')).toThrow();
+    it("throws on invalid format", () => {
+      expect(() => formatPhoneNumber("12345")).toThrow();
     });
   });
 
-  describe('generatePassword', () => {
-    it('generates valid Base64 password', () => {
-      const { password, timestamp } = generatePassword('174379', 'test_passkey');
+  describe("generatePassword", () => {
+    it("generates valid Base64 password", () => {
+      const { password, timestamp } = generatePassword(
+        "174379",
+        "test_passkey"
+      );
       expect(password).toBeDefined();
       expect(timestamp).toMatch(/^\d{14}$/);
     });
@@ -819,30 +824,30 @@ describe('M-Pesa Utilities', () => {
 
 ```typescript
 // server/menu.test.ts
-import { describe, it, expect, beforeAll } from 'vitest';
-import { appRouter } from './routers';
-import { db } from './db';
+import { describe, it, expect, beforeAll } from "vitest";
+import { appRouter } from "./routers";
+import { db } from "./db";
 
-describe('Menu Router', () => {
+describe("Menu Router", () => {
   beforeAll(async () => {
     // Seed test data
     await db.insert(menuItems).values({
-      name: 'Test Smokie',
-      price: '70',
-      description: 'Test item',
+      name: "Test Smokie",
+      price: "70",
+      description: "Test item",
     });
   });
 
-  it('lists all available menu items', async () => {
+  it("lists all available menu items", async () => {
     const caller = appRouter.createCaller({ user: null } as any);
     const items = await caller.menu.list();
     expect(items.length).toBeGreaterThan(0);
   });
 
-  it('gets menu item by ID', async () => {
+  it("gets menu item by ID", async () => {
     const caller = appRouter.createCaller({ user: null } as any);
     const item = await caller.menu.getById({ id: 1 });
-    expect(item.name).toBe('Test Smokie');
+    expect(item.name).toBe("Test Smokie");
   });
 });
 ```
@@ -851,27 +856,27 @@ describe('Menu Router', () => {
 
 ```typescript
 // tests/e2e/order.spec.ts
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
-test('customer can browse menu and add to cart', async ({ page }) => {
-  await page.goto('/');
-  
+test("customer can browse menu and add to cart", async ({ page }) => {
+  await page.goto("/");
+
   // Navigate to menu
-  await page.click('text=View Menu');
-  await expect(page).toHaveURL('/menu');
-  
+  await page.click("text=View Menu");
+  await expect(page).toHaveURL("/menu");
+
   // Add item to cart
   await page.click('text=Smokies >> button:has-text("Add")');
-  
+
   // Cart should update
-  await expect(page.locator('[data-testid="cart-count"]')).toHaveText('1');
-  
+  await expect(page.locator('[data-testid="cart-count"]')).toHaveText("1");
+
   // Go to checkout
-  await page.click('text=Checkout');
-  await expect(page).toHaveURL('/checkout');
+  await page.click("text=Checkout");
+  await expect(page).toHaveURL("/checkout");
 });
 
-test('customer can complete checkout with M-Pesa', async ({ page }) => {
+test("customer can complete checkout with M-Pesa", async ({ page }) => {
   // ... (test full checkout flow with mocked M-Pesa)
 });
 ```
@@ -943,12 +948,12 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 
 ```typescript
 // tRPC query caching
-import { httpBatchLink } from '@trpc/client';
+import { httpBatchLink } from "@trpc/client";
 
 const trpcClient = createTRPCReact<AppRouter>({
   links: [
     httpBatchLink({
-      url: '/api/trpc',
+      url: "/api/trpc",
     }),
   ],
 });
@@ -981,7 +986,10 @@ const orders = await db.query.orders.findMany({
 // Bad: N+1 query
 const orders = await db.select().from(orders);
 for (const order of orders) {
-  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+  const items = await db
+    .select()
+    .from(orderItems)
+    .where(eq(orderItems.orderId, order.id));
 }
 ```
 
@@ -992,13 +1000,14 @@ for (const order of orders) {
 ### Error Tracking
 
 **Options:**
+
 - **Sentry** (recommended) - Free tier, excellent React integration
 - **LogRocket** - Session replay + errors
 - **GlitchTip** - Open-source Sentry alternative
 
 ```typescript
 // client/src/main.tsx
-import * as Sentry from '@sentry/react';
+import * as Sentry from "@sentry/react";
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
@@ -1011,57 +1020,59 @@ Sentry.init({
 
 ```typescript
 // server/_core/logger.ts
-import winston from 'winston';
+import winston from "winston";
 
 export const logger = winston.createLogger({
-  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+  level: process.env.NODE_ENV === "production" ? "info" : "debug",
   format: winston.format.combine(
     winston.format.timestamp(),
     winston.format.json()
   ),
   transports: [
-    new winston.transports.File({ filename: 'error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'combined.log' }),
+    new winston.transports.File({ filename: "error.log", level: "error" }),
+    new winston.transports.File({ filename: "combined.log" }),
   ],
 });
 
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: winston.format.simple(),
-  }));
+if (process.env.NODE_ENV !== "production") {
+  logger.add(
+    new winston.transports.Console({
+      format: winston.format.simple(),
+    })
+  );
 }
 
 // Usage
-logger.info('Order created', { orderId: 123 });
-logger.error('Payment failed', { error, orderId: 123 });
+logger.info("Order created", { orderId: 123 });
+logger.error("Payment failed", { error, orderId: 123 });
 ```
 
 ### Health Check Endpoint
 
 ```typescript
 // server/_core/health.ts
-import express from 'express';
-import { db } from '../db';
+import express from "express";
+import { db } from "../db";
 
 const router = express.Router();
 
-router.get('/health', async (req, res) => {
+router.get("/health", async (req, res) => {
   const health = {
-    status: 'ok',
+    status: "ok",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    database: 'unknown',
+    database: "unknown",
   };
 
   try {
-    await db.execute('SELECT 1');
-    health.database = 'connected';
+    await db.execute("SELECT 1");
+    health.database = "connected";
   } catch (error) {
-    health.database = 'disconnected';
-    health.status = 'degraded';
+    health.database = "disconnected";
+    health.status = "degraded";
   }
 
-  const statusCode = health.status === 'ok' ? 200 : 503;
+  const statusCode = health.status === "ok" ? 200 : 503;
   res.status(statusCode).json(health);
 });
 
@@ -1071,11 +1082,13 @@ export default router;
 ### Uptime Monitoring
 
 **Options:**
+
 - **UptimeRobot** (free, 50 monitors)
 - **Pingdom** (paid, more features)
 - **Better Stack** (free tier)
 
 Monitor:
+
 - `/health` endpoint
 - Homepage load
 - Menu page load

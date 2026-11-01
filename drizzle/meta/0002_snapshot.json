@@ -272,9 +272,7 @@
         "mpesaTransactions_checkoutRequestID_unique": {
           "name": "mpesaTransactions_checkoutRequestID_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "checkoutRequestID"
-          ]
+          "columns": ["checkoutRequestID"]
         }
       },
       "policies": {},
@@ -546,9 +544,7 @@
         "siteSettings_key_unique": {
           "name": "siteSettings_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "key"
-          ]
+          "columns": ["key"]
         }
       },
       "policies": {},
@@ -625,9 +621,7 @@
         "users_openId_unique": {
           "name": "users_openId_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "openId"
-          ]
+          "columns": ["openId"]
         }
       },
       "policies": {},

@@ -730,7 +730,11 @@ function PBFooter() {
 export { PBNav, PBFooter };
 
 export default function Home() {
-  usePageMeta({ title: "Passua Bites — Smocha, Chapo & Kenyan Street Food in Ruiru", description: "Order authentic Kenyan street food — smocha, chapo, ndengu, and more. Passua Bites serves Ruiru, opposite Rainbow Resort." });
+  usePageMeta({
+    title: "Passua Bites — Smocha, Chapo & Kenyan Street Food in Ruiru",
+    description:
+      "Order authentic Kenyan street food — smocha, chapo, ndengu, and more. Passua Bites serves Ruiru, opposite Rainbow Resort.",
+  });
   const { data: displacementMessage } = trpc.location.get.useQuery(undefined, {
     staleTime: 1000 * 60 * 5,
   });
@@ -774,7 +778,15 @@ export default function Home() {
     openingHoursSpecification: [
       {
         "@type": "OpeningHoursSpecification",
-        dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+        dayOfWeek: [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday",
+        ],
         opens: "08:00",
         closes: "22:00",
       },
@@ -790,141 +802,204 @@ export default function Home() {
       <PBNav />
 
       {/* Top hazard stripe */}
-      <div className="pb-hero-hazard-top" style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        height: "12px",
-        zIndex: 40,
-        pointerEvents: "none",
-        background: "repeating-linear-gradient(132deg, var(--pb-ember) 0 21px, var(--pb-bg) 21px 42px)",
-        clipPath: "polygon(0 0,100% 0,100% 70%,96% 100%,88% 65%,80% 100%,72% 60%,64% 100%,56% 65%,48% 100%,40% 60%,32% 100%,24% 65%,16% 100%,8% 60%,0 100%)"
-      }} />
+      <div
+        className="pb-hero-hazard-top"
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: "12px",
+          zIndex: 40,
+          pointerEvents: "none",
+          background:
+            "repeating-linear-gradient(132deg, var(--pb-ember) 0 21px, var(--pb-bg) 21px 42px)",
+          clipPath:
+            "polygon(0 0,100% 0,100% 70%,96% 100%,88% 65%,80% 100%,72% 60%,64% 100%,56% 65%,48% 100%,40% 60%,32% 100%,24% 65%,16% 100%,8% 60%,0 100%)",
+        }}
+      />
 
       {/* Hero — Matatu Street Energy */}
-      <section className="pb-hero-matatu" style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr",
-        minHeight: "86vh",
-        position: "relative",
-      }}>
+      <section
+        className="pb-hero-matatu"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          minHeight: "86vh",
+          position: "relative",
+        }}
+      >
         {/* Background texture: corrugated zinc */}
-        <div style={{
-          position: "absolute",
-          inset: 0,
-          opacity: 0.5,
-          pointerEvents: "none",
-          backgroundImage: "repeating-linear-gradient(90deg, rgba(255,255,255,.012) 0px, rgba(255,255,255,.012) 2px, rgba(0,0,0,.25) 2px, rgba(0,0,0,.25) 4px, rgba(255,255,255,.02) 4px, rgba(255,255,255,.02) 7px)"
-        }} />
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            opacity: 0.5,
+            pointerEvents: "none",
+            backgroundImage:
+              "repeating-linear-gradient(90deg, rgba(255,255,255,.012) 0px, rgba(255,255,255,.012) 2px, rgba(0,0,0,.25) 2px, rgba(0,0,0,.25) 4px, rgba(255,255,255,.02) 4px, rgba(255,255,255,.02) 7px)",
+          }}
+        />
 
         {/* SVG grain noise */}
-        <svg style={{ position: "absolute", inset: 0, opacity: 0.07, pointerEvents: "none", mixBlendMode: "overlay" }} width="100%" height="100%">
+        <svg
+          style={{
+            position: "absolute",
+            inset: 0,
+            opacity: 0.07,
+            pointerEvents: "none",
+            mixBlendMode: "overlay",
+          }}
+          width="100%"
+          height="100%"
+        >
           <filter id="pb-noise">
-            <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch" />
+            <feTurbulence
+              type="fractalNoise"
+              baseFrequency="0.9"
+              numOctaves="2"
+              stitchTiles="stitch"
+            />
           </filter>
           <rect width="100%" height="100%" filter="url(#pb-noise)" />
         </svg>
 
         {/* Left: Text content */}
-        <div className="pb-hero-left" style={{
-          padding: "4.5rem 3rem 4rem 2.5rem",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          borderRight: "1px solid var(--pb-rule2)",
-          position: "relative",
-          zIndex: 10,
-        }}>
+        <div
+          className="pb-hero-left"
+          style={{
+            padding: "4.5rem 3rem 4rem 2.5rem",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            borderRight: "1px solid var(--pb-rule2)",
+            position: "relative",
+            zIndex: 10,
+          }}
+        >
           {/* Stamp badge */}
-          <div className="animate-fade-in" style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            border: "2px solid var(--pb-ember)",
-            color: "var(--pb-ember)",
-            padding: "0.4rem 0.8rem",
-            fontFamily: "'DM Mono',monospace",
-            fontSize: "0.65rem",
-            letterSpacing: "0.15em",
-            textTransform: "uppercase",
-            transform: "rotate(-3deg)",
-            marginBottom: "1.5rem",
-            opacity: 0,
-            animationDelay: "0.15s",
-            width: "fit-content",
-          }}>
+          <div
+            className="animate-fade-in"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              border: "2px solid var(--pb-ember)",
+              color: "var(--pb-ember)",
+              padding: "0.4rem 0.8rem",
+              fontFamily: "'DM Mono',monospace",
+              fontSize: "0.65rem",
+              letterSpacing: "0.15em",
+              textTransform: "uppercase",
+              transform: "rotate(-3deg)",
+              marginBottom: "1.5rem",
+              opacity: 0,
+              animationDelay: "0.15s",
+              width: "fit-content",
+            }}
+          >
             Est. Ruiru ★ Since Day One
           </div>
 
           {/* Main heading — animated letter drop */}
-          <h1 style={{
-            fontFamily: "Anton, sans-serif",
-            fontSize: "clamp(3.6rem, 8vw, 6.6rem)",
-            lineHeight: 0.86,
-            marginBottom: "1.2rem",
-          }}>
+          <h1
+            style={{
+              fontFamily: "Anton, sans-serif",
+              fontSize: "clamp(3.6rem, 8vw, 6.6rem)",
+              lineHeight: 0.86,
+              marginBottom: "1.2rem",
+            }}
+          >
             <div style={{ display: "flex", flexWrap: "wrap", gap: "0.15rem" }}>
-              {["P","A","S","U","A"].map((ch, i) => (
-                <span key={i} className="animate-letter-drop" style={{
-                  color: "var(--pb-ember)",
-                  opacity: 0,
-                  animationDelay: `${0.1 + i * 0.045}s`,
-                }}>{ch}</span>
+              {["P", "A", "S", "U", "A"].map((ch, i) => (
+                <span
+                  key={i}
+                  className="animate-letter-drop"
+                  style={{
+                    color: "var(--pb-ember)",
+                    opacity: 0,
+                    animationDelay: `${0.1 + i * 0.045}s`,
+                  }}
+                >
+                  {ch}
+                </span>
               ))}
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.15rem", marginTop: "0.1rem" }}>
-              {["B","I","T","E","S"].map((ch, i) => (
-                <span key={i} className="animate-letter-drop" style={{
-                  color: "var(--pb-ivory)",
-                  opacity: 0,
-                  animationDelay: `${0.4 + i * 0.045}s`,
-                }}>{ch}</span>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "0.15rem",
+                marginTop: "0.1rem",
+              }}
+            >
+              {["B", "I", "T", "E", "S"].map((ch, i) => (
+                <span
+                  key={i}
+                  className="animate-letter-drop"
+                  style={{
+                    color: "var(--pb-ivory)",
+                    opacity: 0,
+                    animationDelay: `${0.4 + i * 0.045}s`,
+                  }}
+                >
+                  {ch}
+                </span>
               ))}
             </div>
           </h1>
 
           {/* Subheading */}
-          <p style={{
-            fontFamily: "'DM Mono',monospace",
-            fontSize: "0.8rem",
-            color: "var(--pb-ivory3)",
-            lineHeight: 1.6,
-            maxWidth: 340,
-            marginBottom: "1rem",
-          }}>
-            Street food with soul — smoked, wrapped, served fresh. Born in Ruiru. Now online, always around.
+          <p
+            style={{
+              fontFamily: "'DM Mono',monospace",
+              fontSize: "0.8rem",
+              color: "var(--pb-ivory3)",
+              lineHeight: 1.6,
+              maxWidth: 340,
+              marginBottom: "1rem",
+            }}
+          >
+            Street food with soul — smoked, wrapped, served fresh. Born in
+            Ruiru. Now online, always around.
           </p>
 
           {/* Location line */}
-          <div style={{
-            fontFamily: "'DM Mono',monospace",
-            fontSize: "0.72rem",
-            color: "var(--pb-ivory2)",
-            borderLeft: "4px solid var(--pb-ember)",
-            paddingLeft: "0.8rem",
-            marginBottom: "1.8rem",
-          }}>
+          <div
+            style={{
+              fontFamily: "'DM Mono',monospace",
+              fontSize: "0.72rem",
+              color: "var(--pb-ivory2)",
+              borderLeft: "4px solid var(--pb-ember)",
+              paddingLeft: "0.8rem",
+              marginBottom: "1.8rem",
+            }}
+          >
             Opp Rainbow Resort, Ruiru — 0722 473 873
           </div>
 
           {/* CTA buttons */}
-          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" as const }}>
-            <Link href="/menu" style={{
-              padding: "0.7rem 1.5rem",
-              background: "var(--pb-ember)",
-              color: "var(--pb-bg)",
-              fontFamily: "'DM Mono',monospace",
-              fontSize: "0.68rem",
-              fontWeight: 600,
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              border: "none",
-              cursor: "pointer",
-              transition: "all 0.2s",
-              display: "inline-block",
-              textDecoration: "none",
-            }}>
+          <div
+            style={{ display: "flex", gap: "1rem", flexWrap: "wrap" as const }}
+          >
+            <Link
+              href="/menu"
+              style={{
+                padding: "0.7rem 1.5rem",
+                background: "var(--pb-ember)",
+                color: "var(--pb-bg)",
+                fontFamily: "'DM Mono',monospace",
+                fontSize: "0.68rem",
+                fontWeight: 600,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                border: "none",
+                cursor: "pointer",
+                transition: "all 0.2s",
+                display: "inline-block",
+                textDecoration: "none",
+              }}
+            >
               View Menu
             </Link>
             <a
@@ -953,101 +1028,161 @@ export default function Home() {
         </div>
 
         {/* Right: Polaroid with rotating badge */}
-        <div className="pb-hero-right" style={{
-          position: "relative",
-          overflow: "hidden",
-          display: "flex",
-          justifyContent: "flex-end",
-          alignItems: "center",
-          padding: "2rem 3rem",
-          zIndex: 10,
-        }}>
-          {/* Polaroid card */}
-          <div className="pb-hero-polaroid" style={{
+        <div
+          className="pb-hero-right"
+          style={{
             position: "relative",
-            width: "320px",
-            background: "var(--pb-ivory)",
-            boxShadow: "0 25px 60px rgba(0,0,0,0.5)",
-            transform: "rotate(2.5deg)",
-            transition: "transform 0.075s ease-out",
-          }}>
+            overflow: "hidden",
+            display: "flex",
+            justifyContent: "flex-end",
+            alignItems: "center",
+            padding: "2rem 3rem",
+            zIndex: 10,
+          }}
+        >
+          {/* Polaroid card */}
+          <div
+            className="pb-hero-polaroid"
+            style={{
+              position: "relative",
+              width: "320px",
+              background: "var(--pb-ivory)",
+              boxShadow: "0 25px 60px rgba(0,0,0,0.5)",
+              transform: "rotate(2.5deg)",
+              transition: "transform 0.075s ease-out",
+            }}
+          >
             {/* Polaroid image */}
-            <div style={{
-              width: "100%",
-              height: "320px",
-              background: "white",
-              overflow: "hidden",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}>
+            <div
+              style={{
+                width: "100%",
+                height: "320px",
+                background: "white",
+                overflow: "hidden",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
               <img
                 src={LOGO}
                 alt="Passua Bites Logo"
-                style={{ width: "256px", height: "256px", objectFit: "contain", filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.15))" }}
+                style={{
+                  width: "256px",
+                  height: "256px",
+                  objectFit: "contain",
+                  filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.15))",
+                }}
               />
             </div>
 
             {/* Polaroid caption */}
             <div style={{ padding: "0.8rem 1rem", textAlign: "center" }}>
-              <p style={{
-                fontFamily: "'Playfair Display',serif",
-                color: "var(--pb-bg3)",
-                fontStyle: "italic",
-                fontWeight: 700,
-                fontSize: "1rem",
-                margin: 0,
-              }}>
+              <p
+                style={{
+                  fontFamily: "'Playfair Display',serif",
+                  color: "var(--pb-bg3)",
+                  fontStyle: "italic",
+                  fontWeight: 700,
+                  fontSize: "1rem",
+                  margin: 0,
+                }}
+              >
                 Pasua Bites — Street Food with Soul
               </p>
             </div>
 
             {/* Corner peel effect */}
-            <div style={{
-              position: "absolute",
-              bottom: 0,
-              right: 0,
-              width: "32px",
-              height: "32px",
-              background: "linear-gradient(to bottom right, transparent, #d8cdb6)",
-              clipPath: "polygon(100% 0, 0 100%, 100% 100%)",
-              boxShadow: "2px -2px 4px rgba(0,0,0,0.1)",
-            }} />
+            <div
+              style={{
+                position: "absolute",
+                bottom: 0,
+                right: 0,
+                width: "32px",
+                height: "32px",
+                background:
+                  "linear-gradient(to bottom right, transparent, #d8cdb6)",
+                clipPath: "polygon(100% 0, 0 100%, 100% 100%)",
+                boxShadow: "2px -2px 4px rgba(0,0,0,0.1)",
+              }}
+            />
 
             {/* Rotating circular badge */}
-            <div className="pb-hero-badge" style={{
-              position: "absolute",
-              top: "-32px",
-              right: "-32px",
-              width: "96px",
-              height: "96px",
-              zIndex: 30,
-            }}>
-              <div className="animate-spin-slow" style={{ position: "relative", width: "100%", height: "100%", filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.4))" }}>
-                <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%" }}>
+            <div
+              className="pb-hero-badge"
+              style={{
+                position: "absolute",
+                top: "-32px",
+                right: "-32px",
+                width: "96px",
+                height: "96px",
+                zIndex: 30,
+              }}
+            >
+              <div
+                className="animate-spin-slow"
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  height: "100%",
+                  filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.4))",
+                }}
+              >
+                <svg
+                  viewBox="0 0 100 100"
+                  style={{ width: "100%", height: "100%" }}
+                >
                   <defs>
-                    <path id="pb-circlePath" d="M 50,50 m -38,0 a 38,38 0 1,1 76,0 a 38,38 0 1,1 -76,0" />
+                    <path
+                      id="pb-circlePath"
+                      d="M 50,50 m -38,0 a 38,38 0 1,1 76,0 a 38,38 0 1,1 -76,0"
+                    />
                   </defs>
                   <circle cx="50" cy="50" r="38" fill="var(--pb-ember)" />
-                  <text fontFamily="'DM Mono',monospace" fontSize="6.4" letterSpacing="2" fill="var(--pb-bg)">
+                  <text
+                    fontFamily="'DM Mono',monospace"
+                    fontSize="6.4"
+                    letterSpacing="2"
+                    fill="var(--pb-bg)"
+                  >
                     <textPath href="#pb-circlePath" startOffset="0%">
-                      RUIRU'S FINEST ★ STREET BITES ★ RUIRU'S FINEST ★ STREET BITES ★
+                      RUIRU'S FINEST ★ STREET BITES ★ RUIRU'S FINEST ★ STREET
+                      BITES ★
                     </textPath>
                   </text>
                 </svg>
-                <div style={{
-                  position: "absolute",
-                  inset: "8px",
-                  borderRadius: "50%",
-                  background: "var(--pb-ember)",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: "inset 0 2px 8px rgba(0,0,0,0.3)",
-                }}>
-                  <span style={{ color: "white", fontWeight: 700, fontSize: "1.1rem" }}>110/=</span>
-                  <span style={{ color: "white", fontFamily: "'DM Mono',monospace", fontSize: "0.55rem", letterSpacing: "0.15em" }}>SMOCHA</span>
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: "8px",
+                    borderRadius: "50%",
+                    background: "var(--pb-ember)",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: "inset 0 2px 8px rgba(0,0,0,0.3)",
+                  }}
+                >
+                  <span
+                    style={{
+                      color: "white",
+                      fontWeight: 700,
+                      fontSize: "1.1rem",
+                    }}
+                  >
+                    110/=
+                  </span>
+                  <span
+                    style={{
+                      color: "white",
+                      fontFamily: "'DM Mono',monospace",
+                      fontSize: "0.55rem",
+                      letterSpacing: "0.15em",
+                    }}
+                  >
+                    SMOCHA
+                  </span>
                 </div>
               </div>
             </div>
@@ -1056,50 +1191,79 @@ export default function Home() {
       </section>
 
       {/* Bottom hazard stripe */}
-      <div className="pb-hero-hazard-bottom" style={{
-        position: "fixed",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: "12px",
-        zIndex: 40,
-        pointerEvents: "none",
-        background: "repeating-linear-gradient(132deg, var(--pb-ember) 0 21px, var(--pb-bg) 21px 42px)",
-        clipPath: "polygon(0 0,8% 40%,16% 0,24% 35%,32% 0,40% 40%,48% 0,56% 35%,64% 0,72% 40%,80% 0,88% 35%,96% 0,100% 30%,100% 100%,0 100%)"
-      }} />
+      <div
+        className="pb-hero-hazard-bottom"
+        style={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: "12px",
+          zIndex: 40,
+          pointerEvents: "none",
+          background:
+            "repeating-linear-gradient(132deg, var(--pb-ember) 0 21px, var(--pb-bg) 21px 42px)",
+          clipPath:
+            "polygon(0 0,8% 40%,16% 0,24% 35%,32% 0,40% 40%,48% 0,56% 35%,64% 0,72% 40%,80% 0,88% 35%,96% 0,100% 30%,100% 100%,0 100%)",
+        }}
+      />
 
       {/* Marquee: Vendor calls */}
-      <div className="pb-hero-marquee" style={{
-        position: "fixed",
-        bottom: "12px",
-        left: 0,
-        right: 0,
-        zIndex: 30,
-        borderTop: "1px solid rgba(196,92,40,0.2)",
-        background: "rgba(13,9,6,0.7)",
-        backdropFilter: "blur(8px)",
-        padding: "0.5rem 0",
-        overflow: "hidden",
-      }}>
-        <div className="animate-scroll" style={{
-          display: "flex",
-          gap: "1.5rem",
-          whiteSpace: "nowrap",
-          fontFamily: "'DM Mono',monospace",
-          fontSize: "0.65rem",
-          letterSpacing: "0.15em",
-          color: "var(--pb-ivory3)",
-          textTransform: "uppercase",
-          width: "fit-content",
-        }}>
-          {["MOTO MOTO — FRESH OFF THE JIKO","SMOCHAS WORTH FINDING","ALSO ON BOLT FOOD","OPP RAINBOW RESORT, RUIRU","WALK IN OR WHATSAPP"].map((text, i) => (
-            <span key={i} style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
+      <div
+        className="pb-hero-marquee"
+        style={{
+          position: "fixed",
+          bottom: "12px",
+          left: 0,
+          right: 0,
+          zIndex: 30,
+          borderTop: "1px solid rgba(196,92,40,0.2)",
+          background: "rgba(13,9,6,0.7)",
+          backdropFilter: "blur(8px)",
+          padding: "0.5rem 0",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          className="animate-scroll"
+          style={{
+            display: "flex",
+            gap: "1.5rem",
+            whiteSpace: "nowrap",
+            fontFamily: "'DM Mono',monospace",
+            fontSize: "0.65rem",
+            letterSpacing: "0.15em",
+            color: "var(--pb-ivory3)",
+            textTransform: "uppercase",
+            width: "fit-content",
+          }}
+        >
+          {[
+            "MOTO MOTO — FRESH OFF THE JIKO",
+            "SMOCHAS WORTH FINDING",
+            "ALSO ON BOLT FOOD",
+            "OPP RAINBOW RESORT, RUIRU",
+            "WALK IN OR WHATSAPP",
+          ].map((text, i) => (
+            <span
+              key={i}
+              style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}
+            >
               <span>{text}</span>
               <span style={{ color: "var(--pb-ember)" }}>◆</span>
             </span>
           ))}
-          {["MOTO MOTO — FRESH OFF THE JIKO","SMOCHAS WORTH FINDING","ALSO ON BOLT FOOD","OPP RAINBOW RESORT, RUIRU","WALK IN OR WHATSAPP"].map((text, i) => (
-            <span key={`dup-${i}`} style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
+          {[
+            "MOTO MOTO — FRESH OFF THE JIKO",
+            "SMOCHAS WORTH FINDING",
+            "ALSO ON BOLT FOOD",
+            "OPP RAINBOW RESORT, RUIRU",
+            "WALK IN OR WHATSAPP",
+          ].map((text, i) => (
+            <span
+              key={`dup-${i}`}
+              style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}
+            >
               <span>{text}</span>
               <span style={{ color: "var(--pb-ember)" }}>◆</span>
             </span>
@@ -1427,104 +1591,153 @@ export default function Home() {
         </div>
       </section>
 
-        {/* Customer Reviews */}
-        <section
-          className="pb-section-mobile"
+      {/* Customer Reviews */}
+      <section
+        className="pb-section-mobile"
+        style={{
+          padding: "3rem 2.5rem",
+          borderTop: "1px solid var(--pb-rule2)",
+        }}
+      >
+        <div className="pb-eyebrow">What customers say</div>
+        <h2
           style={{
-            padding: "3rem 2.5rem",
-            borderTop: "1px solid var(--pb-rule2)",
+            fontFamily: "'Playfair Display',serif",
+            fontSize: "1.9rem",
+            fontWeight: 700,
+            marginBottom: "1.5rem",
           }}
         >
-          <div className="pb-eyebrow">What customers say</div>
-          <h2
+          Reviews
+        </h2>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "1rem",
+            marginBottom: "1.5rem",
+            flexWrap: "wrap",
+          }}
+        >
+          <span
             style={{
               fontFamily: "'Playfair Display',serif",
-              fontSize: "1.9rem",
-              fontWeight: 700,
-              marginBottom: "1.5rem",
+              fontSize: "2.5rem",
+              fontWeight: 900,
+              color: "var(--pb-ember)",
             }}
           >
-            Reviews
-          </h2>
+            {avgRating?.average ?? "—"}
+          </span>
+          <div>
+            <div style={{ color: "var(--pb-ember)", fontSize: "1.2rem" }}>
+              {avgRating?.average
+                ? "★".repeat(Math.round(avgRating.average)) +
+                  "☆".repeat(5 - Math.round(avgRating.average))
+                : "☆☆☆☆☆"}
+            </div>
+            <div
+              style={{
+                fontFamily: "'DM Mono',monospace",
+                fontSize: "0.6rem",
+                color: "var(--pb-ivory3)",
+                letterSpacing: "0.05em",
+              }}
+            >
+              {avgRating?.count
+                ? `Based on ${avgRating.count} review${avgRating.count !== 1 ? "s" : ""}`
+                : "Based on customer reviews"}
+            </div>
+          </div>
+          <Link
+            href="/reviews"
+            className="pb-btn-ghost"
+            style={{
+              marginLeft: "auto",
+              fontSize: "0.6rem",
+              padding: "0.5rem 1rem",
+            }}
+          >
+            Write a Review →
+          </Link>
+        </div>
+
+        {/* Latest reviews cards */}
+        {latestReviews.length > 0 && (
           <div
             style={{
               display: "flex",
-              alignItems: "center",
-              gap: "1rem",
-              marginBottom: "1.5rem",
-              flexWrap: "wrap",
+              flexDirection: "column",
+              gap: "1px",
+              background: "var(--pb-rule2)",
             }}
           >
-            <span
-              style={{
-                fontFamily: "'Playfair Display',serif",
-                fontSize: "2.5rem",
-                fontWeight: 900,
-                color: "var(--pb-ember)",
-              }}
-            >
-              {avgRating?.average ?? "—"}
-            </span>
-            <div>
-              <div style={{ color: "var(--pb-ember)", fontSize: "1.2rem" }}>
-                {avgRating?.average
-                  ? "★".repeat(Math.round(avgRating.average)) +
-                    "☆".repeat(5 - Math.round(avgRating.average))
-                  : "☆☆☆☆☆"}
-              </div>
+            {latestReviews.map((r: any) => (
               <div
+                key={r.id}
                 style={{
-                  fontFamily: "'DM Mono',monospace",
-                  fontSize: "0.6rem",
-                  color: "var(--pb-ivory3)",
-                  letterSpacing: "0.05em",
+                  background: "var(--pb-bg2)",
+                  padding: "1.2rem 1.5rem",
                 }}
               >
-                {avgRating?.count
-                  ? `Based on ${avgRating.count} review${avgRating.count !== 1 ? "s" : ""}`
-                  : "Based on customer reviews"}
-              </div>
-            </div>
-            <Link
-              href="/reviews"
-              className="pb-btn-ghost"
-              style={{
-                marginLeft: "auto",
-                fontSize: "0.6rem",
-                padding: "0.5rem 1rem",
-              }}
-            >
-              Write a Review →
-            </Link>
-          </div>
-
-          {/* Latest reviews cards */}
-          {latestReviews.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: "var(--pb-rule2)" }}>
-              {latestReviews.map((r: any) => (
-                <div key={r.id} style={{ background: "var(--pb-bg2)", padding: "1.2rem 1.5rem" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.5rem", flexWrap: "wrap", gap: "0.3rem" }}>
-                    <div>
-                      <div style={{ fontSize: "0.82rem", color: "var(--pb-ivory)", fontWeight: 500 }}>{r.customerName}</div>
-                      <div style={{ color: "var(--pb-ember)", fontSize: "0.8rem", marginTop: "0.15rem" }}>
-                        {"★".repeat(r.rating)}
-                        {"☆".repeat(5 - r.rating)}
-                      </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    marginBottom: "0.5rem",
+                    flexWrap: "wrap",
+                    gap: "0.3rem",
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "0.82rem",
+                        color: "var(--pb-ivory)",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {r.customerName}
                     </div>
-                    <div style={{ fontFamily: "'DM Mono',monospace", fontSize: "0.55rem", color: "var(--pb-ivory3)" }}>
-                      {new Date(r.createdAt).toLocaleDateString()}
+                    <div
+                      style={{
+                        color: "var(--pb-ember)",
+                        fontSize: "0.8rem",
+                        marginTop: "0.15rem",
+                      }}
+                    >
+                      {"★".repeat(r.rating)}
+                      {"☆".repeat(5 - r.rating)}
                     </div>
                   </div>
-                  {r.reviewText && (
-                    <div style={{ fontSize: "0.78rem", color: "var(--pb-ivory2)", lineHeight: 1.55, fontStyle: "italic" }}>
-                      "{r.reviewText}"
-                    </div>
-                  )}
+                  <div
+                    style={{
+                      fontFamily: "'DM Mono',monospace",
+                      fontSize: "0.55rem",
+                      color: "var(--pb-ivory3)",
+                    }}
+                  >
+                    {new Date(r.createdAt).toLocaleDateString()}
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
+                {r.reviewText && (
+                  <div
+                    style={{
+                      fontSize: "0.78rem",
+                      color: "var(--pb-ivory2)",
+                      lineHeight: 1.55,
+                      fontStyle: "italic",
+                    }}
+                  >
+                    "{r.reviewText}"
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* CTA */}
       <section

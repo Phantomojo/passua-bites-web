@@ -1,6 +1,8 @@
 import { useEffect, useCallback } from "react";
 
-const GA_MEASUREMENT_ID = import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined;
+const GA_MEASUREMENT_ID = import.meta.env.VITE_GA_MEASUREMENT_ID as
+  | string
+  | undefined;
 
 declare global {
   interface Window {

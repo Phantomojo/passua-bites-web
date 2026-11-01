@@ -7,6 +7,7 @@
 ---
 
 ## Table of Contents
+
 1. [Daraja API Setup](#1-daraja-api-setup)
 2. [STK Push Implementation](#2-stk-push-implementation)
 3. [STK Push Query API](#3-stk-push-query-api)
@@ -34,27 +35,28 @@
 
 ### Sandbox vs Production
 
-| Aspect | Sandbox | Production |
-|--------|---------|------------|
-| Base URL | `https://sandbox.safaricom.co.ke` | `https://api.safaricom.co.ke` |
-| Shortcode | Test shortcode `174379` | Your own assigned shortcode |
-| Passkey | Provided in sandbox portal | Emailed upon go-live approval |
-| Transactions | Simulated only | Real money |
-| STK Query | Known to be unreliable | Works correctly |
+| Aspect       | Sandbox                           | Production                    |
+| ------------ | --------------------------------- | ----------------------------- |
+| Base URL     | `https://sandbox.safaricom.co.ke` | `https://api.safaricom.co.ke` |
+| Shortcode    | Test shortcode `174379`           | Your own assigned shortcode   |
+| Passkey      | Provided in sandbox portal        | Emailed upon go-live approval |
+| Transactions | Simulated only                    | Real money                    |
+| STK Query    | Known to be unreliable            | Works correctly               |
 
 ### Required Credentials
 
-| Credential | Description | Where to Get |
-|------------|-------------|--------------|
-| **Consumer Key** | API identifier | Daraja portal (immediate) |
-| **Consumer Secret** | API secret | Daraja portal (immediate) |
-| **Business Shortcode** | 5-6 digit Paybill/Till | Safaricom Business (2-10 days) |
-| **Passkey** | Used for STK password | Sandbox: portal / Production: email |
-| **SecurityCredential** | For B2C only | Encrypt initiator password with Safaricom cert |
+| Credential             | Description            | Where to Get                                   |
+| ---------------------- | ---------------------- | ---------------------------------------------- |
+| **Consumer Key**       | API identifier         | Daraja portal (immediate)                      |
+| **Consumer Secret**    | API secret             | Daraja portal (immediate)                      |
+| **Business Shortcode** | 5-6 digit Paybill/Till | Safaricom Business (2-10 days)                 |
+| **Passkey**            | Used for STK password  | Sandbox: portal / Production: email            |
+| **SecurityCredential** | For B2C only           | Encrypt initiator password with Safaricom cert |
 
 ### Getting a Shortcode
 
 **For Individuals:**
+
 - Application form
 - National ID
 - KRA PIN certificate
@@ -63,6 +65,7 @@
 - Timeline: 2-4 working days
 
 **For Sole Proprietors:**
+
 - Business certificate/permit
 - Owner's National ID
 - KRA PIN certificate
@@ -70,6 +73,7 @@
 - Timeline: 2-4 working days
 
 **For Limited Companies:**
+
 - CR12 form
 - Certificate of Incorporation
 - Directors' IDs
@@ -87,13 +91,14 @@ Apply at a **Safaricom Shop** or via the **Safaricom Business Portal**.
 
 **Transaction Fees** (depends on tariff plan):
 
-| Tariff Plan | Who Pays | Best For |
-|-------------|----------|----------|
-| **Mgao** | Shared (customer + business) | Startups |
-| **Business Bouquet** | Business absorbs all | E-commerce/food ordering ✓ |
-| **Customer Bouquet** | Customer pays all | Utilities/schools |
+| Tariff Plan          | Who Pays                     | Best For                   |
+| -------------------- | ---------------------------- | -------------------------- |
+| **Mgao**             | Shared (customer + business) | Startups                   |
+| **Business Bouquet** | Business absorbs all         | E-commerce/food ordering ✓ |
+| **Customer Bouquet** | Customer pays all            | Utilities/schools          |
 
 **Customer Charges (2025):**
+
 - KES 1-100: Free
 - KES 101-500: KES 7
 - KES 501-1,000: KES 13
@@ -105,29 +110,38 @@ Apply at a **Safaricom Shop** or via the **Safaricom Business Portal**.
 ### OAuth Token Generation
 
 ```typescript
-import axios from 'axios';
+import axios from "axios";
 
 const consumerKey = process.env.MPESA_CONSUMER_KEY;
 const consumerSecret = process.env.MPESA_CONSUMER_SECRET;
-const isProduction = process.env.NODE_ENV === 'production';
-const baseUrl = isProduction 
-  ? 'https://api.safaricom.co.ke' 
-  : 'https://sandbox.safaricom.co.ke';
+const isProduction = process.env.NODE_ENV === "production";
+const baseUrl = isProduction
+  ? "https://api.safaricom.co.ke"
+  : "https://sandbox.safaricom.co.ke";
 
 let accessToken: string | null = null;
 let tokenExpiry: Date | null = null;
 
 async function getAccessToken(): Promise<string> {
   // Refresh token if expired or about to expire (60s buffer)
-  if (accessToken && tokenExpiry && new Date() < new Date(tokenExpiry.getTime() - 60000)) {
+  if (
+    accessToken &&
+    tokenExpiry &&
+    new Date() < new Date(tokenExpiry.getTime() - 60000)
+  ) {
     return accessToken;
   }
 
-  const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
-  
-  const response = await axios.get(`${baseUrl}/oauth/v1/generate?grant_type=client_credentials`, {
-    headers: { Authorization: `Basic ${auth}` }
-  });
+  const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString(
+    "base64"
+  );
+
+  const response = await axios.get(
+    `${baseUrl}/oauth/v1/generate?grant_type=client_credentials`,
+    {
+      headers: { Authorization: `Basic ${auth}` },
+    }
+  );
 
   accessToken = response.data.access_token;
   tokenExpiry = new Date(Date.now() + 3600000); // Tokens expire in ~1 hour
@@ -142,6 +156,7 @@ async function getAccessToken(): Promise<string> {
 ### What is STK Push?
 
 STK (Simulator Toolkit) Push triggers an M-Pesa payment prompt directly on the customer's phone. They see:
+
 - Business name (registered to shortcode)
 - Amount in KES
 - Account reference (your order number)
@@ -177,33 +192,39 @@ POST {baseUrl}/mpesa/stkpush/v1/processrequest
 
 ### Field Details
 
-| Field | Description | Constraints |
-|-------|-------------|-------------|
-| **BusinessShortCode** | Your Paybill/Till number | 5-6 digits |
-| **Password** | Base64(Shortcode + Passkey + Timestamp) | Generated per transaction |
-| **Timestamp** | YYYYMMDDHHmmss format | Must be current time |
-| **TransactionType** | `CustomerPayBillOnline` or `CustomerBuyGoodsOnline` | Paybill vs Till |
-| **Amount** | Amount in KES | Whole numbers only, no decimals |
-| **PartyA** | Customer phone number | 2547XXXXXXXX format |
-| **PartyB** | Same as BusinessShortCode | Must match |
-| **PhoneNumber** | Customer phone number | 2547XXXXXXXX format |
-| **CallBackURL** | Your HTTPS webhook URL | Must be publicly accessible |
-| **AccountReference** | Order identifier | Max 12 chars, alphanumeric |
-| **TransactionDesc** | Description | Max 13 characters |
+| Field                 | Description                                         | Constraints                     |
+| --------------------- | --------------------------------------------------- | ------------------------------- |
+| **BusinessShortCode** | Your Paybill/Till number                            | 5-6 digits                      |
+| **Password**          | Base64(Shortcode + Passkey + Timestamp)             | Generated per transaction       |
+| **Timestamp**         | YYYYMMDDHHmmss format                               | Must be current time            |
+| **TransactionType**   | `CustomerPayBillOnline` or `CustomerBuyGoodsOnline` | Paybill vs Till                 |
+| **Amount**            | Amount in KES                                       | Whole numbers only, no decimals |
+| **PartyA**            | Customer phone number                               | 2547XXXXXXXX format             |
+| **PartyB**            | Same as BusinessShortCode                           | Must match                      |
+| **PhoneNumber**       | Customer phone number                               | 2547XXXXXXXX format             |
+| **CallBackURL**       | Your HTTPS webhook URL                              | Must be publicly accessible     |
+| **AccountReference**  | Order identifier                                    | Max 12 chars, alphanumeric      |
+| **TransactionDesc**   | Description                                         | Max 13 characters               |
 
 ### Password Generation
 
 ```typescript
-function generatePassword(shortcode: string, passkey: string): { password: string, timestamp: string } {
+function generatePassword(
+  shortcode: string,
+  passkey: string
+): { password: string; timestamp: string } {
   const now = new Date();
-  const timestamp = now.getFullYear().toString() +
-    (now.getMonth() + 1).toString().padStart(2, '0') +
-    now.getDate().toString().padStart(2, '0') +
-    now.getHours().toString().padStart(2, '0') +
-    now.getMinutes().toString().padStart(2, '0') +
-    now.getSeconds().toString().padStart(2, '0');
-  
-  const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
+  const timestamp =
+    now.getFullYear().toString() +
+    (now.getMonth() + 1).toString().padStart(2, "0") +
+    now.getDate().toString().padStart(2, "0") +
+    now.getHours().toString().padStart(2, "0") +
+    now.getMinutes().toString().padStart(2, "0") +
+    now.getSeconds().toString().padStart(2, "0");
+
+  const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString(
+    "base64"
+  );
   return { password, timestamp };
 }
 ```
@@ -213,18 +234,18 @@ function generatePassword(shortcode: string, passkey: string): { password: strin
 ```typescript
 function formatPhoneNumber(phone: string): string {
   // Remove spaces, dashes, plus signs
-  let cleaned = phone.replace(/[\s\-\+]/g, '');
-  
+  let cleaned = phone.replace(/[\s\-\+]/g, "");
+
   // Convert 07XXXXXXXX to 2547XXXXXXXX
-  if (cleaned.startsWith('0')) {
-    cleaned = '254' + cleaned.slice(1);
+  if (cleaned.startsWith("0")) {
+    cleaned = "254" + cleaned.slice(1);
   }
-  
+
   // Validate format
   if (!/^254[17]\d{8}$/.test(cleaned)) {
-    throw new Error('Invalid Kenyan phone number format');
+    throw new Error("Invalid Kenyan phone number format");
   }
-  
+
   return cleaned;
 }
 
@@ -250,6 +271,7 @@ function formatPhoneNumber(phone: string): string {
 ### Callback Data Structure
 
 **Success Callback:**
+
 ```json
 {
   "Body": {
@@ -260,10 +282,10 @@ function formatPhoneNumber(phone: string): string {
       "ResultDesc": "The service request is processed successfully.",
       "CallbackMetadata": {
         "Item": [
-          {"Name": "Amount", "Value": 500},
-          {"Name": "MpesaReceiptNumber", "Value": "QJK7XXXXXXXX"},
-          {"Name": "TransactionDate", "Value": 20260410143045},
-          {"Name": "PhoneNumber", "Value": 254712345678}
+          { "Name": "Amount", "Value": 500 },
+          { "Name": "MpesaReceiptNumber", "Value": "QJK7XXXXXXXX" },
+          { "Name": "TransactionDate", "Value": 20260410143045 },
+          { "Name": "PhoneNumber", "Value": 254712345678 }
         ]
       }
     }
@@ -272,6 +294,7 @@ function formatPhoneNumber(phone: string): string {
 ```
 
 **Failure Callback:**
+
 ```json
 {
   "Body": {
@@ -316,11 +339,11 @@ POST {baseUrl}/mpesa/stkpushquery/v1/query
 
 ### Response Codes
 
-| Code | Meaning | Action |
-|------|---------|--------|
-| `0` | Payment completed | Fulfill order |
-| `1032` | Cancelled by user | Do not retry, show message |
-| `1037` | Timeout/user unreachable | Wait 2-3 min, offer retry |
+| Code   | Meaning                  | Action                     |
+| ------ | ------------------------ | -------------------------- |
+| `0`    | Payment completed        | Fulfill order              |
+| `1032` | Cancelled by user        | Do not retry, show message |
+| `1037` | Timeout/user unreachable | Wait 2-3 min, offer retry  |
 
 **Note:** Sandbox STK Query is known to return "FAILED" even for successful payments. Production works correctly.
 
@@ -330,16 +353,16 @@ POST {baseUrl}/mpesa/stkpushquery/v1/query
 
 ### Common Error Codes
 
-| Code | Meaning | User-Facing Message | Action |
-|------|---------|---------------------|--------|
-| `0` | Success | "Payment confirmed!" | Fulfill order |
-| `1` | Insufficient funds | "Your M-Pesa balance is insufficient. Add funds or use Fuliza, then retry." | Offer retry |
-| `1001` | Transaction in progress | "Another transaction is in progress. Please wait 1-2 minutes and try again." | Wait, retry |
-| `1019` | Transaction expired | "Payment prompt expired. Please try again." | Offer retry |
-| `1032` | Cancelled by user | "Payment was cancelled. Would you like to try again?" | Do NOT auto-retry |
-| `1037` | Timeout | "Payment timed out. Check your network and try again." | Wait 2-3 min, retry |
-| `2001` | Invalid PIN | "Incorrect PIN entered. Please try again." | User can retry |
-| `9999` | System error | "M-Pesa system error. Please try again in a moment." | Wait 1-2 min, retry |
+| Code   | Meaning                 | User-Facing Message                                                          | Action              |
+| ------ | ----------------------- | ---------------------------------------------------------------------------- | ------------------- |
+| `0`    | Success                 | "Payment confirmed!"                                                         | Fulfill order       |
+| `1`    | Insufficient funds      | "Your M-Pesa balance is insufficient. Add funds or use Fuliza, then retry."  | Offer retry         |
+| `1001` | Transaction in progress | "Another transaction is in progress. Please wait 1-2 minutes and try again." | Wait, retry         |
+| `1019` | Transaction expired     | "Payment prompt expired. Please try again."                                  | Offer retry         |
+| `1032` | Cancelled by user       | "Payment was cancelled. Would you like to try again?"                        | Do NOT auto-retry   |
+| `1037` | Timeout                 | "Payment timed out. Check your network and try again."                       | Wait 2-3 min, retry |
+| `2001` | Invalid PIN             | "Incorrect PIN entered. Please try again."                                   | User can retry      |
+| `9999` | System error            | "M-Pesa system error. Please try again in a moment."                         | Wait 1-2 min, retry |
 
 ### Retry Logic Rules
 
@@ -358,12 +381,12 @@ C2B handles payments where the **customer manually initiates** payment via their
 
 ### When to Use C2B vs STK Push
 
-| Scenario | Use |
-|----------|-----|
-| Seamless checkout | **STK Push** ✓ |
-| Customer pays manually | **C2B** |
-| STK Push fails | **C2B** (fallback) |
-| Offline/USSD payment | **C2B** |
+| Scenario               | Use                |
+| ---------------------- | ------------------ |
+| Seamless checkout      | **STK Push** ✓     |
+| Customer pays manually | **C2B**            |
+| STK Push fails         | **C2B** (fallback) |
+| Offline/USSD payment   | **C2B**            |
 
 ### Register URLs
 
@@ -431,11 +454,11 @@ POST {baseUrl}/mpesa/b2c/v1/paymentrequest
 
 ### CommandID Types
 
-| Type | Use Case |
-|------|----------|
-| `BusinessPayment` | General payments (refunds) ✓ |
-| `SalaryPayment` | Employee payments (different tax handling) |
-| `PromotionPayment` | Rewards, bonuses |
+| Type               | Use Case                                   |
+| ------------------ | ------------------------------------------ |
+| `BusinessPayment`  | General payments (refunds) ✓               |
+| `SalaryPayment`    | Employee payments (different tax handling) |
+| `PromotionPayment` | Rewards, bonuses                           |
 
 ### Limits
 
@@ -533,13 +556,17 @@ POST {baseUrl}/mpesa/b2c/v1/paymentrequest
 export const mpesaTransactions = mysqlTable("mpesaTransactions", {
   id: int("id").autoincrement().primaryKey(),
   orderId: int("orderId").notNull(),
-  checkoutRequestID: varchar("checkoutRequestID", { length: 255 }).notNull().unique(),
+  checkoutRequestID: varchar("checkoutRequestID", { length: 255 })
+    .notNull()
+    .unique(),
   merchantRequestID: varchar("merchantRequestID", { length: 255 }),
   mpesaReceiptNumber: varchar("mpesaReceiptNumber", { length: 255 }),
   phoneNumber: varchar("phoneNumber", { length: 20 }).notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   accountReference: varchar("accountReference", { length: 12 }).notNull(),
-  status: mysqlEnum("status", ["pending", "completed", "failed", "cancelled"]).default("pending").notNull(),
+  status: mysqlEnum("status", ["pending", "completed", "failed", "cancelled"])
+    .default("pending")
+    .notNull(),
   resultCode: int("resultCode"),
   resultDesc: text("resultDesc"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -551,15 +578,16 @@ export const mpesaTransactions = mysqlTable("mpesaTransactions", {
 
 ```typescript
 // server/routers/payment.ts
-import { router, protectedProcedure, publicProcedure } from '../_core/trpc';
-import { z } from 'zod';
-import axios from 'axios';
-import { db } from '../db';
-import { orders, mpesaTransactions } from '../storage';
+import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
+import { z } from "zod";
+import axios from "axios";
+import { db } from "../db";
+import { orders, mpesaTransactions } from "../storage";
 
-const baseUrl = process.env.NODE_ENV === 'production'
-  ? 'https://api.safaricom.co.ke'
-  : 'https://sandbox.safaricom.co.ke';
+const baseUrl =
+  process.env.NODE_ENV === "production"
+    ? "https://api.safaricom.co.ke"
+    : "https://sandbox.safaricom.co.ke";
 
 async function getAccessToken() {
   // ... (see OAuth section above)
@@ -571,21 +599,23 @@ function generatePassword(shortcode: string, passkey: string) {
 
 export const paymentRouter = router({
   initiateStkPush: publicProcedure
-    .input(z.object({
-      orderId: z.number(),
-      phoneNumber: z.string(),
-    }))
+    .input(
+      z.object({
+        orderId: z.number(),
+        phoneNumber: z.string(),
+      })
+    )
     .mutation(async ({ input }) => {
       const order = await db.query.orders.findFirst({
         where: (orders, { eq }) => eq(orders.id, input.orderId),
       });
 
       if (!order) {
-        throw new Error('Order not found');
+        throw new Error("Order not found");
       }
 
-      if (order.status !== 'pending') {
-        throw new Error('Order is not in pending state');
+      if (order.status !== "pending") {
+        throw new Error("Order is not in pending state");
       }
 
       const phone = formatPhoneNumber(input.phoneNumber);
@@ -603,19 +633,19 @@ export const paymentRouter = router({
           BusinessShortCode: process.env.MPESA_SHORTCODE,
           Password: password,
           Timestamp: timestamp,
-          TransactionType: 'CustomerPayBillOnline',
+          TransactionType: "CustomerPayBillOnline",
           Amount: amount,
           PartyA: phone,
           PartyB: process.env.MPESA_SHORTCODE,
           PhoneNumber: phone,
           CallBackURL: process.env.MPESA_CALLBACK_URL,
           AccountReference: `Order${input.orderId}`,
-          TransactionDesc: 'Passua Bites food order',
+          TransactionDesc: "Passua Bites food order",
         },
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
         }
       );
@@ -628,33 +658,35 @@ export const paymentRouter = router({
         phoneNumber: phone,
         amount: amount.toString(),
         accountReference: `Order${input.orderId}`,
-        status: 'pending',
+        status: "pending",
       });
 
       return {
         success: true,
         checkoutRequestID: response.data.CheckoutRequestID,
-        message: 'STK Push sent successfully',
+        message: "STK Push sent successfully",
       };
     }),
 
   queryPaymentStatus: publicProcedure
-    .input(z.object({
-      checkoutRequestID: z.string(),
-    }))
+    .input(
+      z.object({
+        checkoutRequestID: z.string(),
+      })
+    )
     .query(async ({ input }) => {
       const transaction = await db.query.mpesaTransactions.findFirst({
         where: (t, { eq }) => eq(t.checkoutRequestID, input.checkoutRequestID),
       });
 
       if (!transaction) {
-        throw new Error('Transaction not found');
+        throw new Error("Transaction not found");
       }
 
       // If already completed, return cached status
-      if (transaction.status === 'completed') {
+      if (transaction.status === "completed") {
         return {
-          status: 'completed',
+          status: "completed",
           mpesaReceiptNumber: transaction.mpesaReceiptNumber,
         };
       }
@@ -677,13 +709,13 @@ export const paymentRouter = router({
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
         }
       );
 
       return {
-        status: response.data.ResultCode === '0' ? 'completed' : 'pending',
+        status: response.data.ResultCode === "0" ? "completed" : "pending",
         resultDesc: response.data.ResultDesc,
       };
     }),
@@ -694,18 +726,20 @@ export const paymentRouter = router({
 
 ```typescript
 // server/_core/mpesaCallback.ts
-import express from 'express';
-import { db } from '../db';
-import { mpesaTransactions, orders } from '../storage';
+import express from "express";
+import { db } from "../db";
+import { mpesaTransactions, orders } from "../storage";
 
 const router = express.Router();
 
-router.post('/api/mpesa/callback', async (req, res) => {
+router.post("/api/mpesa/callback", async (req, res) => {
   // 1. Return 200 IMMEDIATELY to prevent Safaricom retries
-  res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
+  res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
 
   try {
-    const { Body: { stkCallback } } = req.body;
+    const {
+      Body: { stkCallback },
+    } = req.body;
     const { ResultCode, CheckoutRequestID, CallbackMetadata } = stkCallback;
 
     // 2. Find transaction
@@ -714,22 +748,24 @@ router.post('/api/mpesa/callback', async (req, res) => {
     });
 
     if (!transaction) {
-      console.error('Transaction not found:', CheckoutRequestID);
+      console.error("Transaction not found:", CheckoutRequestID);
       return;
     }
 
     // 3. Handle failures
     if (ResultCode !== 0) {
-      await db.update(mpesaTransactions)
+      await db
+        .update(mpesaTransactions)
         .set({
-          status: ResultCode === 1032 ? 'cancelled' : 'failed',
+          status: ResultCode === 1032 ? "cancelled" : "failed",
           resultCode: ResultCode,
           resultDesc: stkCallback.ResultDesc,
         })
         .where((t, { eq }) => eq(t.checkoutRequestID, CheckoutRequestID));
 
-      await db.update(orders)
-        .set({ paymentStatus: 'failed' })
+      await db
+        .update(orders)
+        .set({ paymentStatus: "failed" })
         .where((o, { eq }) => eq(o.id, transaction.orderId));
 
       return;
@@ -744,14 +780,14 @@ router.post('/api/mpesa/callback', async (req, res) => {
     const { MpesaReceiptNumber, Amount, PhoneNumber } = metadata;
 
     // 5. Idempotency - prevent duplicate processing
-    if (transaction.status === 'completed') {
-      console.log('Duplicate callback, skipping:', CheckoutRequestID);
+    if (transaction.status === "completed") {
+      console.log("Duplicate callback, skipping:", CheckoutRequestID);
       return;
     }
 
     // 6. Validate amount
     if (Number(Amount) !== Number(transaction.amount)) {
-      console.error('Amount mismatch:', {
+      console.error("Amount mismatch:", {
         expected: transaction.amount,
         received: Amount,
         orderId: transaction.orderId,
@@ -761,31 +797,32 @@ router.post('/api/mpesa/callback', async (req, res) => {
     }
 
     // 7. Confirm payment and fulfill order
-    await db.update(mpesaTransactions)
+    await db
+      .update(mpesaTransactions)
       .set({
-        status: 'completed',
+        status: "completed",
         mpesaReceiptNumber: MpesaReceiptNumber,
         resultCode: ResultCode,
         resultDesc: stkCallback.ResultDesc,
       })
       .where((t, { eq }) => eq(t.checkoutRequestID, CheckoutRequestID));
 
-    await db.update(orders)
+    await db
+      .update(orders)
       .set({
-        paymentStatus: 'completed',
+        paymentStatus: "completed",
         mpesaTransactionId: MpesaReceiptNumber,
-        status: 'confirmed', // Move from pending to confirmed
+        status: "confirmed", // Move from pending to confirmed
       })
       .where((o, { eq }) => eq(o.id, transaction.orderId));
 
-    console.log('Payment confirmed:', {
+    console.log("Payment confirmed:", {
       orderId: transaction.orderId,
       receipt: MpesaReceiptNumber,
       amount: Amount,
     });
-
   } catch (error) {
-    console.error('Callback processing error:', error);
+    console.error("Callback processing error:", error);
   }
 });
 
@@ -811,25 +848,30 @@ NODE_ENV=development  # or production
 ## Quick Reference
 
 ### Phone Number Format
+
 - Input: `0712345678` or `+254712345678`
 - API: `254712345678` (always)
 - Validation: `/^(?:\+254|0)[17][0-9]{8}$/`
 
 ### Amount Format
+
 - API accepts: Whole numbers only (no decimals)
 - Ksh 70.00 → `70`
 - Use `Math.round(Number(amount))`
 
 ### Transaction Types
+
 - `CustomerPayBillOnline` - for Paybill numbers
 - `CustomerBuyGoodsOnline` - for Till/Buy Goods numbers
 
 ### Key IDs to Store
+
 - `CheckoutRequestID` - for querying status
 - `MerchantRequestID` - for reference
 - `MpesaReceiptNumber` - for reconciliation (success only)
 
 ### Callback Response Codes
+
 - `0` = Success
 - `1` = Insufficient funds
 - `1032` = Cancelled by user
