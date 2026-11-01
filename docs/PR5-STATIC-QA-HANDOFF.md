@@ -11,6 +11,8 @@
 3. Updated the admin page title/description to reflect the owner workspace.
 4. Corrected the misleading pending-order action text. It now says **Accept order**, not **Confirm Payment**, because the current status mutation only changes the fulfilment status.
 5. Added a client-side hold for M-Pesa orders whose order payment status is not completed. The Kitchen and Orders views show **Awaiting M-Pesa** instead of an action that could imply payment has been verified.
+6. Split the unfiltered Kitchen feed from the Orders page's status-filtered query, so changing the Orders filter cannot hide lanes in Kitchen.
+7. Switched new-order sound detection from list length to the newest order ID, avoiding the 100-row cap making the sound indicator stop detecting new arrivals.
 
 These client-side checks are a usability safeguard, not a security boundary. The API must enforce the same rules.
 
@@ -25,7 +27,7 @@ These client-side checks are a usability safeguard, not a security boundary. The
 
 ### P1 — Finish operational UX
 
-- The Kitchen board currently groups orders by status and shows basic customer/order/payment metadata; it has no order line items yet, search, queue filters, priority/age escalation, fulfilment SLA or pause-orders state.
+- The Kitchen board currently groups orders by status and shows basic customer/order/payment metadata; it has no order line items yet, search, queue filters, priority/age escalation, fulfilment SLA or pause-orders state. Its feed is isolated from the Orders page filter, but both remain limited to the latest 100 rows.
 - The order list is limited to the latest 100 records and has no pagination. A queue count is therefore a count of the returned list, not necessarily all orders in the system.
 - The existing Orders, POS, Menu, Reviews, Promotions, Sales, Analytics and Settings panels remain largely their previous implementations. They are still reachable through the new shell, but should receive focused responsive/layout reviews and improvements.
 - Add thoughtful states for offline/stale data, query retries, mutation retries and conflicting updates. Avoid presenting stale cached data as live.
