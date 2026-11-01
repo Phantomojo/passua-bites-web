@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Passua Bites — Audit Report</title>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --bg2: #11162a;
+    --rule: #1f2540;
+    --ivory: #e8e6e1;
+    --ivory2: #c9c6bf;
+    --ivory3: #8a8780;
+    --ember: #ff6b35;
+    --ember2: #ff8a5c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ivory2);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 2.5rem 1.5rem; }
+  .eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    color: var(--ember);
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 900;
+    color: var(--ivory);
+    margin: 0 0 0.5rem;
+    line-height: 1.1;
+  }
+  .meta { font-size: 0.78rem; color: var(--ivory3); margin-bottom: 2rem; }
+  h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--ivory);
+    margin: 2.5rem 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--ember);
+    margin: 1.5rem 0 0.5rem;
+  }
+  p { margin: 0.5rem 0; }
+  ul { margin: 0.5rem 0 0.5rem 1.5rem; padding: 0; }
+  li { margin: 0.3rem 0; }
+  strong { color: var(--ivory); font-weight: 600; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+    background: var(--bg2);
+  }
+  th, td {
+    padding: 0.7rem 0.9rem;
+    text-align: left;
+    border: 1px solid var(--rule);
+  }
+  th {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ember);
+    background: var(--bg);
+    font-weight: 500;
+  }
+  td { color: var(--ivory2); }
+  td:first-child { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--ivory); }
+  code {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.82rem;
+    background: var(--bg2);
+    padding: 0.15rem 0.4rem;
+    border: 1px solid var(--rule);
+    color: var(--ember2);
+  }
+  .sev-high { color: #f87171; font-weight: 600; }
+  .sev-med { color: #fbbf24; font-weight: 600; }
+  .sev-low { color: #60a5fa; font-weight: 600; }
+  .sev-info { color: var(--ivory3); }
+  .badge-ok { color: #4ade80; font-weight: 600; }
+  hr { border: none; border-top: 1px solid var(--rule); margin: 2rem 0; }
+  .priority { background: var(--bg2); border-left: 3px solid var(--ember); padding: 1rem 1.25rem; margin: 0.5rem 0; }
+  .priority b { color: var(--ember); }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Audit Report</div>
+  <h1>Passua Bites</h1>
+  <div class="meta">Site: passua-bites-web.vercel.app · Date: 2026-11-01 · Auditor: Anansi (Hermes Agent)</div>
+
+  <h2>1. Admin Functionality — FUNCTIONAL</h2>
+  <table>
+    <tr><th>Feature</th><th>Status</th><th>Notes</th></tr>
+    <tr><td>Password login</td><td class="badge-ok">✅</td><td><code>ADMIN_PASSWORD</code> env (default <code>passua2026</code> — change in prod)</td></tr>
+    <tr><td>Orders overview + status updates</td><td class="badge-ok">✅</td><td>pending → confirmed → preparing → ready → delivered</td></tr>
+    <tr><td>Menu CRUD (add/edit/delete/toggle)</td><td class="badge-ok">✅</td><td>Image URL, video URL, category, price</td></tr>
+    <tr><td>Reviews moderation</td><td class="badge-ok">✅</td><td>approve / reject / delete</td></tr>
+    <tr><td>Displacement message</td><td class="badge-ok">✅</td><td>site notice editor</td></tr>
+    <tr><td>Analytics tab</td><td class="badge-ok">✅</td><td>pageviews, sessions, devices, countries, browsers</td></tr>
+    <tr><td>New-order sound alert</td><td class="badge-ok">✅</td><td></td></tr>
+    <tr><td>WhatsApp deep-link per order</td><td class="badge-ok">✅</td><td></td></tr>
+  </table>
+  <p><strong>Gaps:</strong> no image upload UI (paste URL only), no order search/filter/export, no menu reorder, no audit log, token in localStorage (XSS risk), no 2FA.</p>
+
+  <h2>2. Media & Efficiency</h2>
+  <ul>
+    <li>18 MB in <code>client/public/media</code> (JPG + WebP)</li>
+    <li><code>LazyImage</code> with IntersectionObserver ✅ · <code>loading="lazy"</code> ✅</li>
+    <li>No responsive <code>srcset</code>/<code>&lt;picture&gt;</code> — full-size images to mobile</li>
+    <li>No Vercel Image Optimization, no video compression pipeline</li>
+    <li>JS bundle 1.07 MB (single chunk, no code-splitting)</li>
+  </ul>
+  <p><strong>Recommendations:</strong> add srcset/picture, convert to WebP/AVIF, enable Vercel Image Optimization, code-split admin bundle, compress videos (ffmpeg CRF 23), add Cache-Control for /media/*, preload hero + fonts.</p>
+
+  <h2>3. Security Audit</h2>
+  <table>
+    <tr><th>#</th><th>Sev</th><th>Finding</th><th>Location</th></tr>
+    <tr><td>S1</td><td class="sev-med">Medium</td><td>Admin token in localStorage (XSS → token theft)</td><td>AdminDashboard.tsx:143</td></tr>
+    <tr><td>S2</td><td class="sev-med">Medium</td><td>Single shared password, no rate limit on admin.login in Vercel entry</td><td>vercel-entry.ts</td></tr>
+    <tr><td>S3</td><td class="sev-low">Low</td><td>dangerouslySetInnerHTML for JSON-LD — safe (stringified), verify no user input</td><td>Home.tsx:788</td></tr>
+    <tr><td>S4</td><td class="sev-low">Low</td><td>CORS <code>*</code> + credentials (browsers block credentialed wildcard)</td><td>vercel-entry.ts</td></tr>
+    <tr><td>S5</td><td class="sev-low">Low</td><td>No CSRF on mutations</td><td>all routers</td></tr>
+    <tr><td>S6</td><td class="sev-info">Info</td><td>No secret leakage in logs</td><td>—</td></tr>
+    <tr><td>S7</td><td class="sev-info">Info</td><td>SQL parameterized (drizzle) — no SQL injection</td><td>analytics.ts</td></tr>
+    <tr><td>S8</td><td class="sev-info">Info</td><td>Rate limit on /api/ (200/15min) ✅</td><td>vercel-entry.ts</td></tr>
+    <tr><td>S9</td><td class="sev-info">Info</td><td>Security headers present ✅</td><td>vercel-entry.ts</td></tr>
+    <tr><td>S10</td><td class="sev-info">Info</td><td>HTTPS enforced by Vercel ✅</td><td>—</td></tr>
+  </table>
+  <p><strong>Recommendations:</strong> move token to httpOnly cookie; add rate limit to admin.login; fix CORS; sanitize review/notes input; rotate default password <code>passua2026</code>; add CSP header; verify no secrets in client bundle.</p>
+
+  <h2>4. Legal & Compliance (Kenya)</h2>
+  <p>Privacy Policy & Terms are already solid (DPA 2019, ODPC, governing law). Gaps:</p>
+  <ol>
+    <li><strong>M-Pesa Paybill mismatch</strong> — Terms says Business No. 400200 / Account 1053125, but live integration uses STK Push shortcode 174379 (sandbox). Update once prod shortcode confirmed.</li>
+    <li><strong>Food business license / health certificate</strong> — not displayed. Add KEPHIS/county permit to footer.</li>
+    <li><strong>Consumer Protection Act (2012)</strong> — refund says "M-Pesa reversal" but no timeframe. Add 14-day commitment.</li>
+    <li><strong>Accessibility (PWD Act)</strong> — no WCAG 2.1 AA statement. Add accessibility page.</li>
+    <li><strong>Cookie consent banner</strong> — none (optional since essential-only, but recommended).</li>
+    <li><strong>Data controller registration</strong> — ensure registered with ODPC.</li>
+    <li><strong>Delivery zone / pricing transparency</strong> — make delivery fees explicit.</li>
+    <li><strong>Allergen disclaimer</strong> — present but could be more prominent on menu items.</li>
+  </ol>
+
+  <h2>5. Other Improvements</h2>
+  <table>
+    <tr><th>Area</th><th>Item</th></tr>
+    <tr><td>SEO</td><td>og:image + JSON-LD ✅. Add sitemap.xml + robots.txt.</td></tr>
+    <tr><td>Performance</td><td>Code-split admin + analytics.</td></tr>
+    <tr><td>PWA</td><td>No service worker/manifest — add for offline menu + install.</td></tr>
+    <tr><td>Monitoring</td><td>No Sentry/LogRocket — add for prod errors.</td></tr>
+    <tr><td>Backups</td><td>Neon DB — enable point-in-time recovery.</td></tr>
+    <tr><td>Admin UX</td><td>No image upload, no order export, no menu reorder.</td></tr>
+    <tr><td>i18n</td><td>English only — consider Swahili.</td></tr>
+    <tr><td>Testing</td><td>No E2E tests — add Playwright smoke tests.</td></tr>
+  </table>
+
+  <h2>6. Priority Action Items</h2>
+  <div class="priority"><b>1.</b> Rotate admin password from <code>passua2026</code> (high, quick)</div>
+  <div class="priority"><b>2.</b> Switch to production Daraja credentials when ready (high)</div>
+  <div class="priority"><b>3.</b> Add rate limiting to <code>admin.login</code> in Vercel entry (medium, quick)</div>
+  <div class="priority"><b>4.</b> Code-split the bundle (medium, perf)</div>
+  <div class="priority"><b>5.</b> Add srcset/picture for images (medium, perf)</div>
+  <div class="priority"><b>6.</b> Update Terms M-Pesa Paybill numbers (medium, legal)</div>
+  <div class="priority"><b>7.</b> Add Content-Security-Policy header (medium, security)</div>
+  <div class="priority"><b>8.</b> Register with ODPC as data controller (legal, one-time)</div>
+  <div class="priority"><b>9.</b> Add cookie consent banner (low, compliance polish)</div>
+  <div class="priority"><b>10.</b> Add image upload to admin (low, UX)</div>
+
+  <hr>
+  <p style="text-align:center; color: var(--ivory3); font-size: 0.78rem;">Full report: <code>AUDIT_REPORT.md</code> in project root.</p>
+</div>
+</body>
+</html>

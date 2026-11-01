@@ -414,6 +414,7 @@ export default function Menu() {
       new Set(menuItems.map((i: any) => i.category).filter(Boolean))
     ),
   ];
+  const featuredItems = menuItems.filter((i: any) => i.featured === 1 || i.featured === true);
   const filtered =
     selectedCategory === "All"
       ? menuItems
@@ -557,6 +558,80 @@ export default function Menu() {
           }}
         >
           <div>
+            {/* Today's Specials */}
+            {featuredItems.length > 0 && selectedCategory === "All" && (
+              <div style={{ marginBottom: "2.5rem" }}>
+                <div style={{
+                  fontFamily: "'DM Mono',monospace",
+                  fontSize: "0.62rem",
+                  letterSpacing: "0.18em",
+                  color: "var(--pb-ember)",
+                  textTransform: "uppercase",
+                  marginBottom: "1rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                }}>
+                  <span style={{ fontSize: "1rem" }}>★</span> Today's Specials
+                </div>
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))",
+                  gap: "1px",
+                  background: "var(--pb-rule2)",
+                }}>
+                  {featuredItems.map((item: any) => {
+                    const inCart = cart.find((c: any) => c.id === item.id);
+                    return (
+                      <div key={item.id} style={{
+                        background: "var(--pb-bg2)",
+                        borderLeft: "3px solid var(--pb-ember)",
+                        padding: "1.25rem",
+                        display: "flex",
+                        gap: "1rem",
+                        alignItems: "center",
+                      }}>
+                        {item.imageUrl && (
+                          <img src={item.imageUrl} alt={item.name} style={{
+                            width: 72, height: 72, objectFit: "cover",
+                            flexShrink: 0, border: "1px solid var(--pb-rule)",
+                          }} />
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontFamily: "'Playfair Display',serif",
+                            fontSize: "1.1rem", fontWeight: 700,
+                            color: "var(--pb-ivory)", marginBottom: "0.2rem",
+                          }}>{item.name}</div>
+                          <div style={{
+                            fontSize: "0.72rem", color: "var(--pb-ivory3)",
+                            lineHeight: 1.5, marginBottom: "0.5rem",
+                          }}>{item.description}</div>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <span style={{
+                              fontFamily: "'Playfair Display',serif",
+                              fontSize: "1.2rem", fontWeight: 700,
+                              color: "var(--pb-ember)",
+                            }}>KSH {Number(item.price)}</span>
+                            {!inCart ? (
+                              <button onClick={() => addToCart(item)} className="pb-btn-primary"
+                                style={{ padding: "0.35rem 0.8rem", fontSize: "0.6rem", minHeight: 32, cursor: "pointer" }}>
+                                + Add
+                              </button>
+                            ) : (
+                              <span style={{ fontFamily: "'DM Mono',monospace", fontSize: "0.65rem", color: "#4ade80" }}>
+                                ✓ In cart
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Category filter */}
             <div
               style={{

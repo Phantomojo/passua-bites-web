@@ -220,10 +220,10 @@ class SDKServer {
         return null;
       }
 
-      return {
+return {
         openId,
         appId,
-        name,
+        name: (name as string) ?? "",
       };
     } catch (error) {
       logger.warn({ err: error }, "[Auth] Session verification failed");
@@ -255,11 +255,20 @@ class SDKServer {
     } as GetUserInfoWithJwtResponse;
   }
 
-  async authenticateRequest(req: Request): Promise<User> {
-    // Regular authentication flow
-    const cookies = this.parseCookies(req.headers.cookie);
-    const sessionCookie = cookies.get(COOKIE_NAME);
-    const session = await this.verifySession(sessionCookie);
+async authenticateRequest(req: Request): Promise<User> {
+    // Support both cookie-based and Bearer-token auth. Bearer token is used
+    // by the admin UI (stored in localStorage) so auth survives even when
+    // cookies are not persisted by the runtime.
+let cookieValue: string | null = null;
+    const authHeader = req.headers.authorization || req.headers.Authorization;
+    if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
+      cookieValue = authHeader.slice(7).trim();
+    } else {
+      const cookies = this.parseCookies(req.headers.cookie);
+cookieValue = cookies.get(COOKIE_NAME) ?? null;
+    }
+
+    const session = await this.verifySession(cookieValue);
 
     if (!session) {
       throw ForbiddenError("Invalid session cookie");
@@ -269,10 +278,9 @@ class SDKServer {
     const signedInAt = new Date();
     let user = await db.getUserByOpenId(sessionUserId);
 
-    // If user not in DB, sync from OAuth server automatically
     if (!user) {
       try {
-        const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
+        const userInfo = await this.getUserInfoWithJwt(cookieValue ?? "");
         await db.upsertUser({
           openId: userInfo.openId,
           name: userInfo.name || null,

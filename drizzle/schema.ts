@@ -39,6 +39,7 @@ export const menuItems = pgTable("menuItems", {
   videoUrl: text("videoUrl"),
   category: varchar("category", { length: 100 }),
   available: integer("available").default(1).notNull(),
+  featured: integer("featured").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -64,6 +65,7 @@ export const orders = pgTable("orders", {
   paymentStatus: varchar("paymentStatus", { length: 20 })
     .default("pending")
     .notNull(),
+  channel: varchar("channel", { length: 20 }).default("online").notNull(),
   mpesaTransactionId: varchar("mpesaTransactionId", { length: 255 }),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -164,5 +166,22 @@ export const analyticsEvents = pgTable("analyticsEvents", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+/**
+ * Announcements / offers table for multiple site-wide messages
+ */
+export const announcements = pgTable("announcements", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  body: text("body"),
+  type: varchar("type", { length: 30 }).default("info").notNull(),
+  active: integer("active").default(1).notNull(),
+  startsAt: timestamp("startsAt"),
+  endsAt: timestamp("endsAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type Announcement = typeof announcements.$inferSelect;
+export type InsertAnnouncement = typeof announcements.$inferInsert;
 export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
 export type InsertAnalyticsEvent = typeof analyticsEvents.$inferInsert;

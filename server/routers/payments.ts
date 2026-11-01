@@ -14,7 +14,10 @@ const MPESA_BASE_URL = isProduction
 const MPESA_SHORTCODE = process.env.MPESA_SHORTCODE || "174379";
 const MPESA_PASSKEY = process.env.MPESA_PASSKEY || "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
 const MPESA_CALLBACK_URL =
-  process.env.MPESA_CALLBACK_URL || "https://your-domain.com/api/mpesa/callback";
+  process.env.MPESA_CALLBACK_URL ||
+  (process.env.APP_URL
+    ? `${process.env.APP_URL.replace(/\/$/, "")}/api/payments/callback`
+    : "https://your-domain.com/api/payments/callback");
 
 // OAuth token cache
 let accessToken: string | null = null;
@@ -185,6 +188,7 @@ export const paymentsRouter = router({
         return {
           status: "completed",
           mpesaReceiptNumber: tx.mpesaReceiptNumber,
+          resultCode: tx.resultCode ?? 0,
         };
       }
 
@@ -210,9 +214,9 @@ export const paymentsRouter = router({
           }
         );
 
-        const resultCode = response.data.ResultCode;
+        const resultCode = Number(response.data.ResultCode);
 
-        if (resultCode === "0") {
+        if (resultCode === 0) {
           // Payment completed - update records
           const metadata: Record<string, any> = {};
           response.data.CallbackMetadata?.Item?.forEach((item: any) => {
@@ -224,7 +228,7 @@ export const paymentsRouter = router({
             .set({
               status: "completed",
               mpesaReceiptNumber: metadata.MpesaReceiptNumber || null,
-              resultCode: parseInt(resultCode),
+              resultCode: resultCode,
               resultDesc: response.data.ResultDesc,
             })
             .where(
@@ -246,16 +250,17 @@ export const paymentsRouter = router({
           return {
             status: "completed",
             mpesaReceiptNumber: metadata.MpesaReceiptNumber,
+            resultCode: 0,
           };
         } else {
           // Payment failed or pending
           const status =
-            resultCode === "1032" ? "cancelled" : "failed";
+            resultCode === 1032 ? "cancelled" : "failed";
           await db
             .update(mpesaTransactions)
             .set({
               status,
-              resultCode: parseInt(resultCode),
+              resultCode: resultCode,
               resultDesc: response.data.ResultDesc,
             })
             .where(
@@ -268,6 +273,7 @@ export const paymentsRouter = router({
           return {
             status: status as "failed" | "cancelled" | "pending",
             resultDesc: response.data.ResultDesc,
+            resultCode,
           };
         }
       } catch (error: any) {
@@ -275,6 +281,7 @@ export const paymentsRouter = router({
         return {
           status: tx.status,
           resultDesc: "Query failed, check callback for status",
+          resultCode: tx.resultCode,
         };
       }
     }),

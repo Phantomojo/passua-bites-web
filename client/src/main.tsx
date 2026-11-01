@@ -40,14 +40,20 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
+const getAdminToken = () =>
+  typeof window !== "undefined"
+    ? localStorage.getItem("pb_admin_token")
+    : null;
+
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url:
-        process.env.NODE_ENV === "development"
-          ? "http://localhost:3000/api/trpc"
-          : "https://passua-api.onrender.com/api/trpc",
+      url: "/api/trpc",
       transformer: superjson,
+      headers() {
+        const token = getAdminToken();
+        return token ? { Authorization: `Bearer ${token}` } : {};
+      },
       fetch(input, init) {
         return globalThis.fetch(input, {
           ...(init ?? {}),

@@ -61,7 +61,7 @@ export default function TermsOfService() {
               4. Payment
             </h2>
             <ul style={{ marginLeft: "1.5rem" }}>
-              <li><strong>M-Pesa Paybill:</strong> Business No. 400200, Account No. 1053125</li>
+              <li><strong>M-Pesa:</strong> We send an M-Pesa STK Push prompt to your phone at checkout (manual Paybill fallback: Business No. 400200, Account No. 1053125)</li>
               <li><strong>Cash on Delivery:</strong> Pay when your order is delivered</li>
               <li>Orders are prepared after payment is confirmed</li>
               <li>We are not responsible for incorrect M-Pesa payments</li>
@@ -86,7 +86,7 @@ export default function TermsOfService() {
             </h2>
             <ul style={{ marginLeft: "1.5rem" }}>
               <li>Orders can be cancelled before preparation begins</li>
-              <li>Refunds for paid orders will be processed via M-Pesa reversal</li>
+              <li>Refunds for paid orders will be processed via M-Pesa reversal within 14 business days</li>
               <li>If we cannot fulfill your order, we will notify you and issue a full refund</li>
               <li>Contact us at 0722 473 873 for cancellations</li>
             </ul>

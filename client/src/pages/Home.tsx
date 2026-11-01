@@ -735,6 +735,7 @@ export default function Home() {
     staleTime: 1000 * 60 * 5,
   });
   const { data: menuItems = [] } = trpc.menu.list.useQuery();
+const { data: announcements = [] } = trpc.announcements.listActive.useQuery();
 
   const { data: avgRating } = trpc.reviews.getAverageRating.useQuery({});
   const { data: latestReviews = [] } = trpc.reviews.list.useQuery(undefined, {
@@ -787,7 +788,19 @@ export default function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaData) }}
       />
-      <PBNav />
+<PBNav />
+
+      {/* Announcements */}
+      {(announcements || []).length > 0 && (
+        <div style={{ padding: "0.75rem 1.25rem", background: "rgba(196,92,40,0.12)", borderBottom: "1px solid var(--pb-rule)" }}>
+          {(announcements as any[]).map((a: any) => (
+            <div key={a.id} style={{ marginBottom: "0.25rem" }}>
+              <strong style={{ color: "var(--pb-ember)" }}>{a.title}</strong>
+              {a.body ? <span style={{ color: "var(--pb-ivory2)", marginLeft: "0.5rem" }}>{a.body}</span> : null}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Top hazard stripe */}
       <div className="pb-hero-hazard-top" style={{
