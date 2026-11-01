@@ -1,13 +1,14 @@
 {
-  "name": "Passua Bites Admin",
-  "short_name": "Passua Admin",
-  "description": "Order queue, menu and sales dashboard for Passua Bites staff.",
-  "start_url": "/admin",
-  "scope": "/",
+  "name": "Passua Bites Owner",
+  "short_name": "Passua Ops",
+  "description": "Private order and business operations app for Passua Bites owners.",
+  "start_url": "/admin?source=installed-app",
+  "scope": "/admin",
   "display": "standalone",
-  "background_color": "#140f0a",
+  "background_color": "#0d0906",
   "theme_color": "#c45c28",
   "orientation": "portrait",
+  "categories": ["business", "food"],
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
