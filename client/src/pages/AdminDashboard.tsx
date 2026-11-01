@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import AnalyticsTab from "@/components/AnalyticsTab";
+import OwnerInstallGuide from "@/components/OwnerInstallGuide";
 import { usePageMeta } from "@/hooks/usePageMeta";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -31,6 +32,24 @@ export default function AdminDashboard() {
     typeof window !== "undefined" ? localStorage.getItem("pb_admin_token") : null
   );
   const [password, setPassword] = useState("");
+  const [installGuideComplete, setInstallGuideComplete] = useState(() => {
+    try { return localStorage.getItem("pb_owner_install_guide_v1") === "1"; } catch { return false; }
+  });
+
+  useEffect(() => {
+    const manifest = document.createElement("link");
+    manifest.rel = "manifest";
+    manifest.href = "/manifest.json";
+    document.head.appendChild(manifest);
+    const robots = document.createElement("meta");
+    robots.name = "robots";
+    robots.content = "noindex, nofollow, noarchive";
+    document.head.appendChild(robots);
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js", { scope: "/admin" }).catch(() => {});
+    }
+    return () => { manifest.remove(); robots.remove(); };
+  }, []);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("orders");
   const [prevOrderCount, setPrevOrderCount] = useState(0);
@@ -367,6 +386,13 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
         </div>
       </div>
     );
+  }
+
+  if (!installGuideComplete) {
+    return <OwnerInstallGuide onContinue={() => {
+      try { localStorage.setItem("pb_owner_install_guide_v1", "1"); } catch {}
+      setInstallGuideComplete(true);
+    }} />;
   }
 
   // Dashboard
