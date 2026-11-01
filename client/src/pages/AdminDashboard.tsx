@@ -36,7 +36,7 @@ export default function AdminDashboard() {
   }, []);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("overview");
-  const [prevOrderCount, setPrevOrderCount] = useState(0);
+  const [prevLatestOrderId, setPrevLatestOrderId] = useState<number | null>(null);
   const [playSound, setPlaySound] = useState(false);
   const [pendingReviews, setPendingReviews] = useState<any[]>([]);
 const [orderStatusFilter, setOrderStatusFilter] = useState<string>("");
@@ -65,7 +65,7 @@ const [orderStatusFilter, setOrderStatusFilter] = useState<string>("");
   );
   const orders = trpc.orders.listAll.useQuery(
     orderStatusFilter ? { status: orderStatusFilter as any, limit: 100 } : { limit: 100 },
-    { enabled: !!token, refetchInterval: 30000 }
+    { enabled: !!token && activeTab === "orders", refetchInterval: 30000 }
   );
   const menuItems = trpc.menu.list.useQuery(undefined, { enabled: !!token });
   const updateOrderStatus = trpc.orders.updateStatus.useMutation();
@@ -131,24 +131,25 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
     }
   };
 
-  // Sound notification follows the unfiltered Kitchen feed, not the Orders page filter.
+  // Track the latest order ID; the Kitchen query is capped at 100 rows.
+  const latestOrderId = kitchenOrders.data?.[0]?.id ?? null;
   useEffect(() => {
-    if (!kitchenOrders.data || prevOrderCount === 0) {
-      if (kitchenOrders.data) setPrevOrderCount(kitchenOrders.data.length);
+    if (latestOrderId === null) return;
+    if (prevLatestOrderId === null) {
+      setPrevLatestOrderId(latestOrderId);
       return;
     }
-    if (kitchenOrders.data.length > prevOrderCount) {
-      // Play notification sound
+    if (latestOrderId > prevLatestOrderId) {
       const audio = new Audio(
-        "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2LkpGKgHRpaGx2g42UlI2BesJYZ3J9iZGTjoh+dG5uc3qEi5OTjIF1amhsdoGMlJOMgHRnaW14g46Vk4x/c2dmbnqFj5aUjYF0ZmdueIOOlZSMfnNmZm56hY+WlI2BdGZnbniDjpWUjH5zZmZueoWPlpSNgXRmZ254g46VlIx+c2dmbnqFj5aUjYF0ZmdueIOOlZSMfnNmZm56hY+WlI2BdA=="
+        "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2LkpGKgHRpaGx2g42UlI2BesJYZ3J9iZGTjoh+dG5uc3qEi5OTjIF1amhsdoGMlJOMgHRnaW14g46Vk4x/c2dmbnqFj5aUjYF0ZmdueIOOlZSMfnNmZm56hY+WlI2BdGZnbniDjpWUjH5zZmZueIOOlZSMfnNmZm56hY+WlI2BdA=="
       );
       audio.volume = 0.5;
       audio.play().catch(() => {});
       setPlaySound(true);
       setTimeout(() => setPlaySound(false), 3000);
     }
-    setPrevOrderCount(kitchenOrders.data.length);
-  }, [kitchenOrders.data?.length]);
+    setPrevLatestOrderId(latestOrderId);
+  }, [latestOrderId, prevLatestOrderId]);
 
   // New menu item form
   const [showAddItem, setShowAddItem] = useState(false);
