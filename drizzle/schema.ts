@@ -1,4 +1,5 @@
 import {
+  boolean,
   decimal,
   index,
   serial,
@@ -74,6 +75,8 @@ export const orders = pgTable("orders", {
   paymentVerifiedAt: timestamp("paymentVerifiedAt"),
   paymentVerifiedBy: varchar("paymentVerifiedBy", { length: 320 }),
   notes: text("notes"),
+  whatsappOrderUpdatesOptIn: boolean("whatsappOrderUpdatesOptIn").default(false).notNull(),
+  whatsappOrderUpdatesOptInAt: timestamp("whatsappOrderUpdatesOptInAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
@@ -83,6 +86,21 @@ export const orders = pgTable("orders", {
 
 export type Order = typeof orders.$inferSelect;
 export type InsertOrder = typeof orders.$inferInsert;
+
+/** Persistent marketing preference; transactional consent is recorded per order. */
+export const customerMessagingPreferences = pgTable("customerMessagingPreferences", {
+  id: serial("id").primaryKey(),
+  phone: varchar("phone", { length: 20 }).notNull().unique(),
+  whatsappMarketingOptIn: boolean("whatsappMarketingOptIn").default(false).notNull(),
+  marketingOptInAt: timestamp("marketingOptInAt"),
+  marketingOptOutAt: timestamp("marketingOptOutAt"),
+  marketingConsentSource: varchar("marketingConsentSource", { length: 50 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type CustomerMessagingPreference = typeof customerMessagingPreferences.$inferSelect;
+export type InsertCustomerMessagingPreference = typeof customerMessagingPreferences.$inferInsert;
 
 /**
  * Order items table (line items for each order)
