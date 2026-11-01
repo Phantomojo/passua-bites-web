@@ -39,5 +39,5 @@ export function extractWhatsAppMarketingOptOutSenders(payload:unknown):string[]{
   if(m.type!=="text"||!/^(STOP|STOPALL|UNSUBSCRIBE|CANCEL|END|QUIT)$/i.test((m.text?.body||"").trim()))continue;
   try{senders.add(normalizeKenyanWhatsAppPhone(m.from||""))}catch{/* ignore malformed sender */}
  }
- return [...senders];
+return Array.from(senders);
 }

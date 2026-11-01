@@ -162,7 +162,7 @@ async function startServer() {
             },
           });
         }
-        const variants = [...new Set(senders.flatMap(getKenyanWhatsAppPhoneVariants))];
+        const variants = Array.from(new Set(senders.flatMap(getKenyanWhatsAppPhoneVariants)));
         await db.update(orders)
           .set({ whatsappOrderUpdatesOptIn: false, updatedAt: optedOutAt })
           .where(inArray(orders.customerPhone, variants))
