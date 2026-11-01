@@ -64,7 +64,7 @@ export default function OwnerInstallGuide({ onContinue }: Props) {
         <div style={{
           fontFamily: "'DM Mono',monospace", color: "var(--pb-ember)",
           fontSize: ".68rem", letterSpacing: ".16em", textTransform: "uppercase",
-        }}>Owner setup · Step 1 of 2</div>
+        }}>Owner app setup · Installation</div>
         <h1 style={{
           fontFamily: "'Playfair Display',serif", fontSize: "clamp(2rem,7vw,3rem)",
           lineHeight: 1.05, margin: ".8rem 0",
