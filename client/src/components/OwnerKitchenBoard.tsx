@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { ArrowRight, Clock3, PackageCheck, RefreshCw, ShoppingBag, Timer } from "lucide-react";
 import type { OwnerTab } from "@/components/OwnerWorkspaceShell";
 
-type OrderRecord = { id: number; customerName?: string | null; customerPhone?: string | null; deliveryAddress?: string | null; totalPrice?: string | number | null; status: string; paymentStatus?: string | null; channel?: string | null; notes?: string | null; createdAt?: string | Date | null };
+type OrderRecord = { id: number; customerName?: string | null; customerPhone?: string | null; deliveryAddress?: string | null; totalPrice?: string | number | null; status: string; paymentMethod?: string | null; paymentStatus?: string | null; channel?: string | null; notes?: string | null; createdAt?: string | Date | null };
 type Props = { orders: OrderRecord[]; isLoading: boolean; isError: boolean; errorMessage?: string; pendingReviews: number; onStatusChange: (orderId: number, status: string) => Promise<void>; onNavigate: (tab: OwnerTab) => void; onRefresh: () => void };
 const lanes = [
   { status: "pending", label: "Needs attention", helper: "New orders to review" },
@@ -21,8 +21,13 @@ function ageLabel(value?: string | Date | null) {
   if (hours < 24) return `${hours}h ${minutes % 60}m ago`;
   return `${Math.floor(hours / 24)}d ago`;
 }
-function nextAction(status: string) {
-  switch (status) {
+function nextAction(order: OrderRecord) {
+  // M-Pesa orders are confirmed by the payment callback. Do not let the
+  // kitchen queue advance an unpaid M-Pesa order as though it were verified.
+  if (order.status === "pending" && order.paymentMethod === "mpesa" && order.paymentStatus !== "completed") {
+    return null;
+  }
+  switch (order.status) {
     case "pending": return { label: "Accept order", next: "confirmed" };
     case "confirmed": return { label: "Start preparing", next: "preparing" };
     case "preparing": return { label: "Mark ready", next: "ready" };
@@ -36,7 +41,7 @@ function formatMoney(value?: string | number | null) {
 }
 function OrderCard({ order, onStatusChange }: { order: OrderRecord; onStatusChange: Props["onStatusChange"] }) {
   const [busy, setBusy] = useState(false);
-  const action = nextAction(order.status);
+  const action = nextAction(order);
   const paid = order.paymentStatus === "completed";
   const address = order.deliveryAddress && order.deliveryAddress !== "Walk-in / POS" ? order.deliveryAddress : null;
   const advance = async () => {
@@ -52,7 +57,7 @@ function OrderCard({ order, onStatusChange }: { order: OrderRecord; onStatusChan
     {order.notes && <div className="pb-kitchen-order-note">{order.notes}</div>}
     <div className="pb-kitchen-order-bottom">
       <div><div className="pb-kitchen-order-total">{formatMoney(order.totalPrice)}</div><span className={`pb-kitchen-payment${paid ? " is-paid" : " is-pending"}`}>{paid ? "PAID" : (order.paymentStatus || "Payment unknown").replace(/_/g, " ").toUpperCase()}</span></div>
-      {action ? <button type="button" className="pb-kitchen-action" onClick={advance} disabled={busy}>{busy ? "Updating…" : action.label}{!busy && <ArrowRight size={15} />}</button> : <span className="pb-kitchen-complete-label">{order.status === "delivered" ? "Completed" : order.status}</span>}
+      {action ? <button type="button" className="pb-kitchen-action" onClick={advance} disabled={busy}>{busy ? "Updating…" : action.label}{!busy && <ArrowRight size={15} />}</button> : <span className={`pb-kitchen-complete-label${order.status === "pending" && order.paymentMethod === "mpesa" && order.paymentStatus !== "completed" ? " is-held" : ""}`}>{order.status === "pending" && order.paymentMethod === "mpesa" && order.paymentStatus !== "completed" ? "Awaiting M-Pesa" : order.status === "delivered" ? "Completed" : order.status}</span>}
     </div>
   </article>;
 }
