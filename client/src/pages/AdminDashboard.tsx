@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -69,6 +69,7 @@ const [orderStatusFilter, setOrderStatusFilter] = useState<string>("");
   );
   const menuItems = trpc.menu.list.useQuery(undefined, { enabled: !!token });
   const updateOrderStatus = trpc.orders.updateStatus.useMutation();
+  const markOrderPaid = trpc.orders.markPaid.useMutation();
   const createMenuItem = trpc.menu.create.useMutation();
   const updateMenuItem = trpc.menu.update.useMutation();
   const deleteMenuItem = trpc.menu.delete.useMutation();
@@ -205,6 +206,17 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
       kitchenOrders.refetch();
     } catch (err: any) {
       toast.error(err.message || "Failed to update order");
+    }
+  };
+
+  const handleMarkPaid = async (orderId: number) => {
+    try {
+      await markOrderPaid.mutateAsync({ id: orderId });
+      toast.success(`Order #${orderId} marked as paid (cash)`);
+      if (activeTab === "orders") orders.refetch();
+      kitchenOrders.refetch();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to mark paid");
     }
   };
 
@@ -406,6 +418,7 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
             errorMessage={kitchenOrders.error?.message}
             pendingReviews={pendingReviews.length}
             onStatusChange={handleStatusChange}
+            onMarkPaid={handleMarkPaid}
             onNavigate={setActiveTab}
             onRefresh={() => {
               kitchenOrders.refetch();
@@ -485,8 +498,8 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
                 </thead>
                 <tbody>
                   {orderList.map((o: any) => (
-                    <tr
-                      key={o.id}
+                    <Fragment key={o.id}>
+                      <tr
                       style={{ borderBottom: "1px solid var(--pb-rule2)" }}
                     >
                       <td
@@ -661,6 +674,37 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
                         </a>
                       </td>
                     </tr>
+                      <tr>
+                        <td
+                          colSpan={9}
+                          style={{
+                            padding: "0.35rem 1rem 0.7rem",
+                            fontSize: "0.7rem",
+                            color: "var(--pb-ivory3)",
+                            borderBottom: "1px solid var(--pb-rule2)",
+                          }}
+                        >
+                          <span style={{ color: "var(--pb-ivory2)" }}>
+                            {(o.items || [])
+                              .map((it: any) => `${it.name || "Item"} ×${it.quantity}`)
+                              .join(", ") || "No items"}
+                          </span>
+                          {o.paymentMethod === "mpesa" &&
+                            o.paymentStatus !== "completed" && (
+                              <button
+                                onClick={() => handleMarkPaid(o.id)}
+                                style={{
+                                  marginLeft: "0.75rem",
+                                  fontSize: "0.6rem",
+                                  padding: "0.2rem 0.5rem",
+                                }}
+                              >
+                                Mark paid (cash)
+                              </button>
+                            )}
+                        </td>
+                      </tr>
+                    </Fragment>
                   ))}
                   {orderList.length === 0 && (
                     <tr>

@@ -2,8 +2,8 @@ import { useMemo, useState } from "react";
 import { ArrowRight, Clock3, PackageCheck, RefreshCw, ShoppingBag, Timer } from "lucide-react";
 import type { OwnerTab } from "@/components/OwnerWorkspaceShell";
 
-type OrderRecord = { id: number; customerName?: string | null; customerPhone?: string | null; deliveryAddress?: string | null; totalPrice?: string | number | null; status: string; paymentMethod?: string | null; paymentStatus?: string | null; channel?: string | null; notes?: string | null; createdAt?: string | Date | null };
-type Props = { orders: OrderRecord[]; isLoading: boolean; isError: boolean; errorMessage?: string; pendingReviews: number; onStatusChange: (orderId: number, status: string) => Promise<void>; onNavigate: (tab: OwnerTab) => void; onRefresh: () => void };
+type OrderRecord = { id: number; customerName?: string | null; customerPhone?: string | null; deliveryAddress?: string | null; totalPrice?: string | number | null; status: string; paymentMethod?: string | null; paymentStatus?: string | null; channel?: string | null; notes?: string | null; createdAt?: string | Date | null; items?: { name?: string | null; quantity?: number | null }[] };
+type Props = { orders: OrderRecord[]; isLoading: boolean; isError: boolean; errorMessage?: string; pendingReviews: number; onStatusChange: (orderId: number, status: string) => Promise<void>; onMarkPaid?: (orderId: number) => Promise<void>; onNavigate: (tab: OwnerTab) => void; onRefresh: () => void };
 const lanes = [
   { status: "pending", label: "Needs attention", helper: "New orders to review" },
   { status: "confirmed", label: "Accepted", helper: "Ready for the kitchen" },
@@ -39,7 +39,7 @@ function formatMoney(value?: string | number | null) {
   const amount = Number(value ?? 0);
   return Number.isFinite(amount) ? `KSh ${amount.toLocaleString("en-KE", { maximumFractionDigits: 0 })}` : "Amount unavailable";
 }
-function OrderCard({ order, onStatusChange }: { order: OrderRecord; onStatusChange: Props["onStatusChange"] }) {
+function OrderCard({ order, onStatusChange, onMarkPaid }: { order: OrderRecord; onStatusChange: Props["onStatusChange"]; onMarkPaid?: Props["onMarkPaid"] }) {
   const [busy, setBusy] = useState(false);
   const action = nextAction(order);
   const paid = order.paymentStatus === "completed";
@@ -55,13 +55,23 @@ function OrderCard({ order, onStatusChange }: { order: OrderRecord; onStatusChan
     {order.customerPhone && <div className="pb-kitchen-order-detail">{order.customerPhone}</div>}
     {address && <div className="pb-kitchen-order-detail">{address}</div>}
     {order.notes && <div className="pb-kitchen-order-note">{order.notes}</div>}
+    {(order.items?.length ?? 0) > 0 && (
+      <div className="pb-kitchen-order-detail" style={{ marginTop: "0.35rem" }}>
+        {(order.items || []).map((it) => `${it.name || "Item"} ×${it.quantity ?? 1}`).join(", ")}
+      </div>
+    )}
     <div className="pb-kitchen-order-bottom">
       <div><div className="pb-kitchen-order-total">{formatMoney(order.totalPrice)}</div><span className={`pb-kitchen-payment${paid ? " is-paid" : " is-pending"}`}>{paid ? "PAID" : (order.paymentStatus || "Payment unknown").replace(/_/g, " ").toUpperCase()}</span></div>
       {action ? <button type="button" className="pb-kitchen-action" onClick={advance} disabled={busy}>{busy ? "Updating…" : action.label}{!busy && <ArrowRight size={15} />}</button> : <span className={`pb-kitchen-complete-label${order.status === "pending" && order.paymentMethod === "mpesa" && order.paymentStatus !== "completed" ? " is-held" : ""}`}>{order.status === "pending" && order.paymentMethod === "mpesa" && order.paymentStatus !== "completed" ? "Awaiting M-Pesa" : order.status === "delivered" ? "Completed" : order.status}</span>}
+      {order.paymentMethod === "mpesa" && order.paymentStatus !== "completed" && onMarkPaid && (
+        <button type="button" className="pb-kitchen-action" style={{ marginTop: "0.5rem" }} onClick={async () => { setBusy(true); try { await onMarkPaid(order.id); } finally { setBusy(false); } }} disabled={busy}>
+          {busy ? "Updating…" : "Mark paid (cash)"}
+        </button>
+      )}
     </div>
   </article>;
 }
-export default function OwnerKitchenBoard({ orders, isLoading, isError, errorMessage, pendingReviews, onStatusChange, onNavigate, onRefresh }: Props) {
+export default function OwnerKitchenBoard({ orders, isLoading, isError, errorMessage, pendingReviews, onStatusChange, onMarkPaid, onNavigate, onRefresh }: Props) {
   const sorted = useMemo(() => [...orders].sort((a, b) => {
     const aTime = a.createdAt ? (a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(String(a.createdAt)).getTime()) : 0;
     const bTime = b.createdAt ? (b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(String(b.createdAt)).getTime()) : 0;
@@ -92,7 +102,7 @@ export default function OwnerKitchenBoard({ orders, isLoading, isError, errorMes
         const laneOrders = sorted.filter(order => order.status === lane.status);
         return <div className="pb-kitchen-lane" key={lane.status}>
           <div className="pb-kitchen-lane-heading"><div><h3>{lane.label}</h3><p>{lane.helper}</p></div><span className="pb-kitchen-lane-count">{laneOrders.length}</span></div>
-          <div className="pb-kitchen-lane-list">{isLoading ? <div className="pb-kitchen-empty">Loading orders…</div> : laneOrders.length ? laneOrders.map(order => <OrderCard key={order.id} order={order} onStatusChange={onStatusChange} />) : <div className="pb-kitchen-empty">{isError ? "Queue unavailable." : "Nothing in this lane."}</div>}</div>
+          <div className="pb-kitchen-lane-list">{isLoading ? <div className="pb-kitchen-empty">Loading orders…</div> : laneOrders.length ? laneOrders.map(order => <OrderCard key={order.id} order={order} onStatusChange={onStatusChange} onMarkPaid={onMarkPaid} />) : <div className="pb-kitchen-empty">{isError ? "Queue unavailable." : "Nothing in this lane."}</div>}</div>
         </div>;
       })}
     </section>

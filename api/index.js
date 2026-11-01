@@ -733,7 +733,7 @@ var menuRouter = router({
 import { z as z3 } from "zod";
 init_db();
 init_schema();
-import { eq as eq3, desc } from "drizzle-orm";
+import { eq as eq3, desc, inArray } from "drizzle-orm";
 var phoneRegex = /^(?:\+254|0)[7][0-9]{8}$/;
 var ordersRouter = router({
   // Create a new order
@@ -782,7 +782,7 @@ var ordersRouter = router({
       totalPrice: totalPrice.toFixed(2),
       status: "pending",
       paymentMethod: input.paymentMethod,
-      paymentStatus: "pending",
+      paymentStatus: input.paymentMethod === "cash" ? "completed" : "pending",
       notes: input.notes || null
     }).returning({ id: orders.id });
     const orderId = inserted.id;
@@ -839,12 +839,43 @@ var ordersRouter = router({
     const db = await getDb();
     if (!db) return [];
     const limit = input?.limit || 50;
-    if (input?.status) {
-      return db.select().from(orders).orderBy(desc(orders.createdAt)).where(eq3(orders.status, input.status)).limit(limit).execute();
+    const orderRows = await (input?.status ? db.select().from(orders).orderBy(desc(orders.createdAt)).where(eq3(orders.status, input.status)).limit(limit).execute() : db.select().from(orders).orderBy(desc(orders.createdAt)).limit(limit).execute());
+    if (orderRows.length === 0) return orderRows;
+    const ids = orderRows.map((o) => o.id);
+    const itemRows = await db.select({
+      orderId: orderItems.orderId,
+      id: orderItems.id,
+      menuItemId: orderItems.menuItemId,
+      name: menuItems.name,
+      quantity: orderItems.quantity,
+      price: orderItems.priceAtTime
+    }).from(orderItems).leftJoin(menuItems, eq3(orderItems.menuItemId, menuItems.id)).where(inArray(orderItems.orderId, ids)).execute();
+    const byOrder = /* @__PURE__ */ new Map();
+    for (const it of itemRows) {
+      if (!byOrder.has(it.orderId)) byOrder.set(it.orderId, []);
+      byOrder.get(it.orderId).push(it);
     }
-    return db.select().from(orders).orderBy(desc(orders.createdAt)).limit(limit).execute();
+    return orderRows.map((o) => ({
+      ...o,
+      items: byOrder.get(o.id) || []
+    }));
   }),
-  // Admin: Update order status
+  // Admin: Mark an order as paid (cash fallback after failed M-Pesa)
+  markPaid: adminProcedure.input(z3.object({ id: z3.number() })).mutation(async ({ input }) => {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+    const [order] = await db.select().from(orders).where(eq3(orders.id, input.id)).limit(1).execute();
+    if (!order) throw new Error("Order not found");
+    if (order.paymentStatus === "completed") {
+      return { success: true, alreadyPaid: true };
+    }
+    await db.update(orders).set({
+      paymentMethod: "cash",
+      paymentStatus: "completed",
+      status: order.status === "pending" ? "confirmed" : order.status
+    }).where(eq3(orders.id, input.id)).execute();
+    return { success: true };
+  }),
   updateStatus: adminProcedure.input(
     z3.object({
       id: z3.number(),
@@ -860,6 +891,30 @@ var ordersRouter = router({
   ).mutation(async ({ input }) => {
     const db = await getDb();
     if (!db) throw new Error("Database not available");
+    const [order] = await db.select().from(orders).where(eq3(orders.id, input.id)).limit(1).execute();
+    if (!order) throw new Error("Order not found");
+    const allowed = {
+      pending: ["confirmed", "cancelled"],
+      confirmed: ["preparing", "cancelled"],
+      preparing: ["ready", "cancelled"],
+      ready: ["delivered", "cancelled"],
+      delivered: [],
+      cancelled: []
+    };
+    if (!(allowed[order.status] || []).includes(input.status)) {
+      throw new Error(
+        `Invalid transition: ${order.status} -> ${input.status}`
+      );
+    }
+    if (input.status === "preparing" || input.status === "ready" || input.status === "delivered") {
+      const method = order.paymentMethod || "mpesa";
+      if (method !== "cash" && order.paymentStatus !== "completed") {
+        throw new Error("Payment not completed for this order");
+      }
+    }
+    if (order.status === "cancelled") {
+      throw new Error("Cancelled orders cannot be updated");
+    }
     await db.update(orders).set({ status: input.status }).where(eq3(orders.id, input.id)).execute();
     return { success: true };
   }),
