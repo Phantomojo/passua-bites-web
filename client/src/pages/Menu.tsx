@@ -376,14 +376,84 @@ const CLOUD =
   "https://d2xsxph8kpxj0f.cloudfront.net/310519663257647439/2dcKibrZSdH6mbhicYbaoL";
 
 const FALLBACK_MENU = [
-  { id: 1, name: "Passua Smocha", category: "Smoshas", price: 110, description: "Chapati, beef smokie, kachumbari, indomie, avocado, seasoned with sauces", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: "/media/videos/Pasuasmocha.mp4" },
-  { id: 2, name: "Zigizaga", category: "Smoshas", price: 140, description: "Chapati, beef smokie, kachumbari, indomie, avocado, topped with a boiled egg, seasoned with sauces", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: "/media/videos/zigizaga.mp4" },
-  { id: 3, name: "Burger", category: "Burgers", price: 150, description: "Buns, lettuce, sliced kachumbari, sauces, beef pattie", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: null },
-  { id: 4, name: "Masala Chips", category: "Sides", price: 150, description: "Crunchy outside, soft inside fries, well marinated — spicy or non-spicy", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: null },
-  { id: 5, name: "Hot Blazer", category: "Specials", price: 200, description: "Two chapatis (wrapped), lettuce, kachumbari, boerewors, indomie, avocado, gravy sauce", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: null },
-  { id: 6, name: "Sultan", category: "Combos", price: 270, description: "Two chapatis (wrapped), lettuce, kachumbari, one beef pattie, masala chips, avocado, sauces — comes with a soda", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: "/media/videos/Sultan.mp4" },
-  { id: 7, name: "Pasua Corn", category: "Sides", price: 300, description: "One beef burger + masala chips (spicy or non-spicy)", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: null },
-  { id: 8, name: "Mega Sultan", category: "Combos", price: 560, description: "Two chapatis (wrapped), lettuce, kachumbari, two beef patties, cheese, masala chips, avocado, sauces — comes with a soda", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: "/media/videos/megasultan.mp4" },
+  {
+    id: 1,
+    name: "Passua Smocha",
+    category: "Smoshas",
+    price: 110,
+    description:
+      "Chapati, beef smokie, kachumbari, indomie, avocado, seasoned with sauces",
+    imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`,
+    videoUrl: "/media/videos/Pasuasmocha.mp4",
+  },
+  {
+    id: 2,
+    name: "Zigizaga",
+    category: "Smoshas",
+    price: 140,
+    description:
+      "Chapati, beef smokie, kachumbari, indomie, avocado, topped with a boiled egg, seasoned with sauces",
+    imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`,
+    videoUrl: "/media/videos/zigizaga.mp4",
+  },
+  {
+    id: 3,
+    name: "Burger",
+    category: "Burgers",
+    price: 150,
+    description: "Buns, lettuce, sliced kachumbari, sauces, beef pattie",
+    imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`,
+    videoUrl: null,
+  },
+  {
+    id: 4,
+    name: "Masala Chips",
+    category: "Sides",
+    price: 150,
+    description:
+      "Crunchy outside, soft inside fries, well marinated — spicy or non-spicy",
+    imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`,
+    videoUrl: null,
+  },
+  {
+    id: 5,
+    name: "Hot Blazer",
+    category: "Specials",
+    price: 200,
+    description:
+      "Two chapatis (wrapped), lettuce, kachumbari, boerewors, indomie, avocado, gravy sauce",
+    imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`,
+    videoUrl: null,
+  },
+  {
+    id: 6,
+    name: "Sultan",
+    category: "Combos",
+    price: 270,
+    description:
+      "Two chapatis (wrapped), lettuce, kachumbari, one beef pattie, masala chips, avocado, sauces — comes with a soda",
+    imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`,
+    videoUrl: "/media/videos/Sultan.mp4",
+  },
+  {
+    id: 7,
+    name: "Pasua Corn",
+    category: "Sides",
+    price: 300,
+    description: "One beef burger + masala chips (spicy or non-spicy)",
+    imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`,
+    videoUrl: null,
+  },
+  {
+    id: 8,
+    name: "Mega Sultan",
+    category: "Combos",
+    price: 560,
+    description:
+      "Two chapatis (wrapped), lettuce, kachumbari, two beef patties, cheese, masala chips, avocado, sauces — comes with a soda",
+    imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`,
+    videoUrl: "/media/videos/megasultan.mp4",
+  },
 ];
 
 interface CartItem {
@@ -397,9 +467,13 @@ interface CartItem {
 }
 
 export default function Menu() {
-  usePageMeta({ title: "Menu — Passua Bites", description: "Browse our full menu of Kenyan street food: smocha, chapati, ndengu, viazi karai, and ice-cold drinks." });
+  usePageMeta({
+    title: "Menu — Passua Bites",
+    description:
+      "Browse our full menu of Kenyan street food: smocha, chapati, ndengu, viazi karai, and ice-cold drinks.",
+  });
   const { data: apiItems, isLoading, error } = trpc.menu.list.useQuery();
-  const menuItems = (apiItems && apiItems.length > 0) ? apiItems : FALLBACK_MENU;
+  const menuItems = apiItems && apiItems.length > 0 ? apiItems : FALLBACK_MENU;
 
   const [cart, setCart] = useState<CartItem[]>(() => {
     const stored = localStorage.getItem("passua_cart");
@@ -435,7 +509,14 @@ export default function Menu() {
         trackGA4Event("add_to_cart", {
           currency: "KES",
           value: item.price,
-          items: [{ item_id: String(item.id), item_name: item.name, price: item.price, quantity: 1 }],
+          items: [
+            {
+              item_id: String(item.id),
+              item_name: item.name,
+              price: item.price,
+              quantity: 1,
+            },
+          ],
         });
         return prev.map(c =>
           c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c
@@ -444,7 +525,14 @@ export default function Menu() {
       trackGA4Event("add_to_cart", {
         currency: "KES",
         value: item.price,
-        items: [{ item_id: String(item.id), item_name: item.name, price: item.price, quantity: 1 }],
+        items: [
+          {
+            item_id: String(item.id),
+            item_name: item.name,
+            price: item.price,
+            quantity: 1,
+          },
+        ],
       });
       return [...prev, cartItem];
     });
@@ -875,12 +963,27 @@ export default function Menu() {
                       borderBottom: "1px solid var(--pb-rule2)",
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.4rem" }}>
-                      <div style={{ fontSize: "0.85rem", color: "var(--pb-ivory)", fontWeight: 400 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        marginBottom: "0.4rem",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: "0.85rem",
+                          color: "var(--pb-ivory)",
+                          fontWeight: 400,
+                        }}
+                      >
                         {item.name}
                       </div>
                       <button
-                        onClick={() => setCart(prev => prev.filter(c => c.id !== item.id))}
+                        onClick={() =>
+                          setCart(prev => prev.filter(c => c.id !== item.id))
+                        }
                         style={{
                           background: "none",
                           border: "none",
@@ -893,14 +996,28 @@ export default function Menu() {
                           transition: "opacity 0.15s",
                         }}
                         onMouseOver={e => (e.currentTarget.style.opacity = "1")}
-                        onMouseOut={e => (e.currentTarget.style.opacity = "0.6")}
+                        onMouseOut={e =>
+                          (e.currentTarget.style.opacity = "0.6")
+                        }
                         aria-label={`Remove ${item.name}`}
                       >
                         ✕
                       </button>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.5rem",
+                        }}
+                      >
                         <button
                           onClick={() => updateQty(item.id, item.quantity - 1)}
                           style={{
@@ -921,7 +1038,15 @@ export default function Menu() {
                         >
                           −
                         </button>
-                        <span style={{ fontFamily: "'DM Mono',monospace", fontSize: "0.7rem", color: "var(--pb-ivory)", minWidth: "1rem", textAlign: "center" }}>
+                        <span
+                          style={{
+                            fontFamily: "'DM Mono',monospace",
+                            fontSize: "0.7rem",
+                            color: "var(--pb-ivory)",
+                            minWidth: "1rem",
+                            textAlign: "center",
+                          }}
+                        >
                           {item.quantity}
                         </span>
                         <button
@@ -945,7 +1070,14 @@ export default function Menu() {
                           +
                         </button>
                       </div>
-                      <div style={{ fontFamily: "'Playfair Display',serif", fontSize: "1rem", fontWeight: 700, color: "var(--pb-ember)" }}>
+                      <div
+                        style={{
+                          fontFamily: "'Playfair Display',serif",
+                          fontSize: "1rem",
+                          fontWeight: 700,
+                          color: "var(--pb-ember)",
+                        }}
+                      >
                         Ksh {item.price * item.quantity}
                       </div>
                     </div>
@@ -989,7 +1121,13 @@ export default function Menu() {
                   </span>
                 </div>
               </div>
-              <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem" }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "0.5rem",
+                  marginBottom: "0.75rem",
+                }}
+              >
                 <button
                   onClick={handleCheckout}
                   className="pb-btn-primary"
@@ -1017,8 +1155,14 @@ export default function Menu() {
                     whiteSpace: "nowrap",
                     transition: "color 0.15s, border-color 0.15s",
                   }}
-                  onMouseOver={e => { e.currentTarget.style.color = "var(--pb-ember)"; e.currentTarget.style.borderColor = "var(--pb-ember)"; }}
-                  onMouseOut={e => { e.currentTarget.style.color = "var(--pb-ivory3)"; e.currentTarget.style.borderColor = "var(--pb-rule2)"; }}
+                  onMouseOver={e => {
+                    e.currentTarget.style.color = "var(--pb-ember)";
+                    e.currentTarget.style.borderColor = "var(--pb-ember)";
+                  }}
+                  onMouseOut={e => {
+                    e.currentTarget.style.color = "var(--pb-ivory3)";
+                    e.currentTarget.style.borderColor = "var(--pb-rule2)";
+                  }}
                 >
                   Clear
                 </button>

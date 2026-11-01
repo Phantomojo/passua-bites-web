@@ -12,9 +12,12 @@ const MPESA_BASE_URL = isProduction
   : "https://sandbox.safaricom.co.ke";
 
 const MPESA_SHORTCODE = process.env.MPESA_SHORTCODE || "174379";
-const MPESA_PASSKEY = process.env.MPESA_PASSKEY || "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
+const MPESA_PASSKEY =
+  process.env.MPESA_PASSKEY ||
+  "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
 const MPESA_CALLBACK_URL =
-  process.env.MPESA_CALLBACK_URL || "https://your-domain.com/api/mpesa/callback";
+  process.env.MPESA_CALLBACK_URL ||
+  "https://your-domain.com/api/mpesa/callback";
 
 // OAuth token cache
 let accessToken: string | null = null;
@@ -93,9 +96,7 @@ export const paymentsRouter = router({
       const orderResult = await db
         .select()
         .from(orders)
-        .where(
-          and(eq(orders.id, input.orderId), eq(orders.status, "pending"))
-        )
+        .where(and(eq(orders.id, input.orderId), eq(orders.status, "pending")))
         .limit(1)
         .execute();
 
@@ -153,7 +154,9 @@ export const paymentsRouter = router({
         };
       } catch (error: any) {
         const errorMsg =
-          error.response?.data?.errorMessage || error.message || "STK Push failed";
+          error.response?.data?.errorMessage ||
+          error.message ||
+          "STK Push failed";
         throw new Error(`M-Pesa STK Push failed: ${errorMsg}`);
       }
     }),
@@ -168,9 +171,7 @@ export const paymentsRouter = router({
       const transaction = await db
         .select()
         .from(mpesaTransactions)
-        .where(
-          eq(mpesaTransactions.checkoutRequestID, input.checkoutRequestID)
-        )
+        .where(eq(mpesaTransactions.checkoutRequestID, input.checkoutRequestID))
         .limit(1)
         .execute();
 
@@ -228,10 +229,7 @@ export const paymentsRouter = router({
               resultDesc: response.data.ResultDesc,
             })
             .where(
-              eq(
-                mpesaTransactions.checkoutRequestID,
-                input.checkoutRequestID
-              )
+              eq(mpesaTransactions.checkoutRequestID, input.checkoutRequestID)
             );
 
           await db
@@ -249,8 +247,7 @@ export const paymentsRouter = router({
           };
         } else {
           // Payment failed or pending
-          const status =
-            resultCode === "1032" ? "cancelled" : "failed";
+          const status = resultCode === "1032" ? "cancelled" : "failed";
           await db
             .update(mpesaTransactions)
             .set({
@@ -259,10 +256,7 @@ export const paymentsRouter = router({
               resultDesc: response.data.ResultDesc,
             })
             .where(
-              eq(
-                mpesaTransactions.checkoutRequestID,
-                input.checkoutRequestID
-              )
+              eq(mpesaTransactions.checkoutRequestID, input.checkoutRequestID)
             );
 
           return {

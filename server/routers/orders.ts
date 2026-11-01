@@ -37,8 +37,9 @@ export const ordersRouter = router({
 
       // Fetch menu items to calculate total and verify availability
       // Get actual menu items
-      const { menuItems: menuItemsTable } =
-        await import("../../drizzle/schema");
+      const { menuItems: menuItemsTable } = await import(
+        "../../drizzle/schema"
+      );
       const availableItems = await db
         .select()
         .from(menuItemsTable)
@@ -125,8 +126,9 @@ export const ordersRouter = router({
       const order = orderResult[0];
 
       // Get order items with menu item names
-      const { menuItems: menuItemsTable } =
-        await import("../../drizzle/schema");
+      const { menuItems: menuItemsTable } = await import(
+        "../../drizzle/schema"
+      );
       const items = await db
         .select({
           id: orderItems.id,

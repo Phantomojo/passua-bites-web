@@ -5,9 +5,14 @@ import { usePageMeta } from "@/hooks/usePageMeta";
 import { trpc } from "@/lib/trpc";
 
 export default function Reviews() {
-  usePageMeta({ title: "Reviews — Passua Bites", description: "Read and leave reviews for Passua Bites. Share your experience with our Kenyan street food." });
+  usePageMeta({
+    title: "Reviews — Passua Bites",
+    description:
+      "Read and leave reviews for Passua Bites. Share your experience with our Kenyan street food.",
+  });
   const { data: reviews = [], isLoading } = trpc.reviews.list.useQuery();
-  const { data: avgRating = { average: 0, count: 0 } } = trpc.reviews.getAverageRating.useQuery({});
+  const { data: avgRating = { average: 0, count: 0 } } =
+    trpc.reviews.getAverageRating.useQuery({});
   const utils = trpc.useUtils();
 
   const [formData, setFormData] = useState({
@@ -25,7 +30,7 @@ export default function Reviews() {
       utils.reviews.list.invalidate();
       utils.reviews.getAverageRating.invalidate();
     },
-    onError: (err) => {
+    onError: err => {
       toast.error(err.message || "Failed to submit review");
     },
   });

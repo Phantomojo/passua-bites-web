@@ -34,12 +34,18 @@ const orderLimiter = rateLimit({
 const authLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 5,
-  message: { error: "Too many authentication attempts, please try again later" },
+  message: {
+    error: "Too many authentication attempts, please try again later",
+  },
   standardHeaders: true,
   legacyHeaders: false,
   handler: (_req, res) => {
     res.setHeader("Retry-After", "60");
-    res.status(429).json({ error: "Too many authentication attempts, please try again later" });
+    res
+      .status(429)
+      .json({
+        error: "Too many authentication attempts, please try again later",
+      });
   },
 });
 
@@ -82,7 +88,9 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-  app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === "/health" } }));
+  app.use(
+    pinoHttp({ logger, autoLogging: { ignore: req => req.url === "/health" } })
+  );
 
   // Security middleware
   app.use(securityHeaders);
@@ -133,7 +141,10 @@ async function startServer() {
         .execute();
 
       if (tx.length === 0) {
-        logger.error({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Transaction not found");
+        logger.error(
+          { checkoutRequestID: CheckoutRequestID },
+          "[M-Pesa] Transaction not found"
+        );
         return;
       }
 
@@ -154,7 +165,10 @@ async function startServer() {
           .set({ paymentStatus: "failed" })
           .where(eq(orders.id, tx[0].orderId));
 
-        logger.info({ status, checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Payment processed");
+        logger.info(
+          { status, checkoutRequestID: CheckoutRequestID },
+          "[M-Pesa] Payment processed"
+        );
         return;
       }
 
@@ -168,13 +182,19 @@ async function startServer() {
 
       // Idempotency check
       if (tx[0].status === "completed") {
-        logger.info({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Duplicate callback, skipping");
+        logger.info(
+          { checkoutRequestID: CheckoutRequestID },
+          "[M-Pesa] Duplicate callback, skipping"
+        );
         return;
       }
 
       // Validate amount
       if (Number(Amount) !== Number(tx[0].amount)) {
-        logger.error({ expected: tx[0].amount, received: Amount, orderId: tx[0].orderId }, "[M-Pesa] Amount mismatch");
+        logger.error(
+          { expected: tx[0].amount, received: Amount, orderId: tx[0].orderId },
+          "[M-Pesa] Amount mismatch"
+        );
         return;
       }
 
@@ -198,7 +218,10 @@ async function startServer() {
         })
         .where(eq(orders.id, tx[0].orderId));
 
-      logger.info({ orderId: tx[0].orderId, receipt: MpesaReceiptNumber, amount: Amount }, "[M-Pesa] Payment confirmed");
+      logger.info(
+        { orderId: tx[0].orderId, receipt: MpesaReceiptNumber, amount: Amount },
+        "[M-Pesa] Payment confirmed"
+      );
     } catch (error) {
       logger.error({ err: error }, "[M-Pesa] Callback processing error");
     }
@@ -262,4 +285,4 @@ async function startServer() {
   });
 }
 
-startServer().catch((err) => logger.fatal({ err }, "Server failed to start"));
+startServer().catch(err => logger.fatal({ err }, "Server failed to start"));

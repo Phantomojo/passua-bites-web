@@ -216,7 +216,10 @@ class SDKServer {
         typeof appId !== "string" ||
         (name !== undefined && typeof name !== "string")
       ) {
-        logger.warn({ openId, appId, name }, "[Auth] Session payload missing required fields");
+        logger.warn(
+          { openId, appId, name },
+          "[Auth] Session payload missing required fields"
+        );
         return null;
       }
 

@@ -24,7 +24,10 @@ const STATUS_STEPS = [
 ];
 
 export default function OrderTracking() {
-  usePageMeta({ title: "Track Order — Passua Bites", description: "Track your Passua Bites order by order ID or phone number." });
+  usePageMeta({
+    title: "Track Order — Passua Bites",
+    description: "Track your Passua Bites order by order ID or phone number.",
+  });
   const [searchId, setSearchId] = useState("");
   const [searchPhone, setSearchPhone] = useState("");
   const [searchBy, setSearchBy] = useState<"id" | "phone">("phone");

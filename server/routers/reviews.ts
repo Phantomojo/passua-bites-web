@@ -57,7 +57,7 @@ export const reviewsRouter = router({
         .execute();
 
       const filtered = input?.menuItemId
-        ? allReviews.filter((r) => r.menuItemId === input.menuItemId)
+        ? allReviews.filter(r => r.menuItemId === input.menuItemId)
         : allReviews;
 
       return filtered.slice(0, input?.limit || 20);
@@ -77,7 +77,7 @@ export const reviewsRouter = router({
         .execute();
 
       const filtered = input.menuItemId
-        ? allReviews.filter((r) => r.menuItemId === input.menuItemId)
+        ? allReviews.filter(r => r.menuItemId === input.menuItemId)
         : allReviews;
 
       if (filtered.length === 0) {

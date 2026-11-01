@@ -155,7 +155,11 @@ function PBFooter() {
 }
 
 export default function NairobiFoodFest() {
-  usePageMeta({ title: "Nairobi Food Fest — Passua Bites", description: "Passua Bites at Nairobi Food Fest — come taste our award-winning smocha and chapo." });
+  usePageMeta({
+    title: "Nairobi Food Fest — Passua Bites",
+    description:
+      "Passua Bites at Nairobi Food Fest — come taste our award-winning smocha and chapo.",
+  });
   return (
     <div
       style={{

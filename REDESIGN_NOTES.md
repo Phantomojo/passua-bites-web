@@ -15,62 +15,60 @@
 
 ### Design System Changes
 
-| Aspect | Before | After |
-|--------|--------|-------|
-| **Background** | White `#FFFFFF` | Dark brown `#0d0906` |
-| **Primary Color** | Blue `--color-blue-700` | Ember `#c45c28` |
-| **Text Color** | Dark grey | Ivory `#f2e8d8` |
-| **Fonts** | System default | Playfair Display (headings) + DM Mono (labels) + DM Sans (body) |
-| **Border Radius** | `0.65rem` (rounded) | `0.15rem` (sharp, editorial) |
-| **Buttons** | Rounded rectangles | Angled clip-path polygons |
-| **Vibe** | Corporate SaaS | High-end street food brand |
+| Aspect            | Before                  | After                                                           |
+| ----------------- | ----------------------- | --------------------------------------------------------------- |
+| **Background**    | White `#FFFFFF`         | Dark brown `#0d0906`                                            |
+| **Primary Color** | Blue `--color-blue-700` | Ember `#c45c28`                                                 |
+| **Text Color**    | Dark grey               | Ivory `#f2e8d8`                                                 |
+| **Fonts**         | System default          | Playfair Display (headings) + DM Mono (labels) + DM Sans (body) |
+| **Border Radius** | `0.65rem` (rounded)     | `0.15rem` (sharp, editorial)                                    |
+| **Buttons**       | Rounded rectangles      | Angled clip-path polygons                                       |
+| **Vibe**          | Corporate SaaS          | High-end street food brand                                      |
 
 ### New CSS Classes
 
 The redesign adds custom CSS classes:
 
-| Class | Purpose |
-|-------|---------|
-| `.pb-nav` | Sticky navigation bar with blur backdrop |
-| `.pb-nav-logo` | Logo + brand link |
-| `.pb-nav-ring` | Circular logo border (36px) |
-| `.pb-nav-brand` | Brand name in Playfair Display |
-| `.pb-nl` | Nav link (DM Mono, uppercase, tracked) |
-| `.pb-btn-primary` | Primary button (ember bg, angled clip-path) |
-| `.pb-btn-ghost` | Ghost button (ember border, transparent bg) |
-| `.pb-eyebrow` | Eyebrow label (ember, uppercase, with line) |
-| `.pb-diamond` | Small diamond separator |
-| `.pb-ticker` | Scrolling ticker animation |
-| `.pb-alert` | Alert box with ember left border |
-| `.pb-card` | Card with dark bg and ember border |
-| `.pb-food-img` | Food image with sepia/saturation filter |
-| `.pb-footer` | Footer styling |
-| `.pb-status-*` | Order status badges (pending, confirmed, preparing, ready, delivered, cancelled) |
+| Class             | Purpose                                                                          |
+| ----------------- | -------------------------------------------------------------------------------- |
+| `.pb-nav`         | Sticky navigation bar with blur backdrop                                         |
+| `.pb-nav-logo`    | Logo + brand link                                                                |
+| `.pb-nav-ring`    | Circular logo border (36px)                                                      |
+| `.pb-nav-brand`   | Brand name in Playfair Display                                                   |
+| `.pb-nl`          | Nav link (DM Mono, uppercase, tracked)                                           |
+| `.pb-btn-primary` | Primary button (ember bg, angled clip-path)                                      |
+| `.pb-btn-ghost`   | Ghost button (ember border, transparent bg)                                      |
+| `.pb-eyebrow`     | Eyebrow label (ember, uppercase, with line)                                      |
+| `.pb-diamond`     | Small diamond separator                                                          |
+| `.pb-ticker`      | Scrolling ticker animation                                                       |
+| `.pb-alert`       | Alert box with ember left border                                                 |
+| `.pb-card`        | Card with dark bg and ember border                                               |
+| `.pb-food-img`    | Food image with sepia/saturation filter                                          |
+| `.pb-footer`      | Footer styling                                                                   |
+| `.pb-status-*`    | Order status badges (pending, confirmed, preparing, ready, delivered, cancelled) |
 
 ### Color Palette
 
 ```css
---pb-bg:       #0d0906  /* Darkest brown - main background */
---pb-bg2:      #130d09  /* Slightly lighter - cards */
---pb-bg3:      #1a1109  /* Lighter still - hover states */
---pb-ember:    #c45c28  /* Primary accent - buttons, labels */
---pb-ember2:   #e07840  /* Lighter ember - hover */
---pb-sienna:   #8b3a1a  /* Dark accent */
---pb-ivory:    #f2e8d8  /* Main text color */
---pb-ivory2:   #c8b898  /* Secondary text */
---pb-ivory3:   #7a6a52  /* Muted text */
---pb-rule:     rgba(196,92,40,0.15)  /* Border color */
---pb-rule2:    rgba(196,92,40,0.08)  /* Subtle border */
+--pb-bg: #0d0906 /* Darkest brown - main background */ --pb-bg2: #130d09
+  /* Slightly lighter - cards */ --pb-bg3: #1a1109
+  /* Lighter still - hover states */ --pb-ember: #c45c28
+  /* Primary accent - buttons, labels */ --pb-ember2: #e07840
+  /* Lighter ember - hover */ --pb-sienna: #8b3a1a /* Dark accent */
+  --pb-ivory: #f2e8d8 /* Main text color */ --pb-ivory2: #c8b898
+  /* Secondary text */ --pb-ivory3: #7a6a52 /* Muted text */
+  --pb-rule: rgba(196, 92, 40, 0.15) /* Border color */
+  --pb-rule2: rgba(196, 92, 40, 0.08) /* Subtle border */;
 ```
 
 ### Typography
 
-| Element | Font | Size | Weight |
-|---------|------|------|--------|
-| **Headings (H1-H6)** | Playfair Display | Varies | 700-900 |
-| **Body Text** | DM Sans | 0.85-0.9rem | 300-400 |
-| **Labels/Nav** | DM Mono | 0.58-0.68rem | 400-500 |
-| **Prices** | Playfair Display | 1.4-1.5rem | 700 |
+| Element              | Font             | Size         | Weight  |
+| -------------------- | ---------------- | ------------ | ------- |
+| **Headings (H1-H6)** | Playfair Display | Varies       | 700-900 |
+| **Body Text**        | DM Sans          | 0.85-0.9rem  | 300-400 |
+| **Labels/Nav**       | DM Mono          | 0.58-0.68rem | 400-500 |
+| **Prices**           | Playfair Display | 1.4-1.5rem   | 700     |
 
 ### Updated Pages
 

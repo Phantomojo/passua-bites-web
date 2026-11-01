@@ -39,7 +39,8 @@ function parseDevice(ua: string): "mobile" | "tablet" | "desktop" {
 }
 
 function parseBrowser(ua: string): string {
-  if (/curl|headlesschrome|playwright|bot|spider|crawl|wget|postman/i.test(ua)) return "Bot/Crawler";
+  if (/curl|headlesschrome|playwright|bot|spider|crawl|wget|postman/i.test(ua))
+    return "Bot/Crawler";
   if (/edg\//i.test(ua)) return "Edge";
   if (/opr\/|opera/i.test(ua)) return "Opera";
   if (/chrome\/\d/i.test(ua) && !/chromium/i.test(ua)) return "Chrome";

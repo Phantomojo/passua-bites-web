@@ -21,8 +21,8 @@
 import { useEffect, useRef, useState } from "react";
 
 interface LazyImageProps {
-  src: string;                    // JPEG/PNG fallback
-  webpSrc?: string;               // WebP version (preferred by browsers that support it)
+  src: string; // JPEG/PNG fallback
+  webpSrc?: string; // WebP version (preferred by browsers that support it)
   alt: string;
   width?: number;
   height?: number;
@@ -81,9 +81,7 @@ export function LazyImage({
       }}
     >
       {/* WebP source — browsers pick this if they support it */}
-      {webpSrc && isVisible && (
-        <source srcSet={webpSrc} type="image/webp" />
-      )}
+      {webpSrc && isVisible && <source srcSet={webpSrc} type="image/webp" />}
 
       {/* Fallback JPEG/PNG */}
       <img
@@ -170,14 +168,12 @@ export function LazyVideo({
       loop={loop}
       playsInline={playsInline}
       poster={posterSrc}
-      preload="none"         // ← Key: don't download anything until visible
+      preload="none" // ← Key: don't download anything until visible
       className={className}
       style={style}
     >
       {/* Only inject <source> tags once visible, triggering the load */}
-      {isVisible && (
-        <source src={mp4Src} type="video/mp4" />
-      )}
+      {isVisible && <source src={mp4Src} type="video/mp4" />}
     </video>
   );
 }
