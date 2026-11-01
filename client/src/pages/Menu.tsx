@@ -381,17 +381,6 @@ const LOGO =
 const CLOUD =
   "https://d2xsxph8kpxj0f.cloudfront.net/310519663257647439/2dcKibrZSdH6mbhicYbaoL";
 
-const FALLBACK_MENU = [
-  { id: 1, name: "Passua Smocha", category: "Smoshas", price: 110, description: "Chapati, beef smokie, kachumbari, indomie, avocado, seasoned with sauces", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: "/media/videos/Pasuasmocha.mp4" },
-  { id: 2, name: "Zigizaga", category: "Smoshas", price: 140, description: "Chapati, beef smokie, kachumbari, indomie, avocado, topped with a boiled egg, seasoned with sauces", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: "/media/videos/zigizaga.mp4" },
-  { id: 3, name: "Burger", category: "Burgers", price: 150, description: "Buns, lettuce, sliced kachumbari, sauces, beef pattie", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: null },
-  { id: 4, name: "Masala Chips", category: "Sides", price: 150, description: "Crunchy outside, soft inside fries, well marinated — spicy or non-spicy", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: null },
-  { id: 5, name: "Hot Blazer", category: "Specials", price: 200, description: "Two chapatis (wrapped), lettuce, kachumbari, boerewors, indomie, avocado, gravy sauce", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: null },
-  { id: 6, name: "Sultan", category: "Combos", price: 270, description: "Two chapatis (wrapped), lettuce, kachumbari, one beef pattie, masala chips, avocado, sauces — comes with a soda", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: "/media/videos/Sultan.mp4" },
-  { id: 7, name: "Passua Corn", category: "Sides", price: 300, description: "One beef burger + masala chips (spicy or non-spicy)", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: null },
-  { id: 8, name: "Mega Sultan", category: "Combos", price: 560, description: "Two chapatis (wrapped), lettuce, kachumbari, two beef patties, cheese, masala chips, avocado, sauces — comes with a soda", imageUrl: `${CLOUD}/smochas-3PwDb6V2QuTSqcMpWtYuCk.webp`, videoUrl: "/media/videos/megasultan.mp4" },
-];
-
 interface CartItem {
   id: number;
   name: string;
@@ -405,11 +394,14 @@ interface CartItem {
 export default function Menu() {
   usePageMeta({ title: "Menu — Passua Bites", description: "Browse our full menu of Kenyan street food: smocha, chapati, ndengu, viazi karai, and ice-cold drinks." });
   const { data: apiItems, isLoading, error } = trpc.menu.list.useQuery(undefined, {
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
     gcTime: 30 * 60 * 1000,
+    refetchInterval: 15 * 1000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
     retry: 1,
   });
-  const menuItems = (apiItems && apiItems.length > 0) ? apiItems : FALLBACK_MENU;
+  const menuItems = apiItems ?? [];
 
   const [cart, setCart] = useState<CartItem[]>(() => {
     const stored = localStorage.getItem("passua_cart");
@@ -430,6 +422,7 @@ export default function Menu() {
       : menuItems.filter((i: any) => i.category === selectedCategory);
 
   const addToCart = (item: any) => {
+    if (Number(item.available) !== 1) return;
     const cartItem = {
       id: item.id,
       name: item.name,
@@ -622,8 +615,13 @@ export default function Menu() {
               </div>
             )}
 
+            {error && (
+              <div role="alert" style={{ textAlign: "center", padding: "2rem", color: "var(--pb-ivory3)" }}>
+                We couldn't load the live menu. Please refresh the page before ordering.
+              </div>
+            )}
             {/* Empty state */}
-            {!isLoading && filtered.length === 0 && (
+            {!isLoading && !error && filtered.length === 0 && (
               <div style={{ textAlign: "center", padding: "3rem" }}>
                 <div
                   style={{
@@ -653,6 +651,7 @@ export default function Menu() {
             >
               {filtered.map((item: any) => {
                 const inCart = cart.find(c => c.id === item.id);
+                const isAvailable = Number(item.available) === 1;
                 return (
                   <div
                     key={item.id}
@@ -692,6 +691,17 @@ export default function Menu() {
                       >
                         {item.name}
                       </div>
+                      {!isAvailable && (
+                        <div role="status" style={{
+                          display: "inline-flex", marginBottom: "0.65rem",
+                          padding: "0.25rem 0.55rem",
+                          border: "1px solid rgba(248,113,113,0.45)", color: "#F87171",
+                          fontFamily: "'DM Mono',monospace", fontSize: "0.58rem",
+                          letterSpacing: "0.08em", textTransform: "uppercase",
+                        }}>
+                          Sold out · check back soon
+                        </div>
+                      )}
                       <div
                         style={{
                           fontSize: "0.75rem",
@@ -778,6 +788,7 @@ export default function Menu() {
                               {inCart.quantity}
                             </span>
                             <button
+                              disabled={!isAvailable}
                               onClick={() => {
                                 const newCart = cart.map(c =>
                                   c.id === item.id
@@ -787,12 +798,12 @@ export default function Menu() {
                                 setCart(newCart);
                               }}
                               style={{
-                                width: 36,
-                                height: 36,
+                                width: 36, height: 36,
                                 background: "rgba(196,92,40,0.15)",
-                                border: "1px solid rgba(196,92,40,0.3)",
+                                border: "1px solid var(--pb-rule2)",
                                 color: "var(--pb-ember)",
-                                cursor: "pointer",
+                                cursor: isAvailable ? "pointer" : "not-allowed",
+                                opacity: isAvailable ? 1 : 0.4,
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
@@ -804,16 +815,17 @@ export default function Menu() {
                           </div>
                         ) : (
                           <button
+                            disabled={!isAvailable}
                             onClick={() => {
                               addToCart(item);
                             }}
                             style={{
-                              width: 44,
-                              height: 44,
-                              background: "rgba(196,92,40,0.1)",
+                              minWidth: 44, minHeight: 44, padding: "0.45rem 0.65rem",
+                              background: isAvailable ? "rgba(196,92,40,0.1)" : "rgba(248,113,113,0.06)",
                               border: "1px solid rgba(196,92,40,0.3)",
-                              color: "var(--pb-ember)",
-                              cursor: "pointer",
+                              color: isAvailable ? "var(--pb-ember)" : "#F87171",
+                              cursor: isAvailable ? "pointer" : "not-allowed",
+                              opacity: isAvailable ? 1 : 0.7,
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "center",
@@ -833,7 +845,7 @@ export default function Menu() {
                               ).style.background = "rgba(196,92,40,0.1)")
                             }
                           >
-                            +
+                            {isAvailable ? "+" : "Sold out"}
                           </button>
                         )}
                       </div>

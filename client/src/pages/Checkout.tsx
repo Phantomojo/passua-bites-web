@@ -23,6 +23,8 @@ export default function Checkout() {
     deliveryAddress: "",
   });
   const [paymentMethod, setPaymentMethod] = useState<"pochi" | "cash">("pochi");
+  const [whatsappOrderUpdatesOptIn, setWhatsappOrderUpdatesOptIn] = useState(false);
+  const [whatsappMarketingOptIn, setWhatsappMarketingOptIn] = useState(false);
   const [receiptCode, setReceiptCode] = useState("");
   const [receiptSubmitted, setReceiptSubmitted] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -113,6 +115,8 @@ export default function Checkout() {
           quantity: item.quantity,
         })),
         paymentMethod,
+        whatsappOrderUpdatesOptIn,
+        whatsappMarketingOptIn,
         notes: receiptCode ? `Pochi receipt submitted: ${receiptCode}` : undefined,
       });
 
@@ -142,6 +146,12 @@ export default function Checkout() {
         }
       } else {
         toast.success("Order placed! Pay cash on delivery.");
+      }
+
+      if (orderResult.whatsappNotificationStatus === "sent") {
+        toast.success("WhatsApp order-received confirmation sent.");
+      } else if (whatsappOrderUpdatesOptIn) {
+        toast.info("Your order is recorded. WhatsApp updates are not available yet; keep your tracking token.");
       }
 
       // Track purchase event
@@ -229,7 +239,7 @@ export default function Checkout() {
                 marginBottom: "0.75rem",
               }}
             >
-              Order confirmed
+              Order received
             </div>
             <h1
               style={{
@@ -239,17 +249,18 @@ export default function Checkout() {
                 marginBottom: "1.5rem",
               }}
             >
-              You're in queue.
+              We've received your order.
             </h1>
 
-            <div
-              style={{
+            <p style={{ color: "var(--pb-ivory2)", fontSize: "0.86rem", lineHeight: 1.7, margin: "0 0 1.5rem" }}>
+              Your order request has been recorded. The team will confirm availability and payment before preparation begins. You can follow progress using the private tracking token below.
+            </p>
+            <div style={{
                 background: "rgba(74,222,128,0.05)",
                 border: "1px solid rgba(74,222,128,0.2)",
-                padding: "1rem",
-                marginBottom: "1.5rem",
-              }}
-            >
+                padding: "1rem", marginBottom: "1.5rem",
+              }}>
+
               <div
                 style={{
                   fontFamily: "'DM Mono',monospace",
@@ -505,9 +516,9 @@ export default function Checkout() {
                   marginBottom: "0.75rem",
                 }}
               >
-                <strong style={{ color: "var(--pb-ivory)" }}>Next step:</strong>
+                <strong style={{ color: "var(--pb-ivory)" }}>Need help?</strong>
                 <br />
-                Notify us on WhatsApp so we can confirm your order
+                Message Pasua on WhatsApp. Your order is already recorded; this chat is optional.
               </div>
               <a
                 href={`https://wa.me/254722473873?text=${encodeURIComponent(`Hi! I just placed an order on your website.\n\nTracking token: ${trackingToken}\nTotal: Ksh ${authoritativeTotal?.toFixed(2)}\nPayment: ${paymentMethod === "pochi" ? (receiptCode ? `Pochi receipt (${receiptCode})` : "Pochi payment pending verification") : "Cash on delivery"}
@@ -521,7 +532,7 @@ export default function Checkout() {
                   textDecoration: "none",
                 }}
               >
-                📱 Notify on WhatsApp
+                Chat with Pasua on WhatsApp
               </a>
             </div>
 
@@ -533,7 +544,7 @@ export default function Checkout() {
               }}
             >
               <Link
-                href="/orders"
+                href={`/orders?token=${encodeURIComponent(trackingToken || "")}`}
                 className="pb-btn-primary"
                 style={{
                   display: "block",
@@ -668,7 +679,7 @@ export default function Checkout() {
                 },
                 {
                   name: "customerPhone",
-                  label: "Phone number for order updates",
+                  label: "Phone number",
                   type: "tel",
                   placeholder: "0712 345 678",
                   required: true,
@@ -706,6 +717,31 @@ export default function Checkout() {
                   style={{ ...inputStyle, resize: "vertical" }}
                 />
               </div>
+
+              <section aria-label="WhatsApp preferences" style={{
+                display: "flex", flexDirection: "column", gap: "0.9rem",
+                padding: "1rem", border: "1px solid var(--pb-rule2)",
+                background: "rgba(37,211,102,0.035)",
+              }}>
+                <label style={{ display: "flex", gap: "0.7rem", alignItems: "flex-start", cursor: "pointer" }}>
+                  <input type="checkbox" checked={whatsappOrderUpdatesOptIn}
+                    onChange={e => setWhatsappOrderUpdatesOptIn(e.target.checked)}
+                    style={{ marginTop: "0.2rem", accentColor: "#25D366" }} />
+                  <span style={{ fontSize: "0.78rem", color: "var(--pb-ivory2)", lineHeight: 1.55 }}>
+                    <strong style={{ color: "var(--pb-ivory)" }}>WhatsApp order updates (optional)</strong>
+                    <br />Send me a receipt that my order was received and messages when its status changes.
+                  </span>
+                </label>
+                <label style={{ display: "flex", gap: "0.7rem", alignItems: "flex-start", cursor: "pointer" }}>
+                  <input type="checkbox" checked={whatsappMarketingOptIn}
+                    onChange={e => setWhatsappMarketingOptIn(e.target.checked)}
+                    style={{ marginTop: "0.2rem", accentColor: "#25D366" }} />
+                  <span style={{ fontSize: "0.78rem", color: "var(--pb-ivory2)", lineHeight: 1.55 }}>
+                    <strong style={{ color: "var(--pb-ivory)" }}>Offers and new menu items (optional)</strong>
+                    <br />I'd also like occasional offers from Pasua Bites on WhatsApp. Reply STOP at any time to unsubscribe.
+                  </span>
+                </label>
+              </section>
 
               <div>
                 <label htmlFor="delivery-zone" style={labelStyle}>Delivery zone</label>

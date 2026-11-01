@@ -2,8 +2,10 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { publicProcedure, adminProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { orders, orderItems, menuItems } from "../../drizzle/schema";
-import { eq, desc } from "drizzle-orm";
+import { orders, orderItems, menuItems, customerMessagingPreferences } from "../../drizzle/schema";
+import { eq, desc, inArray } from "drizzle-orm";
+import { logger } from "../logger";
+import { normalizeKenyanWhatsAppPhone, sendWhatsAppTemplateMessage } from "../_core/whatsapp";
 
 // Phone validation for Kenyan numbers
 const phoneRegex = /^(?:\+254|0)[7][0-9]{8}$/;
@@ -98,6 +100,8 @@ export const ordersRouter = router({
           .min(1)
           .max(20),
         paymentMethod: z.enum(["pochi", "cash", "mpesa"]).default("pochi"),
+        whatsappOrderUpdatesOptIn: z.boolean().default(false),
+        whatsappMarketingOptIn: z.boolean().default(false),
         notes: z.string().trim().max(500).optional(),
       })
     )
@@ -109,10 +113,10 @@ export const ordersRouter = router({
         throw new Error("Orders outside Ruiru require a delivery quote via WhatsApp");
       }
 
-      const availableItems = await db
+      const requestedMenuItems = await db
         .select()
         .from(menuItems)
-        .where(eq(menuItems.available, 1))
+        .where(inArray(menuItems.id, input.items.map(item => item.menuItemId)))
         .execute();
 
       let subtotal = 0;
@@ -123,11 +127,10 @@ export const ordersRouter = router({
       }> = [];
 
       for (const item of input.items) {
-        const menuItem = availableItems.find(m => m.id === item.menuItemId);
-        if (!menuItem) {
-          throw new Error(
-            `Menu item ${item.menuItemId} not found or unavailable`
-          );
+        const menuItem = requestedMenuItems.find(m => m.id === item.menuItemId);
+        if (!menuItem) throw new Error("One of the selected menu items is no longer available.");
+        if (menuItem.available !== 1) {
+          throw new Error(`${menuItem.name} is sold out. Remove it from your cart and try again.`);
         }
         const lineTotal = Number(menuItem.price) * item.quantity;
         subtotal += lineTotal;
@@ -162,6 +165,8 @@ export const ordersRouter = router({
             paymentMethod: input.paymentMethod,
             paymentStatus: "pending",
             notes: input.notes || null,
+            whatsappOrderUpdatesOptIn: input.whatsappOrderUpdatesOptIn,
+            whatsappOrderUpdatesOptInAt: input.whatsappOrderUpdatesOptIn ? new Date() : null,
           })
           .returning({ id: orders.id });
 
@@ -177,14 +182,44 @@ export const ordersRouter = router({
         return inserted.id;
       });
 
-      return {
-        success: true,
-        orderId,
-        trackingToken,
-        subtotal,
-        deliveryFee,
-        totalPrice,
-      };
+      // Marketing consent is separate from per-order transactional consent.
+      if (input.whatsappMarketingOptIn) {
+        try {
+          const phone = normalizeKenyanWhatsAppPhone(input.customerPhone);
+          const consentedAt = new Date();
+          await db.insert(customerMessagingPreferences).values({
+            phone, whatsappMarketingOptIn: true, marketingOptInAt: consentedAt,
+            marketingOptOutAt: null, marketingConsentSource: "checkout", updatedAt: consentedAt,
+          }).onConflictDoUpdate({
+            target: customerMessagingPreferences.phone,
+            set: {
+              whatsappMarketingOptIn: true, marketingOptInAt: consentedAt,
+              marketingOptOutAt: null, marketingConsentSource: "checkout", updatedAt: consentedAt,
+            },
+          });
+        } catch (error) {
+          logger.error({ err: error, orderId }, "[WhatsApp] Failed to store marketing consent");
+        }
+      }
+
+      let whatsappNotificationStatus: "not_requested" | "not_configured" | "sent" | "failed" =
+        input.whatsappOrderUpdatesOptIn ? "not_configured" : "not_requested";
+      if (input.whatsappOrderUpdatesOptIn) {
+        const notification = await sendWhatsAppTemplateMessage({
+          to: input.customerPhone,
+          templateName: process.env.WHATSAPP_ORDER_RECEIVED_TEMPLATE,
+          parameters: [
+            input.customerName, `PB-${orderId}`, `KSh ${totalPrice.toFixed(2)}`,
+            input.paymentMethod === "pochi" ? "Pochi payment is awaiting staff verification" : "Cash on delivery",
+          ],
+        });
+        whatsappNotificationStatus = notification.status;
+        if (notification.status === "failed") {
+          logger.warn({ orderId, reason: notification.reason }, "[WhatsApp] Order-received notification failed");
+        }
+      }
+
+      return { success: true, orderId, trackingToken, subtotal, deliveryFee, totalPrice, whatsappNotificationStatus };
     }),
 
   // Public tracking requires a high-entropy token. The response is intentionally masked.
@@ -257,7 +292,12 @@ export const ordersRouter = router({
       const db = await getDb();
       if (!db) throw new Error("Database not available");
       const [order] = await db
-        .select({ paymentMethod: orders.paymentMethod, paymentStatus: orders.paymentStatus })
+        .select({
+          paymentMethod: orders.paymentMethod, paymentStatus: orders.paymentStatus,
+          status: orders.status, customerName: orders.customerName,
+          customerPhone: orders.customerPhone, totalPrice: orders.totalPrice,
+          whatsappOrderUpdatesOptIn: orders.whatsappOrderUpdatesOptIn,
+        })
         .from(orders)
         .where(eq(orders.id, input.id))
         .limit(1)
@@ -276,7 +316,21 @@ export const ordersRouter = router({
         .set({ status: input.status, updatedAt: new Date() })
         .where(eq(orders.id, input.id))
         .execute();
-      return { success: true };
+
+      let whatsappNotificationStatus: "not_requested" | "not_configured" | "sent" | "failed" =
+        order.whatsappOrderUpdatesOptIn ? "not_configured" : "not_requested";
+      if (order.whatsappOrderUpdatesOptIn && order.status !== input.status) {
+        const notification = await sendWhatsAppTemplateMessage({
+          to: order.customerPhone,
+          templateName: process.env.WHATSAPP_ORDER_STATUS_TEMPLATE,
+          parameters: [order.customerName, `PB-${input.id}`, input.status, `KSh ${Number(order.totalPrice).toFixed(2)}`],
+        });
+        whatsappNotificationStatus = notification.status;
+        if (notification.status === "failed") {
+          logger.warn({ orderId: input.id, reason: notification.reason }, "[WhatsApp] Order-status notification failed");
+        }
+      }
+      return { success: true, whatsappNotificationStatus };
     }),
 
   // Admin: Get dashboard stats

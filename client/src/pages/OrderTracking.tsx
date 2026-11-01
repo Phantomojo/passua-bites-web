@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PBNav, PBFooter } from "./Home";
 import { trpc } from "@/lib/trpc";
 import { usePageMeta } from "@/hooks/usePageMeta";
@@ -18,13 +18,22 @@ export default function OrderTracking() {
     title: "Track Order — Passua Bites",
     description: "Track your Passua Bites order securely with your private tracking token.",
   });
-  const [trackingToken, setTrackingToken] = useState("");
+  const initialToken = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("token") || ""
+    : "";
+  const [trackingToken, setTrackingToken] = useState(initialToken);
   const [attempted, setAttempted] = useState(false);
 
   const trackingQuery = trpc.orders.getByTrackingToken.useQuery(
     { trackingToken: trackingToken.trim() },
     { enabled: false, retry: false }
   );
+
+  useEffect(() => {
+    if (!TOKEN_PATTERN.test(initialToken)) return;
+    setAttempted(true);
+    void trackingQuery.refetch();
+  }, []);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();

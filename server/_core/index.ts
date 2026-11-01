@@ -8,8 +8,12 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { getDb } from "../db";
-import { orders, mpesaTransactions } from "../../drizzle/schema";
-import { eq } from "drizzle-orm";
+import { orders, mpesaTransactions, customerMessagingPreferences } from "../../drizzle/schema";
+import { eq, inArray } from "drizzle-orm";
+import {
+  extractWhatsAppMarketingOptOutSenders, getKenyanWhatsAppPhoneVariants,
+  verifyWhatsAppWebhookSignature, verifyWhatsAppWebhookToken,
+} from "./whatsapp";
 import rateLimit from "express-rate-limit";
 import pinoHttp from "pino-http";
 import { logger } from "../logger";
@@ -87,7 +91,12 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
   // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "50mb" }));
+  app.use(express.json({
+    limit: "50mb",
+    verify: (req, _res, buffer) => {
+      (req as typeof req & { rawBody?: Buffer }).rawBody = Buffer.from(buffer);
+    },
+  }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === "/health" } }));
@@ -118,6 +127,54 @@ async function startServer() {
   });
 
   registerOAuthRoutes(app);
+
+  app.get("/api/webhooks/whatsapp", (req, res) => {
+    const mode = String(req.query["hub.mode"] ?? "");
+    const token = String(req.query["hub.verify_token"] ?? "");
+    const challenge = String(req.query["hub.challenge"] ?? "");
+    if (mode === "subscribe" && challenge &&
+      verifyWhatsAppWebhookToken(token, process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN)) {
+      return res.status(200).type("text/plain").send(challenge);
+    }
+    return res.sendStatus(403);
+  });
+
+  app.post("/api/webhooks/whatsapp", async (req, res) => {
+    const rawBody = (req as typeof req & { rawBody?: Buffer }).rawBody;
+    if (!verifyWhatsAppWebhookSignature(rawBody, req.get("x-hub-signature-256"), process.env.WHATSAPP_APP_SECRET)) {
+      return res.sendStatus(401);
+    }
+    try {
+      const senders = extractWhatsAppMarketingOptOutSenders(req.body);
+      if (senders.length > 0) {
+        const db = await getDb();
+        if (!db) return res.sendStatus(503);
+        const optedOutAt = new Date();
+        for (const phone of senders) {
+          await db.insert(customerMessagingPreferences).values({
+            phone, whatsappMarketingOptIn: false, marketingOptOutAt: optedOutAt,
+            marketingConsentSource: "whatsapp_stop", updatedAt: optedOutAt,
+          }).onConflictDoUpdate({
+            target: customerMessagingPreferences.phone,
+            set: {
+              whatsappMarketingOptIn: false, marketingOptOutAt: optedOutAt,
+              marketingConsentSource: "whatsapp_stop", updatedAt: optedOutAt,
+            },
+          });
+        }
+        const variants = [...new Set(senders.flatMap(getKenyanWhatsAppPhoneVariants))];
+        await db.update(orders)
+          .set({ whatsappOrderUpdatesOptIn: false, updatedAt: optedOutAt })
+          .where(inArray(orders.customerPhone, variants))
+          .execute();
+        logger.info({ optedOutCount: senders.length }, "[WhatsApp] Processed customer opt-outs");
+      }
+      return res.sendStatus(200);
+    } catch (error) {
+      logger.error({ err: error }, "[WhatsApp] Failed to process inbound webhook");
+      return res.sendStatus(500);
+    }
+  });
 
   // M-Pesa Callback endpoint (must be before tRPC middleware)
   app.post("/api/mpesa/callback", async (req, res) => {
