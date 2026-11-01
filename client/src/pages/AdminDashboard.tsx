@@ -4,6 +4,8 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import AnalyticsTab from "@/components/AnalyticsTab";
 import OwnerInstallGuide from "@/components/OwnerInstallGuide";
+import OwnerWorkspaceShell, { type OwnerTab } from "@/components/OwnerWorkspaceShell";
+import OwnerKitchenBoard from "@/components/OwnerKitchenBoard";
 import { usePageMeta } from "@/hooks/usePageMeta";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -15,16 +17,7 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: "#f87171",
 };
 
-type Tab =
-  | "overview"
-  | "pos"
-  | "orders"
-  | "menu"
-  | "announcements"
-  | "reviews"
-  | "settings"
-  | "analytics"
-  | "sales";
+type Tab = OwnerTab;
 
 export default function AdminDashboard() {
   usePageMeta({ title: "Admin Dashboard — Passua Bites", description: "Passua Bites admin dashboard — manage orders, menu, reviews, and analytics." });
@@ -51,7 +44,7 @@ export default function AdminDashboard() {
     return () => { manifest.remove(); robots.remove(); };
   }, []);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>("orders");
+  const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [prevOrderCount, setPrevOrderCount] = useState(0);
   const [playSound, setPlaySound] = useState(false);
   const [pendingReviews, setPendingReviews] = useState<any[]>([]);
@@ -406,359 +399,28 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--pb-bg)",
-        fontFamily: "'DM Sans',sans-serif",
-      }}
+    <OwnerWorkspaceShell
+      activeTab={activeTab}
+      onNavigate={setActiveTab}
+      pendingOrders={orderList.filter((order: any) => order.status === "pending").length}
+      pendingReviews={pendingReviews.length}
+      playSound={playSound}
+      onLogout={handleLogout}
     >
-      {/* Admin Nav */}
-      <nav
-        style={{
-          background: "var(--pb-bg2)",
-          borderBottom: "1px solid var(--pb-rule)",
-          padding: "1rem 2rem",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          position: "sticky",
-          top: 0,
-          zIndex: 100,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              background: "var(--pb-ember)",
-              clipPath: "polygon(50% 0%,100% 50%,50% 100%,0% 50%)",
-              flexShrink: 0,
+      <div className="pb-owner-content-inner">
+        {/* ===== KITCHEN / OVERVIEW ===== */}
+        {activeTab === "overview" && (
+          <OwnerKitchenBoard
+            orders={orderList}
+            isLoading={orders.isLoading}
+            pendingReviews={pendingReviews.length}
+            onStatusChange={handleStatusChange}
+            onNavigate={setActiveTab}
+            onRefresh={() => {
+              orders.refetch();
+              stats.refetch();
             }}
           />
-          <span
-            style={{
-              fontFamily: "'Playfair Display',serif",
-              fontSize: "1rem",
-              fontWeight: 700,
-              color: "var(--pb-ivory)",
-            }}
-          >
-            Admin Dashboard
-          </span>
-        </div>
-        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-          {playSound && (
-            <span
-              style={{
-                fontFamily: "'DM Mono',monospace",
-                fontSize: "0.6rem",
-                color: "#4ade80",
-                animation: "pulse 1s infinite",
-              }}
-            >
-              🔔 New order!
-            </span>
-          )}
-          <Link
-            href="/"
-            style={{
-              fontFamily: "'DM Mono',monospace",
-              fontSize: "0.65rem",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              color: "var(--pb-ivory3)",
-              textDecoration: "none",
-              padding: "0.4rem 0.75rem",
-              border: "1px solid var(--pb-rule)",
-            }}
-          >
-            View Site
-          </Link>
-          <button
-            onClick={handleLogout}
-            className="pb-btn-ghost"
-            style={{ fontSize: "0.65rem", padding: "0.4rem 0.75rem" }}
-          >
-            Logout
-          </button>
-        </div>
-      </nav>
-
-      <div className="pb-section-mobile" style={{ padding: "2rem 2.5rem" }}>
-        {/* Tabs */}
-        <div
-          style={{
-            display: "flex",
-            gap: "0.4rem",
-            marginBottom: "2.5rem",
-            borderBottom: "1px solid var(--pb-rule)",
-            paddingBottom: "1.2rem",
-            flexWrap: "wrap",
-          }}
-        >
-          {(
-            [
-              "overview",
-              "pos",
-              "orders",
-              "menu",
-              "announcements",
-              "reviews",
-              "sales",
-              "settings",
-              "analytics",
-            ] as const
-          ).map(t => (
-            <button
-              key={t}
-              onClick={() => setActiveTab(t)}
-              style={{
-                fontFamily: "'DM Mono',monospace",
-                fontSize: "0.65rem",
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                padding: "0.5rem 1rem",
-                cursor: "pointer",
-                border: "1px solid",
-                background: activeTab === t ? "var(--pb-ember)" : "transparent",
-                color: activeTab === t ? "var(--pb-bg)" : "var(--pb-ivory3)",
-                borderColor:
-                  activeTab === t ? "var(--pb-ember)" : "var(--pb-rule)",
-                transition: "all 0.2s",
-                minHeight: 44,
-              }}
-            >
-              {t}
-              {t === "orders" &&
-                orderList.filter((o: any) => o.status === "pending").length >
-                  0 && (
-                  <span
-                    style={{
-                      marginLeft: "0.4rem",
-                      background: "var(--pb-bg)",
-                      color: "var(--pb-ember)",
-                      borderRadius: "50%",
-                      width: 18,
-                      height: 18,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "0.6rem",
-                      fontWeight: 700,
-                    }}
-                  >
-                    {
-                      orderList.filter((o: any) => o.status === "pending")
-                        .length
-                    }
-                  </span>
-                )}
-              {t === "reviews" && pendingReviews.length > 0 && (
-                <span
-                  style={{
-                    marginLeft: "0.4rem",
-                    background: "var(--pb-bg)",
-                    color: "var(--pb-ember)",
-                    borderRadius: "50%",
-                    width: 18,
-                    height: 18,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "0.6rem",
-                    fontWeight: 700,
-                  }}
-                >
-                  {pendingReviews.length}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* ===== OVERVIEW ===== */}
-        {activeTab === "overview" && (
-          <div
-            style={{ display: "flex", flexDirection: "column", gap: "2rem" }}
-          >
-            {/* Stats */}
-            <div
-              className="pb-grid-mobile"
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(4,1fr)",
-                gap: "1px",
-                background: "var(--pb-rule2)",
-              }}
-            >
-              {[
-                { label: "Total orders", value: statsData.totalOrders },
-                { label: "Pending", value: statsData.pendingOrders },
-                {
-                  label: "Today revenue",
-                  value: `Ksh ${statsData.todayRevenue.toLocaleString()}`,
-                },
-                {
-                  label: "Total revenue",
-                  value: `Ksh ${statsData.totalRevenue.toLocaleString()}`,
-                },
-              ].map(s => (
-                <div
-                  key={s.label}
-                  style={{ background: "var(--pb-bg2)", padding: "1.5rem" }}
-                >
-                  <div
-                    style={{
-                      fontFamily: "'DM Mono',monospace",
-                      fontSize: "0.6rem",
-                      letterSpacing: "0.15em",
-                      color: "var(--pb-ivory3)",
-                      textTransform: "uppercase",
-                      marginBottom: "0.5rem",
-                    }}
-                  >
-                    {s.label}
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: "'Playfair Display',serif",
-                      fontSize: "2rem",
-                      fontWeight: 700,
-                      color: "var(--pb-ember)",
-                    }}
-                  >
-                    {s.value}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Recent orders */}
-            <div>
-              <div
-                style={{
-                  fontFamily: "'DM Mono',monospace",
-                  fontSize: "0.62rem",
-                  letterSpacing: "0.15em",
-                  color: "var(--pb-ember)",
-                  textTransform: "uppercase",
-                  marginBottom: "1rem",
-                }}
-              >
-                Recent orders
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "1px",
-                  background: "var(--pb-rule2)",
-                }}
-              >
-                {orderList.slice(0, 5).map((o: any) => (
-                  <div
-                    key={o.id}
-                    style={{
-                      background: "var(--pb-bg2)",
-                      padding: "1rem 1.25rem",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      flexWrap: "wrap",
-                      gap: "0.5rem",
-                    }}
-                  >
-                    <div>
-                      <div
-                        style={{
-                          fontSize: "0.88rem",
-                          color: "var(--pb-ivory)",
-                        }}
-                      >
-                        {o.customerName}
-                      </div>
-                      <div
-                        style={{
-                          fontFamily: "'DM Mono',monospace",
-                          fontSize: "0.6rem",
-                          color: "var(--pb-ivory3)",
-                          marginTop: "0.15rem",
-                        }}
-                      >
-                        #{o.id} · {o.customerPhone}
-                        {o.notes && (
-                          <span style={{ color: "var(--pb-ember)" }}>
-                            {" "}
-                            · {o.notes.replace("M-Pesa Code: ", "")}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.75rem",
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontFamily: "'Playfair Display',serif",
-                          fontSize: "1rem",
-                          fontWeight: 700,
-                          color: "var(--pb-ember)",
-                        }}
-                      >
-                        Ksh {Number(o.totalPrice)}
-                      </span>
-                      {o.status === "pending" && (
-                        <button
-                          onClick={() => handleStatusChange(o.id, "confirmed")}
-                          className="pb-btn-primary"
-                          style={{
-                            fontSize: "0.58rem",
-                            padding: "0.3rem 0.75rem",
-                            minHeight: 32,
-                          }}
-                        >
-                          ✓ Confirm
-                        </button>
-                      )}
-                      <span
-                        style={{
-                          fontFamily: "'DM Mono',monospace",
-                          fontSize: "0.58rem",
-                          letterSpacing: "0.1em",
-                          textTransform: "uppercase",
-                          padding: "0.2rem 0.6rem",
-                          border: "1px solid",
-                          color: STATUS_COLORS[o.status],
-                          borderColor: STATUS_COLORS[o.status] + "66",
-                        }}
-                      >
-                        {o.status}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-                {orderList.length === 0 && (
-                  <div
-                    style={{
-                      background: "var(--pb-bg2)",
-                      padding: "2rem",
-                      textAlign: "center",
-                      color: "var(--pb-ivory3)",
-                    }}
-                  >
-                    No orders yet
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
         )}
 
         {/* ===== ORDERS ===== */}
@@ -1976,6 +1638,6 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
           </div>
         </div>
       )}
-    </div>
+    </OwnerWorkspaceShell>
   );
 }
