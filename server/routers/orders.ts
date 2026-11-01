@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { publicProcedure, adminProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { orders, orderItems } from "../../drizzle/schema";
+import { orders, orderItems, menuItems } from "../../drizzle/schema";
 import { eq, desc, and } from "drizzle-orm";
 
 // Phone validation for Kenyan numbers
@@ -228,7 +228,138 @@ export const ordersRouter = router({
       return { success: true };
     }),
 
-  // Admin: Get dashboard stats
+  // Admin: Create walk-in / POS order
+  createWalkIn: adminProcedure
+    .input(
+      z.object({
+        customerName: z.string().min(1).max(255),
+        customerPhone: z
+          .string()
+          .regex(phoneRegex, "Invalid Kenyan phone number"),
+        deliveryAddress: z.string().max(500).optional(),
+        items: z
+          .array(
+            z.object({
+              menuItemId: z.number(),
+              quantity: z.number().min(1).max(50),
+            })
+          )
+          .min(1)
+          .max(50),
+        paymentMethod: z.enum(["mpesa", "cash"]).default("cash"),
+        notes: z.string().max(500).optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const { menuItems: menuItemsTable } = await import("../../drizzle/schema");
+      const availableItems = await db
+        .select()
+        .from(menuItemsTable)
+        .execute();
+
+      let totalPrice = 0;
+      const orderItemsData: Array<{
+        menuItemId: number;
+        quantity: number;
+        priceAtTime: string;
+      }> = [];
+
+      for (const item of input.items) {
+        const menuItem = availableItems.find(m => m.id === item.menuItemId);
+        if (!menuItem) {
+          throw new Error(`Menu item ${item.menuItemId} not found`);
+        }
+        const lineTotal = Number(menuItem.price) * item.quantity;
+        totalPrice += lineTotal;
+        orderItemsData.push({
+          menuItemId: item.menuItemId,
+          quantity: item.quantity,
+          priceAtTime: menuItem.price,
+        });
+      }
+
+      const isCash = input.paymentMethod === "cash";
+      const [inserted] = await db
+        .insert(orders)
+        .values({
+          customerName: input.customerName,
+          customerPhone: input.customerPhone,
+          deliveryAddress: input.deliveryAddress || "Walk-in / POS",
+          totalPrice: totalPrice.toFixed(2),
+          status: isCash ? "confirmed" : "pending",
+          paymentMethod: input.paymentMethod,
+          paymentStatus: isCash ? "completed" : "pending",
+          channel: "pos",
+          notes: input.notes || null,
+        })
+        .returning({ id: orders.id });
+
+      const orderId = inserted.id;
+
+      for (const oi of orderItemsData) {
+        await db
+          .insert(orderItems)
+          .values({
+            orderId,
+            menuItemId: oi.menuItemId,
+            quantity: oi.quantity,
+            priceAtTime: oi.priceAtTime,
+          })
+          .execute();
+      }
+
+      return { success: true, orderId, totalPrice };
+    }),
+
+  // Admin: sales summary
+  getSalesSummary: adminProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return { today: 0, week: 0, month: 0, topItems: [] };
+    const allOrders = await db.select().from(orders).execute();
+    const allItems = await db.select().from(orderItems).execute();
+    const allMenu = await db.select().from(menuItems).execute();
+
+    const now = new Date();
+    const startOfDay = new Date(now);
+    startOfDay.setHours(0, 0, 0, 0);
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - 7);
+    const startOfMonth = new Date(now);
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const completed = allOrders.filter(o => o.paymentStatus === "completed");
+    const sum = (from: Date) =>
+      completed
+        .filter(o => new Date(o.createdAt) >= from)
+        .reduce((s, o) => s + Number(o.totalPrice), 0);
+
+    // top items by quantity
+    const qtyByItem = new Map<number, number>();
+    for (const oi of allItems) {
+      const ord = allOrders.find(o => o.id === oi.orderId);
+      if (!ord || ord.paymentStatus !== "completed") continue;
+      qtyByItem.set(oi.menuItemId, (qtyByItem.get(oi.menuItemId) || 0) + oi.quantity);
+    }
+    const topItems = Array.from(qtyByItem.entries())
+      .map(([id, qty]) => ({
+        id,
+        name: allMenu.find(m => m.id === id)?.name || `Item ${id}`,
+        quantity: qty,
+      }))
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 5);
+
+    return {
+      today: sum(startOfDay),
+      week: sum(startOfWeek),
+      month: sum(startOfMonth),
+      topItems,
+    };
+  }),
   getStats: adminProcedure.query(async () => {
     const db = await getDb();
     if (!db)

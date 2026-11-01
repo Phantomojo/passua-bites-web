@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pasua Bites — Matatu Culture Hero Concept</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=DM+Mono:wght@400;500;700&family=Permanent+Marker&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a1a;
+    font-family: 'DM Mono', monospace;
+    overflow-x: hidden;
+    color: #f0f0f0;
+  }
+
+  /* NEON BORDER TOP */
+  .neon-border-top {
+    height: 6px;
+    background: linear-gradient(90deg, #ff00ff, #00ffff, #ff6600, #ff00ff, #00ffff);
+    background-size: 300% 100%;
+    animation: neon-scroll 4s linear infinite;
+  }
+  @keyframes neon-scroll {
+    0% { background-position: 0% 0%; }
+    100% { background-position: 300% 0%; }
+  }
+
+  /* HERO */
+  .hero {
+    position: relative;
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    overflow: hidden;
+  }
+
+  /* LEFT: GRAFFITI WALL */
+  .hero-left {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 4rem 3rem;
+    z-index: 10;
+  }
+
+  /* Graffiti paint splatter overlay */
+  .hero-left::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 20% 30%, rgba(255,0,255,0.12) 0%, transparent 50%),
+      radial-gradient(circle at 70% 60%, rgba(0,255,255,0.1) 0%, transparent 50%),
+      radial-gradient(circle at 40% 80%, rgba(255,102,0,0.08) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  /* Spray paint drip effect */
+  .spray-drip {
+    position: absolute;
+    width: 3px;
+    border-radius: 0 0 3px 3px;
+    opacity: 0.5;
+    animation: drip 3s ease-in infinite;
+  }
+  .spray-drip:nth-child(1) { left: 15%; top: 0; height: 80px; background: #ff00ff; animation-delay: 0s; }
+  .spray-drip:nth-child(2) { left: 35%; top: 0; height: 120px; background: #00ffff; animation-delay: 0.5s; }
+  .spray-drip:nth-child(3) { left: 55%; top: 0; height: 60px; background: #ff6600; animation-delay: 1s; }
+  .spray-drip:nth-child(4) { left: 75%; top: 0; height: 100px; background: #ff00ff; animation-delay: 1.5s; }
+  .spray-drip:nth-child(5) { left: 90%; top: 0; height: 70px; background: #00ffff; animation-delay: 2s; }
+  @keyframes drip {
+    0%, 100% { transform: scaleY(1); opacity: 0.5; }
+    50% { transform: scaleY(1.3); opacity: 0.8; }
+  }
+
+  /* Route number badge */
+  .route-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: #ff00ff;
+    color: #000;
+    padding: 0.5rem 1.2rem;
+    font-family: 'Anton', sans-serif;
+    font-size: 1.4rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+    position: relative;
+    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+  .route-badge .route-num {
+    font-size: 2rem;
+    line-height: 1;
+  }
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 20px rgba(255,0,255,0.5); }
+    50% { box-shadow: 0 0 40px rgba(255,0,255,0.8), 0 0 80px rgba(255,0,255,0.3); }
+  }
+
+  /* Main title — graffiti style */
+  .graffiti-title {
+    font-family: 'Permanent Marker', cursive;
+    font-size: clamp(3rem, 7vw, 6rem);
+    line-height: 0.9;
+    margin-bottom: 0.5rem;
+    position: relative;
+  }
+  .graffiti-title .line1 {
+    color: #00ffff;
+    text-shadow:
+      3px 3px 0 #ff00ff,
+      -1px -1px 0 #ff6600,
+      0 0 30px rgba(0,255,255,0.5);
+    display: block;
+    transform: rotate(-2deg);
+  }
+  .graffiti-title .line2 {
+    color: #ff6600;
+    text-shadow:
+      3px 3px 0 #00ffff,
+      -1px -1px 0 #ff00ff,
+      0 0 30px rgba(255,102,0,0.5);
+    display: block;
+    transform: rotate(1deg);
+    margin-left: 1rem;
+  }
+
+  /* Tagline */
+  .tagline {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.85rem;
+    color: #aaa;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin: 1.5rem 0;
+    padding-left: 0.5rem;
+    border-left: 4px solid #ff00ff;
+  }
+
+  /* Bass bar visualization */
+  .bass-bars {
+    display: flex;
+    gap: 3px;
+    align-items: flex-end;
+    height: 40px;
+    margin: 1.5rem 0;
+  }
+  .bass-bar {
+    width: 4px;
+    background: #00ffff;
+    border-radius: 2px;
+    animation: bass 0.8s ease-in-out infinite;
+  }
+  .bass-bar:nth-child(1) { height: 20px; animation-delay: 0s; }
+  .bass-bar:nth-child(2) { height: 35px; animation-delay: 0.1s; }
+  .bass-bar:nth-child(3) { height: 25px; animation-delay: 0.2s; }
+  .bass-bar:nth-child(4) { height: 40px; animation-delay: 0.3s; }
+  .bass-bar:nth-child(5) { height: 30px; animation-delay: 0.4s; }
+  .bass-bar:nth-child(6) { height: 38px; animation-delay: 0.5s; }
+  .bass-bar:nth-child(7) { height: 22px; animation-delay: 0.6s; }
+  .bass-bar:nth-child(8) { height: 35px; animation-delay: 0.7s; }
+  .bass-bar:nth-child(9) { height: 18px; animation-delay: 0.8s; }
+  .bass-bar:nth-child(10) { height: 40px; animation-delay: 0.1s; }
+  .bass-bar:nth-child(11) { height: 28px; animation-delay: 0.3s; }
+  .bass-bar:nth-child(12) { height: 36px; animation-delay: 0.5s; }
+  @keyframes bass {
+    0%, 100% { transform: scaleY(1); }
+    50% { transform: scaleY(1.8); }
+  }
+
+  /* Location */
+  .location {
+    font-size: 0.75rem;
+    color: #888;
+    margin-bottom: 2rem;
+  }
+  .location strong { color: #ff6600; }
+
+  /* CTAs */
+  .cta-group {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .cta-neon {
+    display: inline-block;
+    padding: 0.8rem 2rem;
+    font-family: 'Anton', sans-serif;
+    font-size: 1rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-decoration: none;
+    border: 2px solid #00ffff;
+    color: #00ffff;
+    background: transparent;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.3s;
+  }
+  .cta-neon:hover {
+    background: #00ffff;
+    color: #0a0a1a;
+    box-shadow: 0 0 30px rgba(0,255,255,0.5);
+  }
+  .cta-neon.primary {
+    background: #ff6600;
+    border-color: #ff6600;
+    color: #000;
+  }
+  .cta-neon.primary:hover {
+    background: #ff8533;
+    box-shadow: 0 0 30px rgba(255,102,0,0.5);
+  }
+
+  /* RIGHT: MATATU VEHICLE */
+  .hero-right {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  /* Matatu body shape */
+  .matatu {
+    position: relative;
+    width: 380px;
+    height: 260px;
+    background: linear-gradient(135deg, #1a1a3a, #0d0d2a);
+    border: 3px solid #ff00ff;
+    border-radius: 20px 20px 8px 8px;
+    transform: perspective(800px) rotateY(-8deg) rotateX(3deg);
+    box-shadow:
+      0 0 40px rgba(255,0,255,0.3),
+      inset 0 0 60px rgba(0,0,0,0.5);
+    animation: matatu-float 4s ease-in-out infinite;
+  }
+  @keyframes matatu-float {
+    0%, 100% { transform: perspective(800px) rotateY(-8deg) rotateX(3deg) translateY(0); }
+    50% { transform: perspective(800px) rotateY(-8deg) rotateX(3deg) translateY(-10px); }
+  }
+
+  /* Matatu windshield */
+  .matatu-windshield {
+    position: absolute;
+    top: 15px;
+    left: 20px;
+    right: 20px;
+    height: 80px;
+    background: linear-gradient(180deg, rgba(0,255,255,0.1), rgba(0,0,0,0.3));
+    border: 2px solid rgba(0,255,255,0.3);
+    border-radius: 10px 10px 0 0;
+  }
+
+  /* Matatu graffiti stripes */
+  .matatu-stripe {
+    position: absolute;
+    height: 8px;
+    border-radius: 4px;
+  }
+  .matatu-stripe:nth-child(1) { bottom: 60px; left: 10px; right: 10px; background: linear-gradient(90deg, #ff00ff, #ff6600); }
+  .matatu-stripe:nth-child(2) { bottom: 45px; left: 10px; right: 10px; background: linear-gradient(90deg, #00ffff, #ff00ff); }
+  .matatu-stripe:nth-child(3) { bottom: 30px; left: 10px; right: 10px; background: linear-gradient(90deg, #ff6600, #00ffff); }
+
+  /* Matatu name */
+  .matatu-name {
+    position: absolute;
+    bottom: 15px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-family: 'Anton', sans-serif;
+    font-size: 2.2rem;
+    letter-spacing: 0.15em;
+    color: #ff00ff;
+    text-shadow: 0 0 20px rgba(255,0,255,0.5);
+  }
+
+  /* Neon underglow */
+  .neon-underglow {
+    position: absolute;
+    bottom: -20px;
+    left: 30px;
+    right: 30px;
+    height: 40px;
+    background: radial-gradient(ellipse, rgba(255,0,255,0.4) 0%, transparent 70%);
+    filter: blur(15px);
+    animation: underglow 2s ease-in-out infinite;
+  }
+  @keyframes underglow {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+
+  /* Floating graffiti tags */
+  .graffiti-tag {
+    position: absolute;
+    font-family: 'Permanent Marker', cursive;
+    opacity: 0.15;
+    pointer-events: none;
+  }
+  .graffiti-tag:nth-child(1) { top: 10%; right: 5%; font-size: 4rem; color: #ff00ff; transform: rotate(12deg); }
+  .graffiti-tag:nth-child(2) { bottom: 20%; left: 5%; font-size: 3rem; color: #00ffff; transform: rotate(-8deg); }
+  .graffiti-tag:nth-child(3) { top: 60%; right: 15%; font-size: 2.5rem; color: #ff6600; transform: rotate(5deg); }
+
+  /* Bottom ticker */
+  .ticker {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: rgba(10,10,26,0.95);
+    border-top: 2px solid #ff00ff;
+    padding: 0.6rem 0;
+    overflow: hidden;
+  }
+  .ticker-track {
+    display: flex;
+    gap: 2rem;
+    white-space: nowrap;
+    animation: ticker-scroll 20s linear infinite;
+    font-family: 'Anton', sans-serif;
+    font-size: 0.9rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  .ticker-item { color: #888; }
+  .ticker-item .hot { color: #ff6600; }
+  .ticker-item .neon { color: #00ffff; }
+  .ticker-sep { color: #ff00ff; }
+  @keyframes ticker-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  /* Mobile */
+  @media (max-width: 768px) {
+    .hero { grid-template-columns: 1fr; }
+    .hero-right { display: none; }
+    .graffiti-title { font-size: 2.8rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="neon-border-top"></div>
+
+<section class="hero">
+  <div class="hero-left">
+    <div class="spray-drip"></div>
+    <div class="spray-drip"></div>
+    <div class="spray-drip"></div>
+    <div class="spray-drip"></div>
+    <div class="spray-drip"></div>
+
+    <div class="route-badge">
+      <span class="route-num">R47</span>
+      <span>RUIRU</span>
+    </div>
+
+    <h1 class="graffiti-title">
+      <span class="line1">PASUA</span>
+      <span class="line2">BITES</span>
+    </h1>
+
+    <div class="tagline">
+      Street food with soul — smoked, wrapped, served fresh
+    </div>
+
+    <div class="bass-bars">
+      <div class="bass-bar"></div>
+      <div class="bass-bar"></div>
+      <div class="bass-bar"></div>
+      <div class="bass-bar"></div>
+      <div class="bass-bar"></div>
+      <div class="bass-bar"></div>
+      <div class="bass-bar"></div>
+      <div class="bass-bar"></div>
+      <div class="bass-bar"></div>
+      <div class="bass-bar"></div>
+      <div class="bass-bar"></div>
+      <div class="bass-bar"></div>
+    </div>
+
+    <div class="location">
+      <strong>Opp Rainbow Resort, Ruiru</strong> — 0722 473 873 — Also on Bolt Food
+    </div>
+
+    <div class="cta-group">
+      <a href="#" class="cta-neon primary">View Menu</a>
+      <a href="#" class="cta-neon">Order on WhatsApp</a>
+    </div>
+  </div>
+
+  <div class="hero-right">
+    <div class="graffiti-tag">MOTO</div>
+    <div class="graffiti-tag">SMOCHA</div>
+    <div class="graffiti-tag">NGANYA</div>
+
+    <div class="matatu">
+      <div class="matatu-windshield"></div>
+      <div class="matatu-stripe"></div>
+      <div class="matatu-stripe"></div>
+      <div class="matatu-stripe"></div>
+      <div class="matatu-name">PASUA</div>
+      <div class="neon-underglow"></div>
+    </div>
+  </div>
+</section>
+
+<div class="ticker">
+  <div class="ticker-track">
+    <span class="ticker-item"><span class="hot">MOTO MOTO</span> — FRESH OFF THE JIKO</span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item"><span class="neon">SMOCHAS WORTH FINDING</span></span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">ALSO ON <span class="hot">BOLT FOOD</span></span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">OPP RAINBOW RESORT, RUIRU</span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item"><span class="neon">WALK IN OR WHATSAPP</span></span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item"><span class="hot">MOTO MOTO</span> — FRESH OFF THE JIKO</span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item"><span class="neon">SMOCHAS WORTH FINDING</span></span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">ALSO ON <span class="hot">BOLT FOOD</span></span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">OPP RAINBOW RESORT, RUIRU</span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item"><span class="neon">WALK IN OR WHATSAPP</span></span>
+    <span class="ticker-sep">◆</span>
+  </div>
+</div>
+
+</body>
+</html>

@@ -116,4 +116,5 @@ client/public/__manus__/version.json
 .env.vercel
 
 # Compiled Vercel serverless handler (built by vercel-build)
-api/index.js
+# Source backup created by vercel-build (idempotency)
+api/index.ts.bak

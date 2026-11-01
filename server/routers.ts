@@ -9,6 +9,8 @@ import { paymentsRouter } from "./routers/payments";
 import { reviewsRouter } from "./routers/reviews";
 import { adminRouter } from "./routers/admin";
 import { analyticsRouter } from "./routers/analytics";
+import { uploadRouter } from "./routers/upload";
+import { announcementsRouter } from "./routers/announcements";
 
 export const appRouter = router({
   system: systemRouter,
@@ -28,6 +30,8 @@ export const appRouter = router({
   reviews: reviewsRouter,
   admin: adminRouter,
   analytics: analyticsRouter,
+  upload: uploadRouter,
+  announcements: announcementsRouter,
 
   // Location/Displacement message router
   location: router({

@@ -140,6 +140,7 @@ export const menuRouter = router({
         videoUrl: z.string().optional(),
         category: z.string().max(100).optional(),
         available: z.boolean().default(true),
+        featured: z.boolean().default(false),
       })
     )
     .mutation(async ({ input }) => {
@@ -155,6 +156,7 @@ export const menuRouter = router({
           videoUrl: input.videoUrl || null,
           category: input.category || null,
           available: input.available ? 1 : 0,
+          featured: input.featured ? 1 : 0,
         })
         .execute();
       return { success: true, insertId: Number((result as any).insertId || 0) };
@@ -172,6 +174,7 @@ export const menuRouter = router({
         videoUrl: z.string().optional().nullable(),
         category: z.string().max(100).optional(),
         available: z.boolean().optional(),
+        featured: z.boolean().optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -190,6 +193,8 @@ export const menuRouter = router({
       if (input.category !== undefined) updates.category = input.category;
       if (input.available !== undefined)
         updates.available = input.available ? 1 : 0;
+      if (input.featured !== undefined)
+        updates.featured = input.featured ? 1 : 0;
 
       if (Object.keys(updates).length === 0) {
         return { success: false, message: "No fields to update" };
@@ -223,6 +228,20 @@ export const menuRouter = router({
       await db
         .update(menuItems)
         .set({ available: input.available ? 1 : 0 })
+        .where(eq(menuItems.id, input.id))
+        .execute();
+      return { success: true };
+    }),
+
+  // Admin: Toggle featured (today's special)
+  toggleFeatured: adminProcedure
+    .input(z.object({ id: z.number(), featured: z.boolean() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      await db
+        .update(menuItems)
+        .set({ featured: input.featured ? 1 : 0 })
         .where(eq(menuItems.id, input.id))
         .execute();
       return { success: true };

@@ -33,6 +33,11 @@ export default function Checkout() {
   const [orderId, setOrderId] = useState<number | null>(null);
   const [stkSent, setStkSent] = useState(false);
   const [stkChecking, setStkChecking] = useState(false);
+  const [stkStatus, setStkStatus] = useState<
+    "idle" | "sending" | "pending" | "completed" | "failed" | "cancelled" | "timeout"
+  >("idle");
+  const [stkReceipt, setStkReceipt] = useState<string | null>(null);
+  const [stkResultDesc, setStkResultDesc] = useState<string>("");
 
   const createOrder = trpc.orders.create.useMutation();
   const initiateStk = trpc.payments.initiateStkPush.useMutation();
@@ -51,12 +56,16 @@ export default function Checkout() {
   // Watch for payment completion
   useEffect(() => {
     if (queryPayment.error) {
+      setStkStatus("failed");
+      setStkResultDesc(queryPayment.error.message || "Payment query failed");
       setStkChecking(false);
       setPollingId("");
       return;
     }
     if (!queryPayment.data) return;
     if (queryPayment.data.status === "completed") {
+      setStkStatus("completed");
+      setStkReceipt(queryPayment.data.mpesaReceiptNumber || null);
       setStkChecking(false);
       setPollingId("");
       toast.success("Payment confirmed! Your order is being prepared.");
@@ -64,17 +73,75 @@ export default function Checkout() {
       queryPayment.data.status === "failed" ||
       queryPayment.data.status === "cancelled"
     ) {
+      const cancelled = queryPayment.data.status === "cancelled";
+      setStkStatus(cancelled ? "cancelled" : "failed");
+      setStkResultDesc(queryPayment.data.resultDesc || "");
       setStkChecking(false);
       setPollingId("");
-      toast.error(
-        "Payment was not completed. You can retry or pay cash on delivery."
-      );
+      toast.error(mpesaResultMessage(queryPayment.data.resultCode ?? undefined));
     }
-  }, [queryPayment.data]);
+  }, [queryPayment.data, queryPayment.error]);
 
   const startPaymentPolling = (checkoutRequestID: string) => {
     setPollingId(checkoutRequestID);
     setStkChecking(true);
+  };
+
+  // Stop polling after 90s if no terminal status arrives
+  useEffect(() => {
+    if (!stkChecking) return;
+    const t = setTimeout(() => {
+      setStkChecking(false);
+      setPollingId("");
+      setStkStatus("timeout");
+      toast.warning(
+        "Payment not confirmed yet. Check your phone and retry if needed."
+      );
+    }, 90000);
+    return () => clearTimeout(t);
+  }, [stkChecking]);
+
+  const mpesaResultMessage = (code?: number): string => {
+    switch (code) {
+      case 0:
+        return "Payment successful.";
+      case 1:
+        return "Insufficient M-Pesa balance.";
+      case 1001:
+        return "Another M-Pesa session is active. Try again shortly.";
+      case 1019:
+        return "Transaction expired. Please retry.";
+      case 1032:
+        return "Payment cancelled. You can retry or pay cash on delivery.";
+      case 1037:
+        return "Could not reach your phone. Ensure it is on with signal, then retry.";
+      case 2001:
+        return "Wrong PIN entered.";
+      default:
+        return "Payment was not completed. You can retry or pay cash on delivery.";
+    }
+  };
+
+  const retryStkPush = async () => {
+    if (!orderId) return;
+    setStkStatus("sending");
+    setStkResultDesc("");
+    try {
+      const stkResult = await initiateStk.mutateAsync({
+        orderId,
+        phoneNumber: formData.customerPhone,
+      });
+      setStkSent(true);
+      setStkStatus("pending");
+      toast.success(stkResult.message);
+      startPaymentPolling(stkResult.checkoutRequestID);
+    } catch (stkError: any) {
+      setStkStatus("failed");
+      setStkResultDesc(stkError.message || "");
+      toast.warning(
+        `M-Pesa prompt failed: ${stkError.message}. You can pay cash on delivery.`
+      );
+    }
   };
 
   useEffect(() => {
@@ -153,17 +220,21 @@ export default function Checkout() {
 
       if (paymentMethod === "mpesa") {
         // Trigger M-Pesa STK Push
+        setStkStatus("sending");
         try {
           const stkResult = await initiateStk.mutateAsync({
             orderId: newOrderId,
             phoneNumber: formData.customerPhone,
           });
           setStkSent(true);
+          setStkStatus("pending");
           toast.success(stkResult.message);
 
           // Start polling for payment status
           startPaymentPolling(stkResult.checkoutRequestID);
         } catch (stkError: any) {
+          setStkStatus("failed");
+          setStkResultDesc(stkError.message || "");
           // STK Push failed but order was created
           toast.warning(
             `Order created but M-Pesa prompt failed: ${stkError.message}. You can pay cash on delivery.`
@@ -364,7 +435,15 @@ export default function Checkout() {
                 style={{
                   background: "rgba(196,92,40,0.05)",
                   border: "1px solid var(--pb-rule2)",
-                  borderLeft: "3px solid var(--pb-ember)",
+                  borderLeft: `3px solid ${
+                    stkStatus === "completed"
+                      ? "#4ade80"
+                      : stkStatus === "failed" ||
+                        stkStatus === "cancelled" ||
+                        stkStatus === "timeout"
+                      ? "#f87171"
+                      : "var(--pb-ember)"
+                  }`,
                   padding: "1rem",
                   marginBottom: "1.5rem",
                 }}
@@ -373,13 +452,46 @@ export default function Checkout() {
                   style={{
                     fontFamily: "'DM Mono',monospace",
                     fontSize: "0.6rem",
-                    color: "var(--pb-ember)",
+                    color:
+                      stkStatus === "completed"
+                        ? "#4ade80"
+                        : stkStatus === "failed" ||
+                          stkStatus === "cancelled" ||
+                          stkStatus === "timeout"
+                        ? "#f87171"
+                        : "var(--pb-ember)",
                     letterSpacing: "0.1em",
                     textTransform: "uppercase",
                     marginBottom: "0.5rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
                   }}
                 >
-                  Payment Instructions
+                  {stkChecking && (
+                    <span
+                      style={{
+                        width: 10,
+                        height: 10,
+                        border: "2px solid currentColor",
+                        borderTopColor: "transparent",
+                        borderRadius: "50%",
+                        display: "inline-block",
+                        animation: "spin 0.8s linear infinite",
+                      }}
+                    />
+                  )}
+                  {stkStatus === "completed"
+                    ? "Payment confirmed"
+                    : stkStatus === "failed"
+                    ? "Payment failed"
+                    : stkStatus === "cancelled"
+                    ? "Payment cancelled"
+                    : stkStatus === "timeout"
+                    ? "Payment not confirmed"
+                    : stkStatus === "sending"
+                    ? "Sending M-Pesa prompt"
+                    : "M-Pesa payment"}
                 </div>
                 <div
                   style={{
@@ -390,34 +502,124 @@ export default function Checkout() {
                     marginBottom: "0.75rem",
                   }}
                 >
-                  Pay{" "}
-                  <strong style={{ color: "var(--pb-ember)" }}>
-                    Ksh {grandTotal}
-                  </strong>{" "}
-                  to:
-                  <br />
-                  <strong>Paybill:</strong>{" "}
-                  <span
-                    style={{
-                      fontFamily: "'DM Mono',monospace",
-                      fontSize: "1rem",
-                      color: "var(--pb-ivory)",
-                    }}
-                  >
-                    400200
-                  </span>
-                  <br />
-                  <strong>Account:</strong>{" "}
-                  <span
-                    style={{
-                      fontFamily: "'DM Mono',monospace",
-                      fontSize: "1rem",
-                      color: "var(--pb-ivory)",
-                    }}
-                  >
-                    1053125
-                  </span>
+                  {stkStatus === "completed" ? (
+                    <>
+                      Your M-Pesa payment was received
+                      {stkReceipt ? (
+                        <>
+                          {" "}
+                          (receipt{" "}
+                          <strong style={{ color: "var(--pb-ivory)" }}>
+                            {stkReceipt}
+                          </strong>
+                          )
+                        </>
+                      ) : null}
+                      . We are preparing your order.
+                    </>
+                  ) : stkStatus === "failed" ||
+                    stkStatus === "cancelled" ||
+                    stkStatus === "timeout" ? (
+                    <>
+                      {stkResultDesc ||
+                        mpesaResultMessage(undefined)}
+                      <br />
+                      You can retry the M-Pesa prompt or pay cash on delivery.
+                    </>
+                  ) : stkChecking ? (
+                    <>
+                      A payment prompt has been sent to{" "}
+                      <strong style={{ color: "var(--pb-ivory)" }}>
+                        {formData.customerPhone}
+                      </strong>
+                      . Enter your M-Pesa PIN to complete. We are checking for
+                      confirmation...
+                    </>
+                  ) : (
+                    <>
+                      An M-Pesa prompt will be sent to your phone. If it does
+                      not arrive, use the retry button below or pay manually.
+                    </>
+                  )}
                 </div>
+
+                {(stkStatus === "failed" ||
+                  stkStatus === "cancelled" ||
+                  stkStatus === "timeout" ||
+                  stkStatus === "pending" ||
+                  stkStatus === "idle") && (
+                  <button
+                    type="button"
+                    onClick={retryStkPush}
+                    disabled={stkChecking || initiateStk.isPending}
+                    className="pb-btn-ghost"
+                    style={{
+                      width: "100%",
+                      padding: "0.6rem",
+                      marginBottom: "0.75rem",
+                      cursor:
+                        stkChecking || initiateStk.isPending
+                          ? "not-allowed"
+                          : "pointer",
+                      opacity: stkChecking || initiateStk.isPending ? 0.6 : 1,
+                    }}
+                  >
+                    {initiateStk.isPending ? "Sending..." : "Retry M-Pesa Prompt"}
+                  </button>
+                )}
+
+                <details style={{ marginTop: "0.25rem" }}>
+                  <summary
+                    style={{
+                      fontFamily: "'DM Mono',monospace",
+                      fontSize: "0.6rem",
+                      color: "var(--pb-ivory3)",
+                      cursor: "pointer",
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Pay manually instead
+                  </summary>
+                  <div
+                    style={{
+                      fontSize: "0.8rem",
+                      color: "var(--pb-ivory2)",
+                      fontWeight: 300,
+                      lineHeight: 1.7,
+                      marginTop: "0.5rem",
+                    }}
+                  >
+                    Pay{" "}
+                    <strong style={{ color: "var(--pb-ember)" }}>
+                      Ksh {grandTotal}
+                    </strong>{" "}
+                    to:
+                    <br />
+                    <strong>Paybill:</strong>{" "}
+                    <span
+                      style={{
+                        fontFamily: "'DM Mono',monospace",
+                        fontSize: "0.95rem",
+                        color: "var(--pb-ivory)",
+                      }}
+                    >
+                      400200
+                    </span>
+                    <br />
+                    <strong>Account:</strong>{" "}
+                    <span
+                      style={{
+                        fontFamily: "'DM Mono',monospace",
+                        fontSize: "0.95rem",
+                        color: "var(--pb-ivory)",
+                      }}
+                    >
+                      1053125
+                    </span>
+                  </div>
+                </details>
+
                 {mpesaCode && (
                   <div
                     style={{
@@ -765,7 +967,7 @@ export default function Checkout() {
                       marginBottom: "0.5rem",
                     }}
                   >
-                    Pay via M-Pesa
+                    M-Pesa STK Push
                   </div>
                   <div
                     style={{
@@ -776,66 +978,81 @@ export default function Checkout() {
                       marginBottom: "0.75rem",
                     }}
                   >
-                    <strong style={{ color: "var(--pb-ivory)" }}>Steps:</strong>
-                    <br />
-                    1. Go to M-Pesa on your phone
-                    <br />
-                    2. Select <strong>Lipa Na M-Pesa</strong>
-                    <br />
-                    3. Select <strong>Paybill</strong>
-                    <br />
-                    4. Business No:{" "}
-                    <strong
-                      style={{ color: "var(--pb-ember)", fontSize: "1rem" }}
-                    >
-                      400200
+                    After you place the order, an M-Pesa payment prompt will be
+                    sent to{" "}
+                    <strong style={{ color: "var(--pb-ivory)" }}>
+                      {formData.customerPhone || "your phone"}
                     </strong>
-                    <br />
-                    5. Account No:{" "}
-                    <strong
-                      style={{ color: "var(--pb-ember)", fontSize: "1rem" }}
-                    >
-                      1053125
-                    </strong>
-                    <br />
-                    6. Amount:{" "}
-                    <strong style={{ color: "var(--pb-ember)" }}>
-                      Ksh {grandTotal}
-                    </strong>
-                    <br />
-                    7. Enter PIN and confirm
+                    . Enter your M-Pesa PIN to complete the payment. Keep your
+                    phone on and with signal.
                   </div>
                   <div
                     style={{
-                      borderTop: "1px solid var(--pb-rule2)",
-                      paddingTop: "0.75rem",
+                      fontSize: "0.72rem",
+                      color: "var(--pb-ivory3)",
+                      lineHeight: 1.6,
+                      padding: "0.5rem 0.75rem",
+                      background: "rgba(0,0,0,0.15)",
+                      border: "1px solid var(--pb-rule2)",
                     }}
                   >
-                    <label style={{ ...labelStyle, marginBottom: "0.3rem" }}>
-                      M-Pesa Confirmation Code (optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={mpesaCode}
-                      onChange={e => setMpesaCode(e.target.value)}
-                      placeholder="e.g. QJK7XXXXXXXX"
+                    💡 The amount{" "}
+                    <strong style={{ color: "var(--pb-ember)" }}>
+                      Ksh {grandTotal}
+                    </strong>{" "}
+                    will be charged. Make sure your M-Pesa balance is sufficient.
+                  </div>
+                  <details style={{ marginTop: "0.75rem" }}>
+                    <summary
                       style={{
-                        ...inputStyle,
                         fontFamily: "'DM Mono',monospace",
-                        fontSize: "0.75rem",
-                        letterSpacing: "0.05em",
-                      }}
-                    />
-                    <div
-                      style={{
-                        fontSize: "0.7rem",
+                        fontSize: "0.6rem",
                         color: "var(--pb-ivory3)",
-                        marginTop: "0.3rem",
+                        cursor: "pointer",
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
                       }}
                     >
-                      Enter the code from your M-Pesa SMS confirmation
+                      Pay manually instead (Paybill)
+                    </summary>
+                    <div
+                      style={{
+                        fontSize: "0.8rem",
+                        color: "var(--pb-ivory2)",
+                        fontWeight: 300,
+                        lineHeight: 1.7,
+                        marginTop: "0.5rem",
+                      }}
+                    >
+                      Pay{" "}
+                      <strong style={{ color: "var(--pb-ember)" }}>
+                        Ksh {grandTotal}
+                      </strong>{" "}
+                      to:
+                      <br />
+                      <strong>Paybill:</strong>{" "}
+                      <span
+                        style={{
+                          fontFamily: "'DM Mono',monospace",
+                          fontSize: "0.95rem",
+                          color: "var(--pb-ivory)",
+                        }}
+                      >
+                        400200
+                      </span>
+                      <br />
+                      <strong>Account:</strong>{" "}
+                      <span
+                        style={{
+                          fontFamily: "'DM Mono',monospace",
+                          fontSize: "0.95rem",
+                          color: "var(--pb-ivory)",
+                        }}
+                      >
+                        1053125
+                      </span>
                     </div>
-                  </div>
+                  </details>
                 </div>
               )}
 

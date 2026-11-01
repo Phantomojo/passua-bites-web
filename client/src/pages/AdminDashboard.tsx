@@ -16,41 +16,71 @@ const STATUS_COLORS: Record<string, string> = {
 
 type Tab =
   | "overview"
+  | "pos"
   | "orders"
   | "menu"
+  | "announcements"
   | "reviews"
   | "settings"
-  | "analytics";
+  | "analytics"
+  | "sales";
 
 export default function AdminDashboard() {
-  usePageMeta({
-    title: "Admin Dashboard — Passua Bites",
-    description:
-      "Passua Bites admin dashboard — manage orders, menu, reviews, and analytics.",
-  });
-  const [token, setToken] = useState<string | null>(null);
+  usePageMeta({ title: "Admin Dashboard — Passua Bites", description: "Passua Bites admin dashboard — manage orders, menu, reviews, and analytics." });
+  const [token, setToken] = useState<string | null>(() =>
+    typeof window !== "undefined" ? localStorage.getItem("pb_admin_token") : null
+  );
   const [password, setPassword] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [activeTab, setActiveTab] = useState<Tab>("orders");
   const [prevOrderCount, setPrevOrderCount] = useState(0);
   const [playSound, setPlaySound] = useState(false);
   const [pendingReviews, setPendingReviews] = useState<any[]>([]);
+const [orderStatusFilter, setOrderStatusFilter] = useState<string>("");
+
+  // POS state
+  const [posCart, setPosCart] = useState<Record<number, number>>({});
+  const [posCustomerName, setPosCustomerName] = useState("");
+  const [posCustomerPhone, setPosCustomerPhone] = useState("");
+  const [posPaymentMethod, setPosPaymentMethod] = useState<"cash" | "mpesa">("cash");
+  const [posNotes, setPosNotes] = useState("");
+  const [posProcessing, setPosProcessing] = useState(false);
+  const [posReceipt, setPosReceipt] = useState<number | null>(null);
+
+  // Announcement form
+  const [newAnnouncement, setNewAnnouncement] = useState({
+    title: "",
+    body: "",
+    type: "info" as "info" | "offer" | "alert",
+  });
 
   const login = trpc.admin.login.useMutation();
   const stats = trpc.orders.getStats.useQuery(undefined, {
     enabled: !!token,
     refetchInterval: 60000,
   });
-  const orders = trpc.orders.listAll.useQuery(undefined, {
-    enabled: !!token,
-    refetchInterval: 30000,
-  });
+  const orders = trpc.orders.listAll.useQuery(
+    orderStatusFilter ? { status: orderStatusFilter as any, limit: 100 } : { limit: 100 },
+    { enabled: !!token, refetchInterval: 30000 }
+  );
   const menuItems = trpc.menu.list.useQuery(undefined, { enabled: !!token });
   const updateOrderStatus = trpc.orders.updateStatus.useMutation();
   const createMenuItem = trpc.menu.create.useMutation();
   const updateMenuItem = trpc.menu.update.useMutation();
   const deleteMenuItem = trpc.menu.delete.useMutation();
   const toggleAvailability = trpc.menu.toggleAvailability.useMutation();
+  const toggleFeatured = trpc.menu.toggleFeatured.useMutation();
+  const uploadImage = trpc.upload.image.useMutation();
+const createWalkIn = trpc.orders.createWalkIn.useMutation();
+const salesSummary = trpc.orders.getSalesSummary.useQuery(undefined, {
+  enabled: !!token,
+});
+const announcementsList = trpc.announcements.listAll.useQuery(undefined, {
+  enabled: !!token,
+});
+const createAnnouncement = trpc.announcements.create.useMutation();
+const toggleAnnouncement = trpc.announcements.toggle.useMutation();
+const deleteAnnouncement = trpc.announcements.delete.useMutation();
   const updateLocation = trpc.location.update.useMutation();
 
   const { data: currentLocation, refetch: refetchLocation } =
@@ -205,6 +235,16 @@ export default function AdminDashboard() {
     try {
       await toggleAvailability.mutateAsync({ id, available });
       toast.success(available ? "Item now available" : "Item hidden");
+      menuItems.refetch();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update");
+    }
+  };
+
+  const handleToggleFeatured = async (id: number, featured: boolean) => {
+    try {
+      await toggleFeatured.mutateAsync({ id, featured });
+      toast.success(featured ? "Marked as today's special" : "Removed from specials");
       menuItems.refetch();
     } catch (err: any) {
       toast.error(err.message || "Failed to update");
@@ -435,9 +475,12 @@ export default function AdminDashboard() {
           {(
             [
               "overview",
+              "pos",
               "orders",
               "menu",
+              "announcements",
               "reviews",
+              "sales",
               "settings",
               "analytics",
             ] as const
@@ -706,7 +749,17 @@ export default function AdminDashboard() {
               }}
             >
               All orders ({orderList.length})
-            </div>
+                        </div>
+                        <select
+                          value={orderStatusFilter}
+                          onChange={e => setOrderStatusFilter(e.target.value)}
+                          style={{ padding: "0.4rem 0.6rem", marginBottom: "1rem", marginLeft: "1rem" }}
+                        >
+                          <option value="">All statuses</option>
+                          {["pending","confirmed","preparing","ready","delivered","cancelled"].map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
             <div
               style={{
                 background: "var(--pb-bg2)",
@@ -766,7 +819,10 @@ export default function AdminDashboard() {
                           color: "var(--pb-ivory)",
                         }}
                       >
-                        #{o.id}
+#{o.id}
+                        {o.channel === "pos" && (
+                          <span style={{ marginLeft: "0.4rem", fontFamily: "'DM Mono',monospace", fontSize: "0.55rem", color: "var(--pb-ember)" }}>POS</span>
+                        )}
                       </td>
                       <td
                         style={{
@@ -1130,6 +1186,53 @@ export default function AdminDashboard() {
                         fontSize: "0.82rem",
                       }}
                     />
+                    <div style={{ marginTop: "0.4rem", display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                      <label
+                        className="pb-btn-ghost"
+                        style={{
+                          fontSize: "0.6rem",
+                          padding: "0.35rem 0.75rem",
+                          cursor: "pointer",
+                          minHeight: 32,
+                          display: "inline-block",
+                        }}
+                      >
+                        {uploadImage.isPending ? "Uploading..." : "📤 Upload image"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: "none" }}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = async () => {
+                              const base64 = (reader.result as string).split(",")[1];
+                              try {
+                                const res = await uploadImage.mutateAsync({
+                                  filename: file.name,
+                                  data: base64,
+                                  contentType: file.type,
+                                });
+                                setNewItem(p => ({ ...p, imageUrl: res.url }));
+                                toast.success("Image uploaded");
+                              } catch (err: any) {
+                                toast.error(err.message || "Upload failed");
+                              }
+                            };
+                            reader.readAsDataURL(file);
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                      {newItem.imageUrl && (
+                        <img
+                          src={newItem.imageUrl}
+                          alt="preview"
+                          style={{ width: 40, height: 40, objectFit: "cover", border: "1px solid var(--pb-rule)" }}
+                        />
+                      )}
+                    </div>
                   </div>
                   <div>
                     <label
@@ -1322,6 +1425,26 @@ export default function AdminDashboard() {
                       }}
                     >
                       {item.available ? "✓ Available" : "✗ Hidden"}
+                    </button>
+                    <button
+                      onClick={() =>
+                        handleToggleFeatured(item.id, !(item.featured === 1 || item.featured === true))
+                      }
+                      style={{
+                        padding: "0.4rem 0.6rem",
+                        border: "1px solid",
+                        background: "transparent",
+                        color: item.featured ? "var(--pb-ember)" : "var(--pb-ivory3)",
+                        borderColor: item.featured
+                          ? "var(--pb-ember)"
+                          : "var(--pb-rule)",
+                        cursor: "pointer",
+                        fontFamily: "'DM Mono',monospace",
+                        fontSize: "0.62rem",
+                        minHeight: 36,
+                      }}
+                    >
+                      {item.featured ? "★ Special" : "☆ Special"}
                     </button>
                     <button
                       onClick={() => handleDeleteMenuItem(item.id)}
@@ -1651,6 +1774,180 @@ export default function AdminDashboard() {
       {activeTab === "analytics" && (
         <div style={{ paddingTop: "1rem" }}>
           <AnalyticsTab />
+        </div>
+      )}
+
+      {/* ===== POS ===== */}
+      {activeTab === "pos" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          <div style={{ fontFamily: "DM Mono,monospace", fontSize: "0.62rem", letterSpacing: "0.15em", color: "var(--pb-ember)", textTransform: "uppercase" }}>
+            Point of Sale — Walk-in order
+          </div>
+          {posReceipt && (
+            <div style={{ background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.3)", padding: "1rem" }}>
+              Order PB-{posReceipt} created.{" "}
+              <button onClick={() => setPosReceipt(null)} style={{ color: "var(--pb-ember)", background: "none", border: "none", cursor: "pointer" }}>New order</button>
+            </div>
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: "1.5rem" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: "0.5rem" }}>
+              {menuList.filter((m: any) => m.available).map((item: any) => (
+                <div key={item.id} style={{ background: "var(--pb-bg2)", border: "1px solid var(--pb-rule)", padding: "0.75rem" }}>
+                  <div style={{ fontSize: "0.85rem", color: "var(--pb-ivory)", marginBottom: "0.25rem" }}>{item.name}</div>
+                  <div style={{ fontFamily: "Playfair Display,serif", color: "var(--pb-ember)", marginBottom: "0.5rem" }}>Ksh {Number(item.price)}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <button onClick={() => setPosCart(p => ({ ...p, [item.id]: Math.max(0, (p[item.id] || 0) - 1) }))} style={{ width: 28, height: 28, cursor: "pointer" }}>-</button>
+                    <span style={{ minWidth: 24, textAlign: "center" }}>{posCart[item.id] || 0}</span>
+                    <button onClick={() => setPosCart(p => ({ ...p, [item.id]: (p[item.id] || 0) + 1 }))} style={{ width: 28, height: 28, cursor: "pointer" }}>+</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ background: "var(--pb-bg2)", border: "1px solid var(--pb-rule)", padding: "1rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              <div style={{ fontWeight: 600, color: "var(--pb-ivory)" }}>Cart</div>
+              {Object.entries(posCart).filter(([, q]) => (q as number) > 0).length === 0 && (
+                <div style={{ color: "var(--pb-ivory3)", fontSize: "0.8rem" }}>No items selected</div>
+              )}
+              {Object.entries(posCart).filter(([, q]) => (q as number) > 0).map(([id, q]) => {
+                const item = menuList.find((m: any) => m.id === Number(id));
+                return (
+                  <div key={id} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.82rem" }}>
+                    <span>{item?.name} x{q}</span>
+                    <span>Ksh {Number(item?.price || 0) * (q as number)}</span>
+                  </div>
+                );
+              })}
+              <input placeholder="Customer name" value={posCustomerName} onChange={e => setPosCustomerName(e.target.value)} style={{ padding: "0.5rem" }} />
+              <input placeholder="Phone (07...)" value={posCustomerPhone} onChange={e => setPosCustomerPhone(e.target.value)} style={{ padding: "0.5rem" }} />
+              <select value={posPaymentMethod} onChange={e => setPosPaymentMethod(e.target.value as any)} style={{ padding: "0.5rem" }}>
+                <option value="cash">Cash</option>
+                <option value="mpesa">M-Pesa</option>
+              </select>
+              <textarea placeholder="Notes (optional)" value={posNotes} onChange={e => setPosNotes(e.target.value)} style={{ padding: "0.5rem", minHeight: 60 }} />
+              <button
+                disabled={posProcessing || Object.values(posCart).every(v => v === 0) || !posCustomerName || !posCustomerPhone}
+                onClick={async () => {
+                  setPosProcessing(true);
+                  try {
+                    const items = Object.entries(posCart)
+                      .filter(([, q]) => (q as number) > 0)
+                      .map(([id, q]) => ({ menuItemId: Number(id), quantity: q as number }));
+                    const res = await createWalkIn.mutateAsync({
+                      customerName: posCustomerName,
+                      customerPhone: posCustomerPhone,
+                      items,
+                      paymentMethod: posPaymentMethod,
+                      notes: posNotes || undefined,
+                    });
+                    setPosReceipt(res.orderId);
+                    setPosCart({});
+                    setPosCustomerName("");
+                    setPosCustomerPhone("");
+                    setPosNotes("");
+                    toast.success("Walk-in order created");
+                    orders.refetch();
+                    salesSummary.refetch();
+                  } catch (err: any) {
+                    toast.error(err.message || "Failed to create order");
+                  } finally {
+                    setPosProcessing(false);
+                  }
+                }}
+                className="pb-btn-primary"
+                style={{ padding: "0.75rem", cursor: "pointer" }}
+              >
+                {posProcessing ? "Creating..." : "Place Order"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== ANNOUNCEMENTS ===== */}
+      {activeTab === "announcements" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          <div style={{ fontFamily: "DM Mono,monospace", fontSize: "0.62rem", letterSpacing: "0.15em", color: "var(--pb-ember)", textTransform: "uppercase" }}>
+            Announcements & Offers
+          </div>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!newAnnouncement.title) return;
+              try {
+                await createAnnouncement.mutateAsync(newAnnouncement);
+                toast.success("Announcement created");
+                setNewAnnouncement({ title: "", body: "", type: "info" });
+                announcementsList.refetch();
+              } catch (err: any) {
+                toast.error(err.message || "Failed");
+              }
+            }}
+            style={{ background: "var(--pb-bg2)", border: "1px solid var(--pb-rule)", padding: "1rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}
+          >
+            <input placeholder="Title" value={newAnnouncement.title} onChange={e => setNewAnnouncement(p => ({ ...p, title: e.target.value }))} style={{ padding: "0.5rem" }} required />
+            <textarea placeholder="Body (optional)" value={newAnnouncement.body} onChange={e => setNewAnnouncement(p => ({ ...p, body: e.target.value }))} style={{ padding: "0.5rem", minHeight: 60 }} />
+            <select value={newAnnouncement.type} onChange={e => setNewAnnouncement(p => ({ ...p, type: e.target.value as any }))} style={{ padding: "0.5rem" }}>
+              <option value="info">Info</option>
+              <option value="offer">Offer</option>
+              <option value="alert">Alert</option>
+            </select>
+            <button type="submit" className="pb-btn-primary" style={{ padding: "0.6rem", cursor: "pointer" }}>Add Announcement</button>
+          </form>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            {(announcementsList.data || []).map((a: any) => (
+              <div key={a.id} style={{ background: "var(--pb-bg2)", border: "1px solid var(--pb-rule)", padding: "1rem", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
+                <div>
+                  <div style={{ color: "var(--pb-ivory)", fontWeight: 600 }}>{a.title}</div>
+                  {a.body && <div style={{ color: "var(--pb-ivory3)", fontSize: "0.82rem", marginTop: "0.25rem" }}>{a.body}</div>}
+                  <div style={{ fontFamily: "DM Mono,monospace", fontSize: "0.6rem", color: "var(--pb-ember)", marginTop: "0.25rem" }}>{a.type} · {a.active ? "active" : "inactive"}</div>
+                </div>
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <button onClick={async () => { await toggleAnnouncement.mutateAsync({ id: a.id, active: !a.active }); announcementsList.refetch(); }} style={{ cursor: "pointer", padding: "0.3rem 0.6rem" }}>
+                    {a.active ? "Disable" : "Enable"}
+                  </button>
+                  <button onClick={async () => { if (!confirm("Delete?")) return; await deleteAnnouncement.mutateAsync({ id: a.id }); announcementsList.refetch(); }} style={{ cursor: "pointer", padding: "0.3rem 0.6rem", color: "#f87171" }}>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+            {(announcementsList.data || []).length === 0 && (
+              <div style={{ color: "var(--pb-ivory3)", padding: "1rem" }}>No announcements yet.</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ===== SALES ===== */}
+      {activeTab === "sales" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          <div style={{ fontFamily: "DM Mono,monospace", fontSize: "0.62rem", letterSpacing: "0.15em", color: "var(--pb-ember)", textTransform: "uppercase" }}>
+            Sales Summary (completed payments)
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "1rem" }}>
+            {[
+              { label: "Today", value: salesSummary.data?.today ?? 0 },
+              { label: "Last 7 days", value: salesSummary.data?.week ?? 0 },
+              { label: "This month", value: salesSummary.data?.month ?? 0 },
+            ].map(s => (
+              <div key={s.label} style={{ background: "var(--pb-bg2)", border: "1px solid var(--pb-rule)", padding: "1.25rem" }}>
+                <div style={{ fontFamily: "DM Mono,monospace", fontSize: "0.6rem", color: "var(--pb-ivory3)", textTransform: "uppercase", marginBottom: "0.5rem" }}>{s.label}</div>
+                <div style={{ fontFamily: "Playfair Display,serif", fontSize: "1.8rem", color: "var(--pb-ember)" }}>Ksh {Number(s.value).toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+          <div>
+            <div style={{ fontFamily: "DM Mono,monospace", fontSize: "0.62rem", color: "var(--pb-ember)", textTransform: "uppercase", marginBottom: "0.75rem" }}>Top items</div>
+            {(salesSummary.data?.topItems || []).map((t: any) => (
+              <div key={t.id} style={{ display: "flex", justifyContent: "space-between", padding: "0.5rem 0", borderBottom: "1px solid var(--pb-rule2)" }}>
+                <span style={{ color: "var(--pb-ivory)" }}>{t.name}</span>
+                <span style={{ fontFamily: "DM Mono,monospace", color: "var(--pb-ivory3)" }}>{t.quantity} sold</span>
+              </div>
+            ))}
+            {(salesSummary.data?.topItems || []).length === 0 && (
+              <div style={{ color: "var(--pb-ivory3)" }}>No sales yet.</div>
+            )}
+          </div>
         </div>
       )}
     </div>

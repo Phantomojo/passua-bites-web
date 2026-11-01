@@ -39,6 +39,7 @@ export const menuItems = pgTable("menuItems", {
   videoUrl: text("videoUrl"),
   category: varchar("category", { length: 100 }),
   available: integer("available").default(1).notNull(),
+  featured: integer("featured").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -49,30 +50,27 @@ export type InsertMenuItem = typeof menuItems.$inferInsert;
 /**
  * Orders table for tracking customer orders
  */
-export const orders = pgTable(
-  "orders",
-  {
-    id: serial("id").primaryKey(),
-    userId: integer("userId"),
-    customerName: varchar("customerName", { length: 255 }).notNull(),
-    customerPhone: varchar("customerPhone", { length: 20 }).notNull(),
-    customerEmail: varchar("customerEmail", { length: 320 }),
-    deliveryAddress: text("deliveryAddress"),
-    totalPrice: decimal("totalPrice", { precision: 10, scale: 2 }).notNull(),
-    status: varchar("status", { length: 20 }).default("pending").notNull(),
-    paymentMethod: varchar("paymentMethod", { length: 50 })
-      .default("mpesa")
-      .notNull(),
-    paymentStatus: varchar("paymentStatus", { length: 20 })
-      .default("pending")
-      .notNull(),
-    mpesaTransactionId: varchar("mpesaTransactionId", { length: 255 }),
-    notes: text("notes"),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-  },
-  t => [index("idx_orders_userId").on(t.userId)]
-);
+export const orders = pgTable("orders", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId"),
+  customerName: varchar("customerName", { length: 255 }).notNull(),
+  customerPhone: varchar("customerPhone", { length: 20 }).notNull(),
+  customerEmail: varchar("customerEmail", { length: 320 }),
+  deliveryAddress: text("deliveryAddress"),
+  totalPrice: decimal("totalPrice", { precision: 10, scale: 2 }).notNull(),
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  paymentMethod: varchar("paymentMethod", { length: 50 })
+    .default("mpesa")
+    .notNull(),
+  paymentStatus: varchar("paymentStatus", { length: 20 })
+    .default("pending")
+    .notNull(),
+  channel: varchar("channel", { length: 20 }).default("online").notNull(),
+  mpesaTransactionId: varchar("mpesaTransactionId", { length: 255 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [index("idx_orders_userId").on(t.userId)]);
 
 export type Order = typeof orders.$inferSelect;
 export type InsertOrder = typeof orders.$inferInsert;
@@ -127,27 +125,23 @@ export type InsertSiteSetting = typeof siteSettings.$inferInsert;
 /**
  * M-Pesa transactions table for payment tracking
  */
-export const mpesaTransactions = pgTable(
-  "mpesaTransactions",
-  {
-    id: serial("id").primaryKey(),
-    orderId: integer("orderId").notNull(),
-    checkoutRequestID: varchar("checkoutRequestID", { length: 255 })
-      .notNull()
-      .unique(),
-    merchantRequestID: varchar("merchantRequestID", { length: 255 }),
-    mpesaReceiptNumber: varchar("mpesaReceiptNumber", { length: 255 }),
-    phoneNumber: varchar("phoneNumber", { length: 20 }).notNull(),
-    amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-    accountReference: varchar("accountReference", { length: 12 }).notNull(),
-    status: varchar("status", { length: 20 }).default("pending").notNull(),
-    resultCode: integer("resultCode"),
-    resultDesc: text("resultDesc"),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-  },
-  t => [index("idx_mpesaTransactions_orderId").on(t.orderId)]
-);
+export const mpesaTransactions = pgTable("mpesaTransactions", {
+  id: serial("id").primaryKey(),
+  orderId: integer("orderId").notNull(),
+  checkoutRequestID: varchar("checkoutRequestID", { length: 255 })
+    .notNull()
+    .unique(),
+  merchantRequestID: varchar("merchantRequestID", { length: 255 }),
+  mpesaReceiptNumber: varchar("mpesaReceiptNumber", { length: 255 }),
+  phoneNumber: varchar("phoneNumber", { length: 20 }).notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  accountReference: varchar("accountReference", { length: 12 }).notNull(),
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  resultCode: integer("resultCode"),
+  resultDesc: text("resultDesc"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [index("idx_mpesaTransactions_orderId").on(t.orderId)]);
 
 export type MpesaTransaction = typeof mpesaTransactions.$inferSelect;
 export type InsertMpesaTransaction = typeof mpesaTransactions.$inferInsert;
@@ -172,5 +166,22 @@ export const analyticsEvents = pgTable("analyticsEvents", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+/**
+ * Announcements / offers table for multiple site-wide messages
+ */
+export const announcements = pgTable("announcements", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  body: text("body"),
+  type: varchar("type", { length: 30 }).default("info").notNull(),
+  active: integer("active").default(1).notNull(),
+  startsAt: timestamp("startsAt"),
+  endsAt: timestamp("endsAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type Announcement = typeof announcements.$inferSelect;
+export type InsertAnnouncement = typeof announcements.$inferInsert;
 export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
 export type InsertAnalyticsEvent = typeof analyticsEvents.$inferInsert;

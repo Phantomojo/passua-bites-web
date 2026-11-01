@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pasua Bites — Street Food Hero Concept</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=DM+Mono:wght@400;500;700&family=Permanent+Marker&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #1a0a04;
+    font-family: 'DM Mono', monospace;
+    overflow-x: hidden;
+    color: #f2e8d8;
+  }
+
+  /* CHARCOAL EMBER TOP STRIPE */
+  .ember-stripe {
+    height: 8px;
+    background: linear-gradient(90deg,
+      #ff4500 0%, #ff6b00 15%, #ff8c00 30%,
+      #ff4500 45%, #cc3300 60%, #ff6b00 75%,
+      #ff4500 90%, #ff8c00 100%);
+    background-size: 200% 100%;
+    animation: ember-pulse 3s ease-in-out infinite;
+  }
+  @keyframes ember-pulse {
+    0%, 100% { background-position: 0% 0%; filter: brightness(1); }
+    50% { background-position: 100% 0%; filter: brightness(1.3); }
+  }
+
+  /* HERO */
+  .hero {
+    position: relative;
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    overflow: hidden;
+  }
+
+  /* LEFT */
+  .hero-left {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 4rem 3rem;
+    z-index: 10;
+  }
+
+  /* Smoke/heat haze overlay */
+  .hero-left::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 30% 70%, rgba(255,69,0,0.08) 0%, transparent 60%),
+      radial-gradient(ellipse at 70% 30%, rgba(255,140,0,0.05) 0%, transparent 50%);
+    pointer-events: none;
+    animation: smoke-drift 8s ease-in-out infinite;
+  }
+  @keyframes smoke-drift {
+    0%, 100% { transform: translateX(0) translateY(0); opacity: 0.8; }
+    50% { transform: translateX(10px) translateY(-5px); opacity: 1; }
+  }
+
+  /* Fire icon */
+  .fire-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    animation: fire-flicker 1.5s ease-in-out infinite;
+  }
+  @keyframes fire-flicker {
+    0%, 100% { transform: scale(1) rotate(0deg); filter: brightness(1); }
+    25% { transform: scale(1.05) rotate(-2deg); filter: brightness(1.2); }
+    50% { transform: scale(1.1) rotate(0deg); filter: brightness(1.4); }
+    75% { transform: scale(1.05) rotate(2deg); filter: brightness(1.2); }
+  }
+
+  /* Hot callout */
+  .hot-callout {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #ff4500;
+    color: #fff;
+    padding: 0.5rem 1.2rem;
+    font-family: 'Anton', sans-serif;
+    font-size: 1.2rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+    animation: hot-pulse 2s ease-in-out infinite;
+  }
+  @keyframes hot-pulse {
+    0%, 100% { box-shadow: 0 0 15px rgba(255,69,0,0.5); }
+    50% { box-shadow: 0 0 30px rgba(255,69,0,0.8), 0 0 60px rgba(255,69,0,0.3); }
+  }
+
+  /* Title */
+  .title {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(3rem, 6vw, 5.5rem);
+    font-weight: 900;
+    line-height: 0.92;
+    margin-bottom: 0.5rem;
+  }
+  .title .pasua {
+    color: #ff6b00;
+    display: block;
+    text-shadow: 2px 2px 0 #cc3300;
+  }
+  .title .bites {
+    color: #f2e8d8;
+    display: block;
+    font-style: italic;
+  }
+
+  /* Tagline */
+  .tagline {
+    font-size: 0.85rem;
+    color: #c4a882;
+    line-height: 1.7;
+    max-width: 360px;
+    margin-bottom: 1rem;
+  }
+
+  /* Jiko grill illustration */
+  .jiko {
+    margin: 1.5rem 0;
+    position: relative;
+    width: 200px;
+    height: 100px;
+  }
+  .jiko-bowl {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120px;
+    height: 60px;
+    background: #3a2a1a;
+    border-radius: 0 0 60px 60px;
+    border: 3px solid #5a4a3a;
+    border-top: none;
+  }
+  .jiko-coals {
+    position: absolute;
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 4px;
+  }
+  .coal {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ff4500;
+    animation: coal-glow 1.5s ease-in-out infinite;
+  }
+  .coal:nth-child(1) { animation-delay: 0s; }
+  .coal:nth-child(2) { animation-delay: 0.3s; background: #ff6b00; }
+  .coal:nth-child(3) { animation-delay: 0.6s; }
+  .coal:nth-child(4) { animation-delay: 0.9s; background: #ff8c00; }
+  .coal:nth-child(5) { animation-delay: 1.2s; }
+  @keyframes coal-glow {
+    0%, 100% { box-shadow: 0 0 5px #ff4500; transform: scale(1); }
+    50% { box-shadow: 0 0 15px #ff6b00, 0 0 30px rgba(255,69,0,0.3); transform: scale(1.2); }
+  }
+  /* Smoke wisps */
+  .smoke {
+    position: absolute;
+    top: 0;
+    width: 2px;
+    background: rgba(200,200,200,0.3);
+    border-radius: 50%;
+    animation: smoke-rise 3s ease-out infinite;
+  }
+  .smoke:nth-child(1) { left: 45%; height: 30px; animation-delay: 0s; }
+  .smoke:nth-child(2) { left: 50%; height: 40px; animation-delay: 1s; }
+  .smoke:nth-child(3) { left: 55%; height: 25px; animation-delay: 2s; }
+  @keyframes smoke-rise {
+    0% { transform: translateY(0) scaleX(1); opacity: 0.4; }
+    50% { transform: translateY(-20px) scaleX(2); opacity: 0.2; }
+    100% { transform: translateY(-40px) scaleX(3); opacity: 0; }
+  }
+
+  /* Location */
+  .location {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: 0.75rem;
+    color: #a08060;
+    margin-bottom: 2rem;
+    padding: 0.8rem 0;
+    border-top: 1px solid rgba(255,69,0,0.2);
+    border-bottom: 1px solid rgba(255,69,0,0.2);
+  }
+  .location .fire-dot {
+    width: 8px;
+    height: 8px;
+    background: #ff4500;
+    border-radius: 50%;
+    animation: coal-glow 2s ease-in-out infinite;
+  }
+
+  /* CTAs */
+  .cta-group {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .cta {
+    display: inline-block;
+    padding: 0.8rem 2rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    text-decoration: none;
+    border: 2px solid;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  .cta.primary {
+    background: #ff4500;
+    border-color: #ff4500;
+    color: #fff;
+  }
+  .cta.primary:hover {
+    background: #ff6b00;
+    box-shadow: 0 0 25px rgba(255,69,0,0.5);
+  }
+  .cta.secondary {
+    background: transparent;
+    border-color: #ff8c00;
+    color: #ff8c00;
+  }
+  .cta.secondary:hover {
+    background: #ff8c00;
+    color: #1a0a04;
+  }
+
+  /* RIGHT: FOOD PREP SCENE */
+  .hero-right {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  /* Heat haze background */
+  .hero-right::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(255,69,0,0.02) 2px,
+      rgba(255,69,0,0.02) 4px
+    );
+    animation: heat-haze 4s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes heat-haze {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+  }
+
+  /* Chapati wrap illustration */
+  .chapati-wrap {
+    position: relative;
+    z-index: 10;
+    text-align: center;
+  }
+
+  .chapati-circle {
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 40%, #f2c800, #d4a017, #b8860b);
+    position: relative;
+    margin: 0 auto 1.5rem;
+    box-shadow:
+      0 10px 40px rgba(0,0,0,0.5),
+      inset 0 -5px 15px rgba(0,0,0,0.3),
+      inset 0 5px 15px rgba(255,255,255,0.1);
+    animation: chapati-rotate 20s linear infinite;
+  }
+  @keyframes chapati-rotate {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  /* Chapati texture lines */
+  .chapati-circle::before {
+    content: '';
+    position: absolute;
+    inset: 15px;
+    border-radius: 50%;
+    border: 2px dashed rgba(139,69,19,0.3);
+  }
+  .chapati-circle::after {
+    content: '';
+    position: absolute;
+    inset: 35px;
+    border-radius: 50%;
+    border: 1px solid rgba(139,69,19,0.2);
+  }
+
+  /* Filling dots on chapati */
+  .filling {
+    position: absolute;
+    border-radius: 50%;
+  }
+  .filling.lettuce { width: 20px; height: 20px; background: #228b22; top: 30%; left: 25%; }
+  .filling.tomato { width: 15px; height: 15px; background: #dc143c; top: 45%; right: 20%; }
+  .filling.meat { width: 18px; height: 18px; background: #8b4513; bottom: 30%; left: 30%; }
+  .filling.sauce { width: 12px; height: 12px; background: #ff4500; top: 60%; left: 50%; }
+
+  /* Price tag */
+  .price-tag {
+    display: inline-block;
+    background: rgba(255,69,0,0.9);
+    color: #fff;
+    padding: 0.8rem 1.5rem;
+    font-family: 'Anton', sans-serif;
+    font-size: 1.8rem;
+    letter-spacing: 0.05em;
+    position: relative;
+    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+  }
+  .price-tag .currency {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    vertical-align: super;
+    opacity: 0.8;
+  }
+
+  /* Sauce bottles */
+  .sauce-bottles {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 1.5rem;
+  }
+  .bottle {
+    width: 20px;
+    height: 50px;
+    border-radius: 3px 3px 8px 8px;
+    position: relative;
+  }
+  .bottle::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    background: inherit;
+    filter: brightness(0.8);
+  }
+  .bottle.chili { background: #dc143c; }
+  .bottle.ketchup { background: #ff4500; }
+  .bottle.mayo { background: #f5f5dc; }
+
+  /* Floating ingredient labels */
+  .ingredient-label {
+    position: absolute;
+    font-family: 'Permanent Marker', cursive;
+    font-size: 0.8rem;
+    opacity: 0.3;
+    pointer-events: none;
+  }
+  .ingredient-label:nth-child(1) { top: 15%; right: 10%; color: #228b22; transform: rotate(-5deg); }
+  .ingredient-label:nth-child(2) { bottom: 25%; left: 8%; color: #dc143c; transform: rotate(8deg); }
+  .ingredient-label:nth-child(3) { top: 50%; right: 5%; color: #f2c800; transform: rotate(-3deg); }
+
+  /* Bottom ticker */
+  .ticker {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: rgba(26,10,4,0.95);
+    border-top: 2px solid #ff4500;
+    padding: 0.6rem 0;
+    overflow: hidden;
+  }
+  .ticker-track {
+    display: flex;
+    gap: 2rem;
+    white-space: nowrap;
+    animation: ticker-scroll 18s linear infinite;
+    font-family: 'Anton', sans-serif;
+    font-size: 0.9rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  .ticker-item { color: #888; }
+  .ticker-item .fire { color: #ff4500; }
+  .ticker-item .gold { color: #f2c800; }
+  .ticker-sep { color: #ff6b00; }
+  @keyframes ticker-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  /* Mobile */
+  @media (max-width: 768px) {
+    .hero { grid-template-columns: 1fr; }
+    .hero-right { display: none; }
+    .title { font-size: 2.8rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="ember-stripe"></div>
+
+<section class="hero">
+  <div class="hero-left">
+    <div class="fire-icon">🔥</div>
+
+    <div class="hot-callout">
+      MOTO MOTO — FRESH OFF THE JIKO
+    </div>
+
+    <h1 class="title">
+      <span class="pasua">Pasua</span>
+      <span class="bites">Bites</span>
+    </h1>
+
+    <p class="tagline">
+      Street food with soul — smoked, wrapped, served fresh. Born in Ruiru. Now online, always around.
+    </p>
+
+    <div class="jiko">
+      <div class="smoke"></div>
+      <div class="smoke"></div>
+      <div class="smoke"></div>
+      <div class="jiko-bowl"></div>
+      <div class="jiko-coals">
+        <div class="coal"></div>
+        <div class="coal"></div>
+        <div class="coal"></div>
+        <div class="coal"></div>
+        <div class="coal"></div>
+      </div>
+    </div>
+
+    <div class="location">
+      <div class="fire-dot"></div>
+      <span><strong style="color:#ff6b00">Opp Rainbow Resort, Ruiru</strong> — 0722 473 873 — Also on Bolt Food</span>
+    </div>
+
+    <div class="cta-group">
+      <a href="#" class="cta primary">View Menu</a>
+      <a href="#" class="cta secondary">Order on WhatsApp</a>
+    </div>
+  </div>
+
+  <div class="hero-right">
+    <div class="ingredient-label">Lettuce</div>
+    <div class="ingredient-label">Chili Sauce</div>
+    <div class="ingredient-label">Chapati</div>
+
+    <div class="chapati-wrap">
+      <div class="chapati-circle">
+        <div class="filling lettuce"></div>
+        <div class="filling tomato"></div>
+        <div class="filling meat"></div>
+        <div class="filling sauce"></div>
+      </div>
+
+      <div class="price-tag">
+        <span class="currency">KSH</span> 110/=
+      </div>
+
+      <div class="sauce-bottles">
+        <div class="bottle chili"></div>
+        <div class="bottle ketchup"></div>
+        <div class="bottle mayo"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="ticker">
+  <div class="ticker-track">
+    <span class="ticker-item"><span class="fire">MOTO MOTO</span> — FRESH OFF THE JIKO</span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item"><span class="gold">SMOCHAS WORTH FINDING</span></span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">ALSO ON <span class="fire">BOLT FOOD</span></span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">OPP RAINBOW RESORT, RUIRU</span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item"><span class="gold">WALK IN OR WHATSAPP</span></span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item"><span class="fire">MOTO MOTO</span> — FRESH OFF THE JIKO</span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item"><span class="gold">SMOCHAS WORTH FINDING</span></span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">ALSO ON <span class="fire">BOLT FOOD</span></span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">OPP RAINBOW RESORT, RUIRU</span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item"><span class="gold">WALK IN OR WHATSAPP</span></span>
+    <span class="ticker-sep">◆</span>
+  </div>
+</div>
+
+</body>
+</html>
