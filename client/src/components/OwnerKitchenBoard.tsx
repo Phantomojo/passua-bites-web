@@ -3,7 +3,7 @@ import { ArrowRight, Clock3, PackageCheck, RefreshCw, ShoppingBag, Timer } from 
 import type { OwnerTab } from "@/components/OwnerWorkspaceShell";
 
 type OrderRecord = { id: number; customerName?: string | null; customerPhone?: string | null; deliveryAddress?: string | null; totalPrice?: string | number | null; status: string; paymentStatus?: string | null; channel?: string | null; notes?: string | null; createdAt?: string | Date | null };
-type Props = { orders: OrderRecord[]; isLoading: boolean; pendingReviews: number; onStatusChange: (orderId: number, status: string) => Promise<void>; onNavigate: (tab: OwnerTab) => void; onRefresh: () => void };
+type Props = { orders: OrderRecord[]; isLoading: boolean; isError: boolean; errorMessage?: string; pendingReviews: number; onStatusChange: (orderId: number, status: string) => Promise<void>; onNavigate: (tab: OwnerTab) => void; onRefresh: () => void };
 const lanes = [
   { status: "pending", label: "Needs attention", helper: "New orders to review" },
   { status: "confirmed", label: "Accepted", helper: "Ready for the kitchen" },
@@ -56,7 +56,7 @@ function OrderCard({ order, onStatusChange }: { order: OrderRecord; onStatusChan
     </div>
   </article>;
 }
-export default function OwnerKitchenBoard({ orders, isLoading, pendingReviews, onStatusChange, onNavigate, onRefresh }: Props) {
+export default function OwnerKitchenBoard({ orders, isLoading, isError, errorMessage, pendingReviews, onStatusChange, onNavigate, onRefresh }: Props) {
   const sorted = useMemo(() => [...orders].sort((a, b) => {
     const aTime = a.createdAt ? (a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(String(a.createdAt)).getTime()) : 0;
     const bTime = b.createdAt ? (b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(String(b.createdAt)).getTime()) : 0;
@@ -78,12 +78,16 @@ export default function OwnerKitchenBoard({ orders, isLoading, pendingReviews, o
       <div className="pb-kitchen-metric"><span className="pb-kitchen-metric-icon"><PackageCheck size={17} /></span><div><strong>{ready}</strong><span>Ready to go</span></div></div>
     </section>
     {pendingReviews > 0 && <button type="button" className="pb-kitchen-review-notice" onClick={() => onNavigate("reviews")}><span>{pendingReviews} review{pendingReviews === 1 ? "" : "s"} awaiting moderation</span><span>Review now <ArrowRight size={14} /></span></button>}
+    {isError && <div className="pb-kitchen-error" role="alert">
+      <div><strong>Orders could not be refreshed.</strong><span>{errorMessage || "Check the connection and try again."}</span></div>
+      <button type="button" onClick={onRefresh}>Try again <RefreshCw size={14} /></button>
+    </div>}
     <section className="pb-kitchen-board" aria-label="Orders by status">
       {lanes.map(lane => {
         const laneOrders = sorted.filter(order => order.status === lane.status);
         return <div className="pb-kitchen-lane" key={lane.status}>
           <div className="pb-kitchen-lane-heading"><div><h3>{lane.label}</h3><p>{lane.helper}</p></div><span className="pb-kitchen-lane-count">{laneOrders.length}</span></div>
-          <div className="pb-kitchen-lane-list">{isLoading ? <div className="pb-kitchen-empty">Loading orders…</div> : laneOrders.length ? laneOrders.map(order => <OrderCard key={order.id} order={order} onStatusChange={onStatusChange} />) : <div className="pb-kitchen-empty">Nothing in this lane.</div>}</div>
+          <div className="pb-kitchen-lane-list">{isLoading ? <div className="pb-kitchen-empty">Loading orders…</div> : laneOrders.length ? laneOrders.map(order => <OrderCard key={order.id} order={order} onStatusChange={onStatusChange} />) : <div className="pb-kitchen-empty">{isError ? "Queue unavailable." : "Nothing in this lane."}</div>}</div>
         </div>;
       })}
     </section>
