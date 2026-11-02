@@ -30,7 +30,7 @@ async function ensureSeedAdmin() {
       username: "admin",
       passwordHash: hashPassword(seedPassword),
       name: "Passua Bites Admin",
-      role: "admin",
+      role: "owner",
       isActive: true,
     });
   }
