@@ -14,6 +14,21 @@ import { createContext } from "./_core/context.js";
 import rateLimit from "express-rate-limit";
 import { processMpesaCallback } from "./mpesaCallback.js";
 
+const ALLOWED_ORIGINS = new Set(
+  [
+    process.env.APP_URL,
+    "https://passua-bites-web.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:3000",
+  ].filter(Boolean) as string[]
+);
+
+function isAllowedOrigin(origin: string | undefined): boolean {
+  if (!origin) return true; // same-origin requests may omit Origin
+  return ALLOWED_ORIGINS.has(origin);
+}
+
 const app = express();
 
 // Trust Vercel's proxy so express-rate-limit can derive req.ip from
@@ -59,6 +74,14 @@ const generalLimiter = rateLimit({
   validate: { ip: false },
 });
 
+const orderLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { error: "Too many requests, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { ip: false },
+});
 const authLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 5,
@@ -74,16 +97,27 @@ const authLimiter = rateLimit({
 
 app.use("/api/", generalLimiter);
 app.use("/api/trpc/admin.login", authLimiter);
+app.use("/api/trpc/orders.create", orderLimiter);
+app.use("/api/trpc/payments.initiateStkPush", orderLimiter);
 
 // CORS for cross-origin requests
 app.use((req, res, next) => {
   const origin = req.headers.origin;
+  if (origin && !isAllowedOrigin(origin)) {
+    return res.status(403).json({ error: "Origin not allowed" });
+  }
   if (origin) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Credentials", "true");
   }
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  // CSRF/origin protection for cookie-authenticated state-changing requests
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method) && origin) {
+    if (!isAllowedOrigin(origin)) {
+      return res.status(403).json({ error: "CSRF origin check failed" });
+    }
+  }
   if (req.method === "OPTIONS") {
     res.status(204).end();
     return;
@@ -91,6 +125,9 @@ app.use((req, res, next) => {
   next();
 });
 
+// NOTE: Rate limits use an in-memory store. In serverless deployments this is
+// per-instance and not shared; effective distributed limits require a shared
+// store (e.g., Redis/Upstash) if strict global throttling is required.
 // Health check
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });

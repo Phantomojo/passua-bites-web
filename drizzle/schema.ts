@@ -66,6 +66,9 @@ export const orders = pgTable("orders", {
     .default("pending")
     .notNull(),
   channel: varchar("channel", { length: 20 }).default("online").notNull(),
+  paidBy: varchar("paidBy", { length: 64 }),
+  paidAt: timestamp("paidAt"),
+  paymentReason: text("paymentReason"),
   mpesaTransactionId: varchar("mpesaTransactionId", { length: 255 }),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
