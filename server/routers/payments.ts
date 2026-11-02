@@ -511,11 +511,22 @@ export const paymentsRouter = router({
             };
           }
 
+          const [order] = await db
+            .select()
+            .from(orders)
+            .where(eq(orders.id, tx.orderId))
+            .limit(1)
+            .execute();
+
           await db
             .update(orders)
             .set({
               paymentStatus: "completed",
               mpesaTransactionId: receipt,
+              paymentReason:
+                order?.status === "cancelled"
+                  ? "Late payment after cancellation - reconcile/refund"
+                  : order?.paymentReason ?? null,
             })
             .where(eq(orders.id, tx.orderId))
             .execute();

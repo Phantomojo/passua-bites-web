@@ -43,6 +43,13 @@
       "when": 1793567432740,
       "tag": "0005_living_penance",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793606466514,
+      "tag": "0006_true_ghost_rider",
+      "breakpoints": true
     }
   ]
 }

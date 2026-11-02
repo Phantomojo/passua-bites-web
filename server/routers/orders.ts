@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { publicProcedure, adminProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
+import { reconcileOrderPayment } from "../mpesaCallback";
 import { orders, orderItems, menuItems } from "../../drizzle/schema";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { signOrderPaymentToken, verifyOrderPaymentToken } from "../_core/paymentToken";
@@ -126,6 +127,8 @@ export const ordersRouter = router({
       if (!verifyOrderPaymentToken(input.paymentToken, input.id)) {
         throw new Error("Invalid payment token");
       }
+
+      await reconcileOrderPayment(input.id);
 
       const db = await getDb();
       if (!db) return undefined;
@@ -289,14 +292,17 @@ export const ordersRouter = router({
           paymentReason: input.reason,
         })
         .where(
-          and(eq(orders.id, input.id), eq(orders.paymentStatus, "pending"))
+          and(
+            eq(orders.id, input.id),
+            inArray(orders.paymentStatus, ["pending", "failed"])
+          )
         )
         .execute();
       const rowCount = (upd as any).rowCount ?? 0;
       if (rowCount === 0) {
-        return { success: true, alreadyPaid: true };
+        return { success: false, alreadyPaid: false };
       }
-      return { success: true };
+      return { success: true, alreadyPaid: false };
     }),
   updateStatus: adminProcedure
     .input(

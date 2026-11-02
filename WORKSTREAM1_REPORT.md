@@ -40,7 +40,7 @@
 
 ## 4. Workstream 1 — Payment and order security (branch `workstream/payment-order-security`)
 
-**Commits:** `97bbbc0`, `370d1ec` (pushed; no PR opened yet)
+**Commits:** `97bbbc0`, `370d1ec`, `e8678ae`, `ed67251` (pushed to PR #6; not merged)
 
 ### Implemented
 - `server/_core/paymentToken.ts`: HMAC `signOrderPaymentToken` / `verifyOrderPaymentToken`.

@@ -1,6 +1,9 @@
+import { sql } from "drizzle-orm";
+
 import {
   decimal,
   index,
+  uniqueIndex,
   serial,
   pgTable,
   text,
@@ -144,7 +147,12 @@ export const mpesaTransactions = pgTable("mpesaTransactions", {
   resultDesc: text("resultDesc"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-}, (t) => [index("idx_mpesaTransactions_orderId").on(t.orderId)]);
+}, (t) => [
+  index("idx_mpesaTransactions_orderId").on(t.orderId),
+  uniqueIndex("uniq_mpesaTransactions_active_order")
+    .on(t.orderId)
+    .where(sql`${t.status} IN ('initiating', 'pending')`),
+]);
 
 export type MpesaTransaction = typeof mpesaTransactions.$inferSelect;
 export type InsertMpesaTransaction = typeof mpesaTransactions.$inferInsert;

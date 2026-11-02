@@ -1,6 +1,6 @@
 import { getDb } from "./db";
 import { orders, mpesaTransactions } from "../drizzle/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { logger } from "./logger";
 import { queryStkPushStatus } from "./routers/payments";
 import { formatPhoneNumber } from "./routers/payments";
@@ -27,6 +27,39 @@ import { formatPhoneNumber } from "./routers/payments";
  * filter silently drops such callbacks. Use a neutral path such as
  * /api/payments/callback.
  */
+export async function reconcileOrderPayment(orderId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const [tx] = await db
+    .select()
+    .from(mpesaTransactions)
+    .where(
+      and(eq(mpesaTransactions.orderId, orderId), eq(mpesaTransactions.status, "completed"))
+    )
+    .orderBy(desc(mpesaTransactions.createdAt))
+    .limit(1)
+    .execute();
+  if (!tx) return;
+  const [order] = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.id, orderId))
+    .limit(1)
+    .execute();
+  if (!order) return;
+  if (order.paymentStatus === "completed") return;
+  await db
+    .update(orders)
+    .set({
+      paymentStatus: "completed",
+      mpesaTransactionId: tx.mpesaReceiptNumber || order.mpesaTransactionId,
+      paymentReason: order.paymentReason || "Reconciled from completed M-Pesa transaction",
+      status: order.status === "pending" ? "confirmed" : order.status,
+    })
+    .where(eq(orders.id, orderId))
+    .execute();
+}
+
 export async function processMpesaCallback(body: any): Promise<void> {
   try {
     const { Body } = body || {};
@@ -304,11 +337,22 @@ export async function processMpesaCallback(body: any): Promise<void> {
       return;
     }
 
+    const [order] = await db
+      .select()
+      .from(orders)
+      .where(eq(orders.id, transaction.orderId))
+      .limit(1)
+      .execute();
+
     await db
       .update(orders)
       .set({
         paymentStatus: "completed",
         mpesaTransactionId: receipt,
+        paymentReason:
+          order?.status === "cancelled"
+            ? "Late payment after cancellation - reconcile/refund"
+            : order?.paymentReason ?? null,
       })
       .where(eq(orders.id, transaction.orderId))
       .execute();

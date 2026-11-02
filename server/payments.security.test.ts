@@ -27,6 +27,19 @@ describe("payment token", () => {
     const token = signOrderPaymentToken(7, -1000);
     expect(verifyOrderPaymentToken(token, 7)).toBe(false);
   });
+
+  it("fails closed when production secret is missing", () => {
+    const oldNodeEnv = process.env.NODE_ENV;
+    const oldSecret = process.env.ORDER_PAYMENT_TOKEN_SECRET;
+    process.env.NODE_ENV = "production";
+    delete process.env.ORDER_PAYMENT_TOKEN_SECRET;
+    try {
+      expect(() => signOrderPaymentToken(1)).toThrow();
+    } finally {
+      process.env.NODE_ENV = oldNodeEnv;
+      if (oldSecret) process.env.ORDER_PAYMENT_TOKEN_SECRET = oldSecret;
+    }
+  });
 });
 
 describe("phone formatting", () => {
