@@ -195,6 +195,30 @@ export const adminUsers = pgTable("adminUsers", {
 });
 
 export type AdminUser = typeof adminUsers.$inferSelect;
+
+export const whatsappOptOuts = pgTable("whatsappOptOuts", {
+  id: serial("id").primaryKey(),
+  phone: varchar("phone", { length: 20 }).notNull().unique(),
+  reason: varchar("reason", { length: 50 }).default("user_stop").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type WhatsAppOptOut = typeof whatsappOptOuts.$inferSelect;
+
+export const whatsappOutboundMessages = pgTable("whatsappOutboundMessages", {
+  id: serial("id").primaryKey(),
+  toPhone: varchar("toPhone", { length: 20 }).notNull(),
+  templateName: varchar("templateName", { length: 100 }).notNull(),
+  parameters: text("parameters").default("[]").notNull(),
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  attempts: integer("attempts").default(0).notNull(),
+  lastError: text("lastError"),
+  nextAttemptAt: timestamp("nextAttemptAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type WhatsAppOutboundMessage = typeof whatsappOutboundMessages.$inferSelect;
 export type Announcement = typeof announcements.$inferSelect;
 export type InsertAnnouncement = typeof announcements.$inferInsert;
 export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;

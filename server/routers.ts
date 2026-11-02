@@ -11,6 +11,7 @@ import { adminRouter } from "./routers/admin";
 import { analyticsRouter } from "./routers/analytics";
 import { uploadRouter } from "./routers/upload";
 import { announcementsRouter } from "./routers/announcements";
+import { whatsappRouter } from "./routers/whatsapp";
 
 export const appRouter = router({
   system: systemRouter,
@@ -32,6 +33,7 @@ export const appRouter = router({
   analytics: analyticsRouter,
   upload: uploadRouter,
   announcements: announcementsRouter,
+  whatsapp: whatsappRouter,
 
   // Location/Displacement message router
   location: router({
