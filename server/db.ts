@@ -11,6 +11,7 @@ import {
   InsertReview,
   siteSettings,
   InsertSiteSetting,
+  whatsappOptOuts,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { logger } from "./logger";
@@ -210,8 +211,24 @@ export async function setSiteSetting(key: string, value: string) {
   }
 }
 
+export async function recordWhatsAppOptOuts(phones: string[]): Promise<void> {
+  const database = await getDb();
+  if (!database || phones.length === 0) return;
+  for (const phone of phones) {
+    try {
+      await database
+        .insert(whatsappOptOuts)
+        .values({ phone, reason: "user_stop" })
+        .onConflictDoNothing()
+        .execute();
+    } catch {
+      // ignore duplicates
+    }
+  }
+}
+
 export async function getAllSiteSettings() {
-  const db = await getDb();
-  if (!db) return [];
-  return db.select().from(siteSettings).execute();
+  const database = await getDb();
+  if (!database) return [];
+  return database.select().from(siteSettings).execute();
 }

@@ -11,6 +11,8 @@ import rateLimit from "express-rate-limit";
 import pinoHttp from "pino-http";
 import { logger } from "../logger";
 import { processMpesaCallback } from "../mpesaCallback";
+import { verifyWhatsAppWebhookSignature, extractWhatsAppMarketingOptOutSenders, verifyWhatsAppWebhookToken } from "./whatsapp";
+import * as db from "../db";
 
 // Security: Rate limiting
 const generalLimiter = rateLimit({
@@ -77,7 +79,7 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
   // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "50mb" }));
+  app.use(express.json({ limit: "50mb", verify: (req: any, _res, buf) => { req.rawBody = buf; } }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === "/health" } }));
@@ -104,6 +106,30 @@ async function startServer() {
   app.post("/api/payments/callback", async (req: any, res: any) => {
     await processMpesaCallback(req.body);
     res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
+  });
+
+  // WhatsApp webhook — Meta verification + signed inbound events.
+  app.get("/api/whatsapp/webhook", (req: any, res: any) => {
+    const mode = req.query["hub.mode"];
+    const token = req.query["hub.verify_token"];
+    const challenge = req.query["hub.challenge"];
+    const configured = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
+    if (mode === "subscribe" && verifyWhatsAppWebhookToken(String(token), configured)) {
+      return res.status(200).send(challenge);
+    }
+    return res.status(403).end();
+  });
+
+  app.post("/api/whatsapp/webhook", async (req: any, res: any) => {
+    const signature = req.headers["x-hub-signature-256"];
+    const secret = process.env.WHATSAPP_APP_SECRET;
+    const rawBody = req.rawBody as Buffer | undefined;
+    if (!verifyWhatsAppWebhookSignature(rawBody, signature, secret)) {
+      return res.status(401).json({ error: "Invalid signature" });
+    }
+    const optOuts = extractWhatsAppMarketingOptOutSenders(req.body);
+    await db.recordWhatsAppOptOuts(optOuts);
+    res.status(200).json({ received: true });
   });
 
   app.use("/api/", generalLimiter); // Apply rate limiting to other API routes

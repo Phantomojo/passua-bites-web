@@ -13,6 +13,8 @@ import { appRouter } from "./routers.js";
 import { createContext } from "./_core/context.js";
 import rateLimit from "express-rate-limit";
 import { processMpesaCallback } from "./mpesaCallback.js";
+import { verifyWhatsAppWebhookSignature, extractWhatsAppMarketingOptOutSenders, verifyWhatsAppWebhookToken } from "./_core/whatsapp.js";
+import * as db from "./db.js";
 
 const app = express();
 
@@ -21,7 +23,7 @@ const app = express();
 // express-rate-limit v8 throws ERR_ERL_UNDEFINED_IP_ADDRESS).
 app.set("trust proxy", 1);
 
-app.use(express.json({ limit: "50mb" }));
+app.use(express.json({ limit: "50mb", verify: (req: any, _res, buf) => { req.rawBody = buf; } }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // Security headers
@@ -49,7 +51,29 @@ app.post("/api/payments/callback", async (req: any, res: any) => {
   res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
 });
 
-// Rate limiting
+// WhatsApp webhook
+app.get("/api/whatsapp/webhook", (req: any, res: any) => {
+  const mode = req.query["hub.mode"];
+  const token = req.query["hub.verify_token"];
+  const challenge = req.query["hub.challenge"];
+  const configured = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
+  if (mode === "subscribe" && verifyWhatsAppWebhookToken(String(token), configured)) {
+    return res.status(200).send(challenge);
+  }
+  return res.status(403).end();
+});
+
+app.post("/api/whatsapp/webhook", async (req: any, res: any) => {
+  const signature = req.headers["x-hub-signature-256"];
+  const secret = process.env.WHATSAPP_APP_SECRET;
+  const rawBody = req.rawBody as Buffer | undefined;
+  if (!verifyWhatsAppWebhookSignature(rawBody, signature, secret)) {
+    return res.status(401).json({ error: "Invalid signature" });
+  }
+  const optOuts = extractWhatsAppMarketingOptOutSenders(req.body);
+  await db.recordWhatsAppOptOuts(optOuts);
+  res.status(200).json({ received: true });
+});
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: process.env.NODE_ENV === "production" ? 200 : 500,
