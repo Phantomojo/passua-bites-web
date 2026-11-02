@@ -2,7 +2,7 @@ import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { orders, mpesaTransactions } from "../../drizzle/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import axios from "axios";
 import {
   signOrderPaymentToken,
@@ -138,6 +138,10 @@ export const paymentsRouter = router({
 
       const order = orderResult[0];
 
+      if (order.paymentStatus === "completed") {
+        throw new Error("Order already paid");
+      }
+
       const phone = formatPhoneNumber(input.phoneNumber);
       const orderPhone = formatPhoneNumber(order.customerPhone);
       if (phone !== orderPhone) {
@@ -148,6 +152,7 @@ export const paymentsRouter = router({
         .select()
         .from(mpesaTransactions)
         .where(eq(mpesaTransactions.orderId, input.orderId))
+        .orderBy(desc(mpesaTransactions.createdAt))
         .limit(1)
         .execute();
 
@@ -165,7 +170,13 @@ export const paymentsRouter = router({
         }
       }
 
-      const amount = Math.round(Number(order.totalPrice));
+      const amount = Number(order.totalPrice);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error("Order amount must be a positive number");
+      }
+      if (!Number.isInteger(amount)) {
+        throw new Error("Order amount must be a whole number of KSh");
+      }
 
       const { password, timestamp } = generatePassword();
       const token = await getMpesaAccessToken();
@@ -201,15 +212,34 @@ export const paymentsRouter = router({
         throw new Error(`M-Pesa STK Push failed: ${errorMsg}`);
       }
 
-      await db.insert(mpesaTransactions).values({
-        orderId: input.orderId,
-        checkoutRequestID: response.data.CheckoutRequestID,
-        merchantRequestID: response.data.MerchantRequestID,
-        phoneNumber: phone,
-        amount: amount.toString(),
-        accountReference: `PB${input.orderId}`,
-        status: "pending",
-      });
+      try {
+        await db.insert(mpesaTransactions).values({
+          orderId: input.orderId,
+          checkoutRequestID: response.data.CheckoutRequestID,
+          merchantRequestID: response.data.MerchantRequestID,
+          phoneNumber: phone,
+          amount: amount.toString(),
+          accountReference: `PB${input.orderId}`,
+          status: "pending",
+        });
+      } catch (insertError: any) {
+        // Race: a pending transaction may have been inserted concurrently.
+        const [existing] = await db
+          .select()
+          .from(mpesaTransactions)
+          .where(eq(mpesaTransactions.orderId, input.orderId))
+          .orderBy(desc(mpesaTransactions.createdAt))
+          .limit(1)
+          .execute();
+        if (existing && existing.status === "pending") {
+          return {
+            success: true,
+            checkoutRequestID: existing.checkoutRequestID,
+            message: "STK Push already pending. Check your phone.",
+          };
+        }
+        throw insertError;
+      }
 
       return {
         success: true,
@@ -285,33 +315,121 @@ export const paymentsRouter = router({
             metadata[item.Name] = item.Value;
           });
 
-          await db
+          const receipt = metadata.MpesaReceiptNumber;
+          const amount = metadata.Amount;
+          const phone = metadata.PhoneNumber;
+
+          // Require receipt and matching amount before completing.
+          if (!receipt || amount === undefined || amount === null) {
+            await db
+              .update(mpesaTransactions)
+              .set({
+                status: "pending",
+                resultCode,
+                resultDesc: "Insufficient payment evidence",
+              })
+              .where(
+                and(
+                  eq(mpesaTransactions.checkoutRequestID, input.checkoutRequestID),
+                  eq(mpesaTransactions.status, "pending")
+                )
+              )
+              .execute();
+            return {
+              status: "pending",
+              resultDesc: "Insufficient payment evidence",
+              resultCode,
+            };
+          }
+
+          if (Number(amount) !== Number(tx.amount)) {
+            await db
+              .update(mpesaTransactions)
+              .set({ status: "failed", resultCode, resultDesc: "Amount mismatch" })
+              .where(
+                and(
+                  eq(mpesaTransactions.checkoutRequestID, input.checkoutRequestID),
+                  eq(mpesaTransactions.status, "pending")
+                )
+              )
+              .execute();
+            await db
+              .update(orders)
+              .set({ paymentStatus: "failed" })
+              .where(
+                and(eq(orders.id, tx.orderId), eq(orders.paymentStatus, "pending"))
+              )
+              .execute();
+            return { status: "failed", resultDesc: "Amount mismatch", resultCode };
+          }
+
+          // Phone check when present
+          if (phone !== undefined && phone !== null) {
+            const normalized = String(phone).replace(/\D/g, "");
+            const txPhone = tx.phoneNumber.replace(/\D/g, "");
+            if (normalized && txPhone && normalized !== txPhone) {
+              await db
+                .update(mpesaTransactions)
+                .set({ status: "failed", resultCode, resultDesc: "Phone mismatch" })
+                .where(
+                  and(
+                    eq(mpesaTransactions.checkoutRequestID, input.checkoutRequestID),
+                    eq(mpesaTransactions.status, "pending")
+                  )
+                )
+                .execute();
+              await db
+                .update(orders)
+                .set({ paymentStatus: "failed" })
+                .where(
+                  and(eq(orders.id, tx.orderId), eq(orders.paymentStatus, "pending"))
+                )
+                .execute();
+              return { status: "failed", resultDesc: "Phone mismatch", resultCode };
+            }
+          }
+
+          const upd = await db
             .update(mpesaTransactions)
             .set({
               status: "completed",
-              mpesaReceiptNumber: metadata.MpesaReceiptNumber || null,
-              resultCode: resultCode,
+              mpesaReceiptNumber: receipt,
+              resultCode,
               resultDesc: response.data.ResultDesc,
             })
             .where(
-              eq(
-                mpesaTransactions.checkoutRequestID,
-                input.checkoutRequestID
+              and(
+                eq(mpesaTransactions.checkoutRequestID, input.checkoutRequestID),
+                eq(mpesaTransactions.status, "pending")
               )
-            );
+            )
+            .execute();
+
+          const rowCount = (upd as any).rowCount ?? 0;
+          if (rowCount === 0) {
+            // Already handled elsewhere; return current state.
+            return {
+              status: tx.status as any,
+              mpesaReceiptNumber: tx.mpesaReceiptNumber,
+              resultCode: tx.resultCode ?? 0,
+            };
+          }
 
           await db
             .update(orders)
             .set({
               paymentStatus: "completed",
-              mpesaTransactionId: metadata.MpesaReceiptNumber || null,
+              mpesaTransactionId: receipt,
               status: "confirmed",
             })
-            .where(eq(orders.id, tx.orderId));
+            .where(
+              and(eq(orders.id, tx.orderId), eq(orders.paymentStatus, "pending"))
+            )
+            .execute();
 
           return {
             status: "completed",
-            mpesaReceiptNumber: metadata.MpesaReceiptNumber,
+            mpesaReceiptNumber: receipt,
             resultCode: 0,
           };
         } else {
@@ -325,9 +443,9 @@ export const paymentsRouter = router({
               resultDesc: response.data.ResultDesc,
             })
             .where(
-              eq(
-                mpesaTransactions.checkoutRequestID,
-                input.checkoutRequestID
+              and(
+                eq(mpesaTransactions.checkoutRequestID, input.checkoutRequestID),
+                eq(mpesaTransactions.status, "pending")
               )
             );
 
@@ -378,6 +496,7 @@ export const paymentsRouter = router({
         .select()
         .from(mpesaTransactions)
         .where(eq(mpesaTransactions.orderId, input.orderId))
+        .orderBy(desc(mpesaTransactions.createdAt))
         .limit(1)
         .execute();
 

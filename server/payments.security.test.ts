@@ -20,6 +20,12 @@ describe("payment token", () => {
   it("rejects malformed tokens", () => {
     expect(verifyOrderPaymentToken("not-a-token", 1)).toBe(false);
     expect(verifyOrderPaymentToken("", 1)).toBe(false);
+    expect(verifyOrderPaymentToken("a.b.c", 1)).toBe(false);
+  });
+
+  it("rejects expired tokens", () => {
+    const token = signOrderPaymentToken(7, -1000);
+    expect(verifyOrderPaymentToken(token, 7)).toBe(false);
   });
 });
 

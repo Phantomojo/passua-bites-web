@@ -34,12 +34,8 @@ export async function processMpesaCallback(body: any): Promise<void> {
     }
 
     const { stkCallback } = Body;
-    const {
-      ResultCode,
-      CheckoutRequestID,
-      CallbackMetadata,
-      ResultDesc,
-    } = stkCallback;
+    const { ResultCode, CheckoutRequestID, CallbackMetadata, ResultDesc } =
+      stkCallback;
 
     const code = Number(ResultCode);
 
@@ -49,7 +45,6 @@ export async function processMpesaCallback(body: any): Promise<void> {
       return;
     }
 
-    // Find transaction
     const tx = await db
       .select()
       .from(mpesaTransactions)
@@ -65,11 +60,13 @@ export async function processMpesaCallback(body: any): Promise<void> {
       return;
     }
 
-    // Idempotency: already completed
-    if (tx[0].status === "completed") {
+    const transaction = tx[0];
+
+    // Idempotency: already completed — never downgrade.
+    if (transaction.status === "completed") {
       logger.info(
         { checkoutRequestID: CheckoutRequestID },
-        "[M-Pesa] Duplicate callback, skipping"
+        "[M-Pesa] Duplicate callback for completed payment, skipping"
       );
       return;
     }
@@ -84,15 +81,24 @@ export async function processMpesaCallback(body: any): Promise<void> {
           resultCode: code,
           resultDesc: ResultDesc || null,
         })
-        .where(eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID));
+        .where(
+          and(
+            eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+            eq(mpesaTransactions.status, "pending")
+          )
+        )
+        .execute();
 
       await db
         .update(orders)
         .set({ paymentStatus: "failed" })
-        .where(eq(orders.id, tx[0].orderId));
+        .where(
+          and(eq(orders.id, transaction.orderId), eq(orders.paymentStatus, "pending"))
+        )
+        .execute();
 
       logger.info(
-        { status, code, checkoutRequestID: CheckoutRequestID, orderId: tx[0].orderId },
+        { status, code, checkoutRequestID: CheckoutRequestID },
         "[M-Pesa] Payment not completed"
       );
       return;
@@ -104,15 +110,39 @@ export async function processMpesaCallback(body: any): Promise<void> {
       metadata[item.Name] = item.Value;
     });
 
-    const { MpesaReceiptNumber, Amount } = metadata;
+    const receipt = metadata.MpesaReceiptNumber;
+    const amount = metadata.Amount;
+    const phone = metadata.PhoneNumber;
 
-    // Validate amount when present
-    if (Amount !== undefined && Number(Amount) !== Number(tx[0].amount)) {
+    // Require receipt and amount evidence.
+    if (!receipt || amount === undefined || amount === null) {
+      logger.error(
+        { checkoutRequestID: CheckoutRequestID },
+        "[M-Pesa] Missing receipt or amount in callback"
+      );
+      await db
+        .update(mpesaTransactions)
+        .set({
+          status: "pending",
+          resultCode: code,
+          resultDesc: "Insufficient payment evidence",
+        })
+        .where(
+          and(
+            eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+            eq(mpesaTransactions.status, "pending")
+          )
+        )
+        .execute();
+      return;
+    }
+
+    // Validate amount.
+    if (Number(amount) !== Number(transaction.amount)) {
       logger.error(
         {
-          expected: tx[0].amount,
-          received: Amount,
-          orderId: tx[0].orderId,
+          expected: transaction.amount,
+          received: amount,
           checkoutRequestID: CheckoutRequestID,
         },
         "[M-Pesa] Amount mismatch in callback"
@@ -120,21 +150,63 @@ export async function processMpesaCallback(body: any): Promise<void> {
       await db
         .update(mpesaTransactions)
         .set({ status: "failed", resultCode: code, resultDesc: "Amount mismatch" })
-        .where(eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID));
+        .where(
+          and(
+            eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+            eq(mpesaTransactions.status, "pending")
+          )
+        )
+        .execute();
       await db
         .update(orders)
         .set({ paymentStatus: "failed" })
-        .where(eq(orders.id, tx[0].orderId));
+        .where(
+          and(eq(orders.id, transaction.orderId), eq(orders.paymentStatus, "pending"))
+        )
+        .execute();
       return;
     }
 
-    // Confirm payment
-    // Idempotent update: only if not already completed
+    // Validate phone when present.
+    if (phone !== undefined && phone !== null) {
+      try {
+        const normalized = String(phone).replace(/\D/g, "");
+        const txPhone = transaction.phoneNumber.replace(/\D/g, "");
+        if (normalized && txPhone && normalized !== txPhone) {
+          logger.error(
+            { checkoutRequestID: CheckoutRequestID },
+            "[M-Pesa] Phone mismatch in callback"
+          );
+          await db
+            .update(mpesaTransactions)
+            .set({ status: "failed", resultCode: code, resultDesc: "Phone mismatch" })
+            .where(
+              and(
+                eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+                eq(mpesaTransactions.status, "pending")
+              )
+            )
+            .execute();
+          await db
+            .update(orders)
+            .set({ paymentStatus: "failed" })
+            .where(
+              and(eq(orders.id, transaction.orderId), eq(orders.paymentStatus, "pending"))
+            )
+            .execute();
+          return;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // Confirm payment conditionally.
     const upd = await db
       .update(mpesaTransactions)
       .set({
         status: "completed",
-        mpesaReceiptNumber: MpesaReceiptNumber || null,
+        mpesaReceiptNumber: receipt,
         resultCode: code,
         resultDesc: ResultDesc || null,
       })
@@ -145,9 +217,13 @@ export async function processMpesaCallback(body: any): Promise<void> {
         )
       )
       .execute();
-    // If no rows updated, duplicate callback; skip order update
-    if ((upd as any).rowCount === 0 && tx[0].status !== "pending") {
-      logger.info({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Duplicate callback, skipping");
+
+    const rowCount = (upd as any).rowCount ?? 0;
+    if (rowCount === 0) {
+      logger.info(
+        { checkoutRequestID: CheckoutRequestID },
+        "[M-Pesa] Duplicate callback, skipping"
+      );
       return;
     }
 
@@ -155,17 +231,16 @@ export async function processMpesaCallback(body: any): Promise<void> {
       .update(orders)
       .set({
         paymentStatus: "completed",
-        mpesaTransactionId: MpesaReceiptNumber || null,
+        mpesaTransactionId: receipt,
         status: "confirmed",
       })
-      .where(eq(orders.id, tx[0].orderId));
+      .where(
+        and(eq(orders.id, transaction.orderId), eq(orders.paymentStatus, "pending"))
+      )
+      .execute();
 
     logger.info(
-      {
-        orderId: tx[0].orderId,
-        receipt: MpesaReceiptNumber,
-        amount: Amount,
-      },
+      { orderId: transaction.orderId, receipt, amount },
       "[M-Pesa] Payment confirmed"
     );
   } catch (error) {
