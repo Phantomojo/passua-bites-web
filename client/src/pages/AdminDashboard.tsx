@@ -12,9 +12,12 @@ type Tab = OwnerTab;
 
 export default function AdminDashboard() {
   usePageMeta({ title: "Owner Operations — Pasua Bites", description: "Pasua Bites owner workspace for kitchen operations, orders, menu management, and business reporting." });
-  const [token, setToken] = useState<string | null>(() =>
-    typeof window !== "undefined" ? localStorage.getItem("pb_admin_token") : null
-  );
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const me = trpc.admin.me.useQuery(undefined, { retry: false });
+  useEffect(() => {
+    if (me.data) setIsAuthenticated(true);
+    else if (me.data === null) setIsAuthenticated(false);
+  }, [me.data]);
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("admin");
   const [installGuideComplete, setInstallGuideComplete] = useState(() => {
@@ -59,19 +62,20 @@ const [orderStatusFilter, setOrderStatusFilter] = useState<string>("");
   });
 
   const login = trpc.admin.login.useMutation();
+  const logout = trpc.admin.logout.useMutation();
   // Keep the Kitchen feed independent from the Orders page filter.
   const kitchenOrders = trpc.orders.listAll.useQuery(
     { limit: 100 },
-    { enabled: !!token, refetchInterval: 30000 }
+    { enabled: isAuthenticated, refetchInterval: 30000 }
   );
   const orders = trpc.orders.listAll.useQuery(
     orderStatusFilter ? { status: orderStatusFilter as any, limit: 100 } : { limit: 100 },
-    { enabled: !!token && activeTab === "orders", refetchInterval: 30000 }
+    { enabled: isAuthenticated && activeTab === "orders", refetchInterval: 30000 }
   );
-  const menuItems = trpc.menu.list.useQuery(undefined, { enabled: !!token });
+  const menuItems = trpc.menu.list.useQuery(undefined, { enabled: isAuthenticated });
   const updateOrderStatus = trpc.orders.updateStatus.useMutation();
   const markOrderPaid = trpc.orders.markPaid.useMutation();
-  const isPaused = trpc.orders.isPaused.useQuery(undefined, { enabled: !!token });
+  const isPaused = trpc.orders.isPaused.useQuery(undefined, { enabled: isAuthenticated });
   const setPaused = trpc.orders.setPaused.useMutation();
   const createMenuItem = trpc.menu.create.useMutation();
   const updateMenuItem = trpc.menu.update.useMutation();
@@ -81,10 +85,10 @@ const [orderStatusFilter, setOrderStatusFilter] = useState<string>("");
   const uploadImage = trpc.upload.image.useMutation();
 const createWalkIn = trpc.orders.createWalkIn.useMutation();
 const salesSummary = trpc.orders.getSalesSummary.useQuery(undefined, {
-  enabled: !!token,
+  enabled: isAuthenticated,
 });
 const announcementsList = trpc.announcements.listAll.useQuery(undefined, {
-  enabled: !!token,
+  enabled: isAuthenticated,
 });
 const createAnnouncement = trpc.announcements.create.useMutation();
 const toggleAnnouncement = trpc.announcements.toggle.useMutation();
@@ -92,19 +96,19 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
   const updateLocation = trpc.location.update.useMutation();
 
   const { data: currentLocation, refetch: refetchLocation } =
-    trpc.location.get.useQuery(undefined, { enabled: !!token });
+    trpc.location.get.useQuery(undefined, { enabled: isAuthenticated });
   const { data: allSettings } = trpc.location.getAll.useQuery(undefined, {
-    enabled: !!token,
+    enabled: isAuthenticated,
   });
 
   // Fetch pending reviews (same-origin)
   useEffect(() => {
-    if (!token) return;
+    if (!isAuthenticated) return;
     fetch(`/api/trpc/reviews.listPending`)
       .then(r => r.json())
       .then(d => setPendingReviews(d.result?.data?.json || []))
       .catch(() => {});
-  }, [token, activeTab]);
+  }, [isAuthenticated, activeTab]);
 
   const handleReviewAction = async (id: number, approved: boolean) => {
     try {
@@ -182,8 +186,10 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
     setIsLoggingIn(true);
     try {
       const result = await login.mutateAsync({ username, password });
-      setToken(result.token);
-      localStorage.setItem("pb_admin_token", result.token);
+      if (result.success) {
+        setIsAuthenticated(true);
+        me.refetch();
+      }
       toast.success("Logged in successfully");
     } catch (err: any) {
       toast.error(err.message || "Invalid password");
@@ -192,9 +198,13 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
     }
   };
 
-  const handleLogout = () => {
-    setToken(null);
-    localStorage.removeItem("pb_admin_token");
+  const handleLogout = async () => {
+    try {
+      await logout.mutateAsync();
+    } catch {
+      // ignore
+    }
+    setIsAuthenticated(false);
     toast.info("Logged out");
   };
 
@@ -284,7 +294,7 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
   };
 
   // Login screen
-  if (!token) {
+  if (!isAuthenticated) {
     return (
       <div
         style={{

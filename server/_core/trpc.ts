@@ -31,7 +31,7 @@ export const adminProcedure = t.procedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
 
-    if (!ctx.user || ctx.user.role !== "admin") {
+    if (!ctx.adminUser && (!ctx.user || ctx.user.role !== "admin")) {
       throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
     }
 
@@ -39,7 +39,18 @@ export const adminProcedure = t.procedure.use(
       ctx: {
         ...ctx,
         user: ctx.user,
+        adminUser: ctx.adminUser,
       },
     });
   })
 );
+
+export const requireRole = (...roles: string[]) =>
+  t.middleware(async opts => {
+    const { ctx, next } = opts;
+    const role = ctx.adminUser?.role ?? ctx.user?.role;
+    if (!role || !roles.includes(role)) {
+      throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+    }
+    return next({ ctx });
+  });
