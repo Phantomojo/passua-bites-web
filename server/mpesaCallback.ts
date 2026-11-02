@@ -97,17 +97,27 @@ export async function processMpesaCallback(body: any): Promise<void> {
 
     const transaction = tx[0];
 
-    // Match merchant request ID when the callback provides it.
+    // Require merchant request ID match.
     const callbackMerchantRequestID = stkCallback.MerchantRequestID;
     if (
-      callbackMerchantRequestID &&
-      transaction.merchantRequestID &&
+      !callbackMerchantRequestID ||
+      !transaction.merchantRequestID ||
       callbackMerchantRequestID !== transaction.merchantRequestID
     ) {
       logger.error(
         { checkoutRequestID: CheckoutRequestID },
-        "[M-Pesa] Merchant request ID mismatch in callback"
+        "[M-Pesa] Merchant request ID missing or mismatched in callback"
       );
+      await db
+        .update(mpesaTransactions)
+        .set({ status: "pending", resultDesc: "Merchant request ID mismatch" })
+        .where(
+          and(
+            eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+            eq(mpesaTransactions.status, "pending")
+          )
+        )
+        .execute();
       return;
     }
 
@@ -187,8 +197,48 @@ export async function processMpesaCallback(body: any): Promise<void> {
       return;
     }
 
+    // Require query IDs to match stored and callback values.
+    if (
+      !queryData?.CheckoutRequestID ||
+      queryData.CheckoutRequestID !== CheckoutRequestID ||
+      queryData.CheckoutRequestID !== transaction.checkoutRequestID
+    ) {
+      logger.error({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] CheckoutRequestID mismatch in query");
+      await db
+        .update(mpesaTransactions)
+        .set({ status: "pending", resultDesc: "CheckoutRequestID mismatch" })
+        .where(
+          and(
+            eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+            eq(mpesaTransactions.status, "pending")
+          )
+        )
+        .execute();
+      return;
+    }
+
+    if (
+      !queryData?.MerchantRequestID ||
+      queryData.MerchantRequestID !== callbackMerchantRequestID ||
+      queryData.MerchantRequestID !== transaction.merchantRequestID
+    ) {
+      logger.error({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] MerchantRequestID mismatch in query");
+      await db
+        .update(mpesaTransactions)
+        .set({ status: "pending", resultDesc: "MerchantRequestID mismatch" })
+        .where(
+          and(
+            eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+            eq(mpesaTransactions.status, "pending")
+          )
+        )
+        .execute();
+      return;
+    }
+
+    // Use callback metadata for amount/receipt/phone (STK Query does not return it).
     const metadata: Record<string, any> = {};
-    queryData?.CallbackMetadata?.Item?.forEach((item: any) => {
+    CallbackMetadata?.Item?.forEach((item: any) => {
       metadata[item.Name] = item.Value;
     });
 

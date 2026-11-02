@@ -169,7 +169,7 @@ var init_schema = __esm({
       updatedAt: timestamp("updatedAt").defaultNow().notNull()
     }, (t2) => [
       index("idx_mpesaTransactions_orderId").on(t2.orderId),
-      uniqueIndex("uniq_mpesaTransactions_active_order").on(t2.orderId).where(sql`${t2.status} IN ('initiating', 'pending')`)
+      uniqueIndex("uniq_mpesaTransactions_active_order").on(t2.orderId).where(sql`${t2.status} IN ('initiating', 'pending', 'unknown')`)
     ]);
     analyticsEvents = pgTable("analyticsEvents", {
       id: serial("id").primaryKey(),
@@ -843,9 +843,15 @@ function getCallbackUrl() {
     throw new Error("MPESA_CALLBACK_URL or APP_URL is required");
   }
   const secret = process.env.MPESA_CALLBACK_SECRET;
-  if (secret) {
+  const isProduction2 = process.env.NODE_ENV === "production";
+  if (isProduction2) {
+    if (!secret || secret.trim() === "") {
+      throw new Error("MPESA_CALLBACK_SECRET is required in production");
+    }
+  }
+  if (secret && secret.trim() !== "") {
     const url = new URL(cfg.callbackUrl);
-    url.searchParams.set("token", secret);
+    url.searchParams.set("token", secret.trim());
     return url.toString();
   }
   return cfg.callbackUrl;
@@ -977,7 +983,7 @@ var paymentsRouter = router({
       reservationId = inserted.id;
     } catch (reserveError) {
       const [existing] = await db.select().from(mpesaTransactions).where(eq3(mpesaTransactions.orderId, input.orderId)).orderBy(desc(mpesaTransactions.createdAt)).limit(1).execute();
-      if (existing && (existing.status === "pending" || existing.status === "initiating")) {
+      if (existing && (existing.status === "pending" || existing.status === "initiating" || existing.status === "unknown")) {
         return {
           success: true,
           checkoutRequestID: existing.checkoutRequestID,
@@ -1014,8 +1020,12 @@ var paymentsRouter = router({
         }
       );
     } catch (error) {
-      await db.update(mpesaTransactions).set({ status: "failed", resultDesc: "STK Push failed" }).where(eq3(mpesaTransactions.id, reservationId)).execute().catch(() => void 0);
+      const isAmbiguous = !error?.response || error?.code === "ECONNABORTED" || error?.code === "ETIMEDOUT" || /timeout/i.test(String(error?.message || ""));
       const errorMsg = error.response?.data?.errorMessage || error.message || "STK Push failed";
+      await db.update(mpesaTransactions).set({
+        status: isAmbiguous ? "unknown" : "failed",
+        resultDesc: isAmbiguous ? "Ambiguous STK response; reconcile before retry" : `STK Push failed: ${errorMsg}`
+      }).where(eq3(mpesaTransactions.id, reservationId)).execute().catch(() => void 0);
       throw new Error(`M-Pesa STK Push failed: ${errorMsg}`);
     }
     try {
@@ -1081,82 +1091,36 @@ var paymentsRouter = router({
       );
       const resultCode = Number(response.data.ResultCode);
       if (resultCode === 0) {
-        const metadata = {};
-        response.data.CallbackMetadata?.Item?.forEach((item) => {
-          metadata[item.Name] = item.Value;
-        });
-        const receipt = metadata.MpesaReceiptNumber;
-        const amount = metadata.Amount;
-        const phone = metadata.PhoneNumber;
-        if (!receipt || amount === void 0 || amount === null) {
-          await db.update(mpesaTransactions).set({
-            status: "pending",
-            resultCode,
-            resultDesc: "Insufficient payment evidence"
-          }).where(
+        const queryCheckoutId = response.data.CheckoutRequestID;
+        const queryMerchantId = response.data.MerchantRequestID;
+        if (!queryCheckoutId || queryCheckoutId !== input.checkoutRequestID || queryCheckoutId !== tx.checkoutRequestID) {
+          await db.update(mpesaTransactions).set({ status: "pending", resultCode, resultDesc: "CheckoutRequestID mismatch" }).where(
             and(
               eq3(mpesaTransactions.checkoutRequestID, input.checkoutRequestID),
               eq3(mpesaTransactions.status, "pending")
             )
           ).execute();
-          return {
-            status: "pending",
-            resultDesc: "Insufficient payment evidence",
-            resultCode
-          };
+          return { status: "pending", resultDesc: "CheckoutRequestID mismatch", resultCode };
         }
-        if (Number(amount) !== Number(tx.amount)) {
-          await db.update(mpesaTransactions).set({ status: "failed", resultCode, resultDesc: "Amount mismatch" }).where(
+        if (!queryMerchantId || !tx.merchantRequestID || queryMerchantId !== tx.merchantRequestID) {
+          await db.update(mpesaTransactions).set({ status: "pending", resultCode, resultDesc: "MerchantRequestID mismatch" }).where(
             and(
               eq3(mpesaTransactions.checkoutRequestID, input.checkoutRequestID),
               eq3(mpesaTransactions.status, "pending")
             )
           ).execute();
-          await db.update(orders).set({ paymentStatus: "failed" }).where(
-            and(eq3(orders.id, tx.orderId), eq3(orders.paymentStatus, "pending"))
-          ).execute();
-          return { status: "failed", resultDesc: "Amount mismatch", resultCode };
+          return { status: "pending", resultDesc: "MerchantRequestID mismatch", resultCode };
         }
-        if (!phone) {
-          await db.update(mpesaTransactions).set({ status: "pending", resultCode, resultDesc: "Missing phone evidence" }).where(
+        if (!tx.mpesaReceiptNumber) {
+          await db.update(mpesaTransactions).set({ status: "pending", resultCode, resultDesc: "Awaiting callback metadata" }).where(
             and(
               eq3(mpesaTransactions.checkoutRequestID, input.checkoutRequestID),
               eq3(mpesaTransactions.status, "pending")
             )
           ).execute();
-          return {
-            status: "pending",
-            resultDesc: "Missing phone evidence",
-            resultCode
-          };
+          return { status: "pending", resultDesc: "Awaiting callback metadata", resultCode };
         }
-        try {
-          const normalized = formatPhoneNumber(String(phone));
-          const txPhone = formatPhoneNumber(tx.phoneNumber);
-          if (normalized !== txPhone) {
-            await db.update(mpesaTransactions).set({ status: "failed", resultCode, resultDesc: "Phone mismatch" }).where(
-              and(
-                eq3(mpesaTransactions.checkoutRequestID, input.checkoutRequestID),
-                eq3(mpesaTransactions.status, "pending")
-              )
-            ).execute();
-            await db.update(orders).set({ paymentStatus: "failed" }).where(
-              and(eq3(orders.id, tx.orderId), eq3(orders.paymentStatus, "pending"))
-            ).execute();
-            return { status: "failed", resultDesc: "Phone mismatch", resultCode };
-          }
-        } catch {
-          await db.update(mpesaTransactions).set({ status: "failed", resultCode, resultDesc: "Invalid phone" }).where(
-            and(
-              eq3(mpesaTransactions.checkoutRequestID, input.checkoutRequestID),
-              eq3(mpesaTransactions.status, "pending")
-            )
-          ).execute();
-          await db.update(orders).set({ paymentStatus: "failed" }).where(
-            and(eq3(orders.id, tx.orderId), eq3(orders.paymentStatus, "pending"))
-          ).execute();
-          return { status: "failed", resultDesc: "Invalid phone", resultCode };
-        }
+        const receipt = tx.mpesaReceiptNumber;
         const upd = await db.update(mpesaTransactions).set({
           status: "completed",
           mpesaReceiptNumber: receipt,
@@ -1282,11 +1246,17 @@ async function processMpesaCallback(body) {
     }
     const transaction = tx[0];
     const callbackMerchantRequestID = stkCallback.MerchantRequestID;
-    if (callbackMerchantRequestID && transaction.merchantRequestID && callbackMerchantRequestID !== transaction.merchantRequestID) {
+    if (!callbackMerchantRequestID || !transaction.merchantRequestID || callbackMerchantRequestID !== transaction.merchantRequestID) {
       logger.error(
         { checkoutRequestID: CheckoutRequestID },
-        "[M-Pesa] Merchant request ID mismatch in callback"
+        "[M-Pesa] Merchant request ID missing or mismatched in callback"
       );
+      await db.update(mpesaTransactions).set({ status: "pending", resultDesc: "Merchant request ID mismatch" }).where(
+        and2(
+          eq4(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+          eq4(mpesaTransactions.status, "pending")
+        )
+      ).execute();
       return;
     }
     if (transaction.status === "completed") {
@@ -1340,8 +1310,28 @@ async function processMpesaCallback(body) {
       ).execute();
       return;
     }
+    if (!queryData?.CheckoutRequestID || queryData.CheckoutRequestID !== CheckoutRequestID || queryData.CheckoutRequestID !== transaction.checkoutRequestID) {
+      logger.error({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] CheckoutRequestID mismatch in query");
+      await db.update(mpesaTransactions).set({ status: "pending", resultDesc: "CheckoutRequestID mismatch" }).where(
+        and2(
+          eq4(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+          eq4(mpesaTransactions.status, "pending")
+        )
+      ).execute();
+      return;
+    }
+    if (!queryData?.MerchantRequestID || queryData.MerchantRequestID !== callbackMerchantRequestID || queryData.MerchantRequestID !== transaction.merchantRequestID) {
+      logger.error({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] MerchantRequestID mismatch in query");
+      await db.update(mpesaTransactions).set({ status: "pending", resultDesc: "MerchantRequestID mismatch" }).where(
+        and2(
+          eq4(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+          eq4(mpesaTransactions.status, "pending")
+        )
+      ).execute();
+      return;
+    }
     const metadata = {};
-    queryData?.CallbackMetadata?.Item?.forEach((item) => {
+    CallbackMetadata?.Item?.forEach((item) => {
       metadata[item.Name] = item.Value;
     });
     const receipt = metadata.MpesaReceiptNumber;

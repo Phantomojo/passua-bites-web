@@ -29,8 +29,6 @@ export default function OrderTracking() {
     description: "Track your Passua Bites order by order ID or phone number.",
   });
   const [searchId, setSearchId] = useState("");
-  const [searchPhone, setSearchPhone] = useState("");
-  const [searchBy, setSearchBy] = useState<"id" | "phone">("phone");
   const [searchToken, setSearchToken] = useState(() => {
     try {
       return localStorage.getItem("pb_last_payment_token") || "";
@@ -92,55 +90,6 @@ export default function OrderTracking() {
           Track Order
         </h1>
 
-        {/* Search method toggle */}
-        <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem" }}>
-          <button
-            onClick={() => {
-              setSearchBy("phone");
-              setAttempted(false);
-            }}
-            style={{
-              flex: 1,
-              padding: "0.75rem",
-              border: `1px solid ${searchBy === "phone" ? "var(--pb-ember)" : "var(--pb-rule)"}`,
-              background:
-                searchBy === "phone" ? "rgba(196,92,40,0.1)" : "transparent",
-              color:
-                searchBy === "phone" ? "var(--pb-ember)" : "var(--pb-ivory3)",
-              fontFamily: "'DM Mono',monospace",
-              fontSize: "0.65rem",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              cursor: "pointer",
-              minHeight: 44,
-            }}
-          >
-            By Phone
-          </button>
-          <button
-            onClick={() => {
-              setSearchBy("id");
-              setAttempted(false);
-            }}
-            style={{
-              flex: 1,
-              padding: "0.75rem",
-              border: `1px solid ${searchBy === "id" ? "var(--pb-ember)" : "var(--pb-rule)"}`,
-              background:
-                searchBy === "id" ? "rgba(196,92,40,0.1)" : "transparent",
-              color: searchBy === "id" ? "var(--pb-ember)" : "var(--pb-ivory3)",
-              fontFamily: "'DM Mono',monospace",
-              fontSize: "0.65rem",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              cursor: "pointer",
-              minHeight: 44,
-            }}
-          >
-            By Order ID
-          </button>
-        </div>
-
         {/* Search form */}
         <form
           onSubmit={handleSearch}
@@ -152,37 +101,20 @@ export default function OrderTracking() {
             flexWrap: "wrap",
           }}
         >
-          {searchBy === "phone" ? (
-            <input
-              type="tel"
-              value={searchPhone}
-              onChange={e => setSearchPhone(e.target.value)}
-              placeholder="Your phone number (e.g. 0712345678)"
-              style={{
-                flex: 1,
-                padding: "0.75rem 0.9rem",
-                fontFamily: "'DM Mono',monospace",
-                fontSize: "0.78rem",
-                letterSpacing: "0.04em",
-                minHeight: 44,
-              }}
-            />
-          ) : (
-            <input
-              type="text"
-              value={searchId}
-              onChange={e => setSearchId(e.target.value)}
-              placeholder="Order ID (e.g. 1, 2, 3)"
-              style={{
-                flex: 1,
-                padding: "0.75rem 0.9rem",
-                fontFamily: "'DM Mono',monospace",
-                fontSize: "0.78rem",
-                letterSpacing: "0.04em",
-                minHeight: 44,
-              }}
-            />
-          )}
+          <input
+            type="text"
+            value={searchId}
+            onChange={e => setSearchId(e.target.value)}
+            placeholder="Order ID (e.g. 1, 2, 3)"
+            style={{
+              flex: 1,
+              padding: "0.75rem 0.9rem",
+              fontFamily: "'DM Mono',monospace",
+              fontSize: "0.78rem",
+              letterSpacing: "0.04em",
+              minHeight: 44,
+            }}
+          />          
           <button
             type="submit"
             className="pb-btn-primary"

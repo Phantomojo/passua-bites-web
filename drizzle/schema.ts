@@ -151,7 +151,7 @@ export const mpesaTransactions = pgTable("mpesaTransactions", {
   index("idx_mpesaTransactions_orderId").on(t.orderId),
   uniqueIndex("uniq_mpesaTransactions_active_order")
     .on(t.orderId)
-    .where(sql`${t.status} IN ('initiating', 'pending')`),
+    .where(sql`${t.status} IN ('initiating', 'pending', 'unknown')`),
 ]);
 
 export type MpesaTransaction = typeof mpesaTransactions.$inferSelect;

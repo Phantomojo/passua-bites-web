@@ -37,15 +37,21 @@ function getMpesaConfig() {
   };
 }
 
-function getCallbackUrl(): string {
+export function getCallbackUrl(): string {
   const cfg = getMpesaConfig();
   if (!cfg.callbackUrl) {
     throw new Error("MPESA_CALLBACK_URL or APP_URL is required");
   }
   const secret = process.env.MPESA_CALLBACK_SECRET;
-  if (secret) {
+  const isProduction = process.env.NODE_ENV === "production";
+  if (isProduction) {
+    if (!secret || secret.trim() === "") {
+      throw new Error("MPESA_CALLBACK_SECRET is required in production");
+    }
+  }
+  if (secret && secret.trim() !== "") {
     const url = new URL(cfg.callbackUrl);
-    url.searchParams.set("token", secret);
+    url.searchParams.set("token", secret.trim());
     return url.toString();
   }
   return cfg.callbackUrl;
@@ -231,7 +237,7 @@ export const paymentsRouter = router({
           .orderBy(desc(mpesaTransactions.createdAt))
           .limit(1)
           .execute();
-        if (existing && (existing.status === "pending" || existing.status === "initiating")) {
+        if (existing && (existing.status === "pending" || existing.status === "initiating" || existing.status === "unknown")) {
           return {
             success: true,
             checkoutRequestID: existing.checkoutRequestID,
@@ -270,14 +276,24 @@ export const paymentsRouter = router({
           }
         );
       } catch (error: any) {
+        const isAmbiguous =
+          !error?.response ||
+          error?.code === "ECONNABORTED" ||
+          error?.code === "ETIMEDOUT" ||
+          /timeout/i.test(String(error?.message || ""));
+        const errorMsg =
+          error.response?.data?.errorMessage || error.message || "STK Push failed";
         await db
           .update(mpesaTransactions)
-          .set({ status: "failed", resultDesc: "STK Push failed" })
+          .set({
+            status: isAmbiguous ? "unknown" : "failed",
+            resultDesc: isAmbiguous
+              ? "Ambiguous STK response; reconcile before retry"
+              : `STK Push failed: ${errorMsg}`,
+          })
           .where(eq(mpesaTransactions.id, reservationId))
           .execute()
           .catch(() => undefined);
-        const errorMsg =
-          error.response?.data?.errorMessage || error.message || "STK Push failed";
         throw new Error(`M-Pesa STK Push failed: ${errorMsg}`);
       }
 
@@ -369,24 +385,17 @@ export const paymentsRouter = router({
         const resultCode = Number(response.data.ResultCode);
 
         if (resultCode === 0) {
-          const metadata: Record<string, any> = {};
-          response.data.CallbackMetadata?.Item?.forEach((item: any) => {
-            metadata[item.Name] = item.Value;
-          });
-
-          const receipt = metadata.MpesaReceiptNumber;
-          const amount = metadata.Amount;
-          const phone = metadata.PhoneNumber;
-
-          // Require receipt and matching amount before completing.
-          if (!receipt || amount === undefined || amount === null) {
+          // Require query IDs to be present and match stored values.
+          const queryCheckoutId = response.data.CheckoutRequestID;
+          const queryMerchantId = response.data.MerchantRequestID;
+          if (
+            !queryCheckoutId ||
+            queryCheckoutId !== input.checkoutRequestID ||
+            queryCheckoutId !== tx.checkoutRequestID
+          ) {
             await db
               .update(mpesaTransactions)
-              .set({
-                status: "pending",
-                resultCode,
-                resultDesc: "Insufficient payment evidence",
-              })
+              .set({ status: "pending", resultCode, resultDesc: "CheckoutRequestID mismatch" })
               .where(
                 and(
                   eq(mpesaTransactions.checkoutRequestID, input.checkoutRequestID),
@@ -394,17 +403,16 @@ export const paymentsRouter = router({
                 )
               )
               .execute();
-            return {
-              status: "pending",
-              resultDesc: "Insufficient payment evidence",
-              resultCode,
-            };
+            return { status: "pending", resultDesc: "CheckoutRequestID mismatch", resultCode };
           }
-
-          if (Number(amount) !== Number(tx.amount)) {
+          if (
+            !queryMerchantId ||
+            !tx.merchantRequestID ||
+            queryMerchantId !== tx.merchantRequestID
+          ) {
             await db
               .update(mpesaTransactions)
-              .set({ status: "failed", resultCode, resultDesc: "Amount mismatch" })
+              .set({ status: "pending", resultCode, resultDesc: "MerchantRequestID mismatch" })
               .where(
                 and(
                   eq(mpesaTransactions.checkoutRequestID, input.checkoutRequestID),
@@ -412,21 +420,15 @@ export const paymentsRouter = router({
                 )
               )
               .execute();
-            await db
-              .update(orders)
-              .set({ paymentStatus: "failed" })
-              .where(
-                and(eq(orders.id, tx.orderId), eq(orders.paymentStatus, "pending"))
-              )
-              .execute();
-            return { status: "failed", resultDesc: "Amount mismatch", resultCode };
+            return { status: "pending", resultDesc: "MerchantRequestID mismatch", resultCode };
           }
 
-          // Require phone evidence.
-          if (!phone) {
+          // STK Query does not return CallbackMetadata. Only reconcile if the
+          // callback has already supplied a receipt; otherwise stay pending.
+          if (!tx.mpesaReceiptNumber) {
             await db
               .update(mpesaTransactions)
-              .set({ status: "pending", resultCode, resultDesc: "Missing phone evidence" })
+              .set({ status: "pending", resultCode, resultDesc: "Awaiting callback metadata" })
               .where(
                 and(
                   eq(mpesaTransactions.checkoutRequestID, input.checkoutRequestID),
@@ -434,57 +436,10 @@ export const paymentsRouter = router({
                 )
               )
               .execute();
-            return {
-              status: "pending",
-              resultDesc: "Missing phone evidence",
-              resultCode,
-            };
+            return { status: "pending", resultDesc: "Awaiting callback metadata", resultCode };
           }
 
-          try {
-            const normalized = formatPhoneNumber(String(phone));
-            const txPhone = formatPhoneNumber(tx.phoneNumber);
-            if (normalized !== txPhone) {
-              await db
-                .update(mpesaTransactions)
-                .set({ status: "failed", resultCode, resultDesc: "Phone mismatch" })
-                .where(
-                  and(
-                    eq(mpesaTransactions.checkoutRequestID, input.checkoutRequestID),
-                    eq(mpesaTransactions.status, "pending")
-                  )
-                )
-                .execute();
-              await db
-                .update(orders)
-                .set({ paymentStatus: "failed" })
-                .where(
-                  and(eq(orders.id, tx.orderId), eq(orders.paymentStatus, "pending"))
-                )
-                .execute();
-              return { status: "failed", resultDesc: "Phone mismatch", resultCode };
-            }
-          } catch {
-            await db
-              .update(mpesaTransactions)
-              .set({ status: "failed", resultCode, resultDesc: "Invalid phone" })
-              .where(
-                and(
-                  eq(mpesaTransactions.checkoutRequestID, input.checkoutRequestID),
-                  eq(mpesaTransactions.status, "pending")
-                )
-              )
-              .execute();
-            await db
-              .update(orders)
-              .set({ paymentStatus: "failed" })
-              .where(
-                and(eq(orders.id, tx.orderId), eq(orders.paymentStatus, "pending"))
-              )
-              .execute();
-            return { status: "failed", resultDesc: "Invalid phone", resultCode };
-          }
-
+          const receipt = tx.mpesaReceiptNumber;
           const upd = await db
             .update(mpesaTransactions)
             .set({
@@ -503,7 +458,6 @@ export const paymentsRouter = router({
 
           const rowCount = (upd as any).rowCount ?? 0;
           if (rowCount === 0) {
-            // Already handled elsewhere; return current state.
             return {
               status: tx.status as any,
               mpesaReceiptNumber: tx.mpesaReceiptNumber,
