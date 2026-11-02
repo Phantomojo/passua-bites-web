@@ -1,6 +1,6 @@
 import { getDb } from "./db";
 import { orders, mpesaTransactions } from "../drizzle/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { logger } from "./logger";
 
 /**
@@ -117,11 +117,20 @@ export async function processMpesaCallback(body: any): Promise<void> {
         },
         "[M-Pesa] Amount mismatch in callback"
       );
+      await db
+        .update(mpesaTransactions)
+        .set({ status: "failed", resultCode: code, resultDesc: "Amount mismatch" })
+        .where(eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID));
+      await db
+        .update(orders)
+        .set({ paymentStatus: "failed" })
+        .where(eq(orders.id, tx[0].orderId));
       return;
     }
 
     // Confirm payment
-    await db
+    // Idempotent update: only if not already completed
+    const upd = await db
       .update(mpesaTransactions)
       .set({
         status: "completed",
@@ -129,7 +138,18 @@ export async function processMpesaCallback(body: any): Promise<void> {
         resultCode: code,
         resultDesc: ResultDesc || null,
       })
-      .where(eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID));
+      .where(
+        and(
+          eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+          eq(mpesaTransactions.status, "pending")
+        )
+      )
+      .execute();
+    // If no rows updated, duplicate callback; skip order update
+    if ((upd as any).rowCount === 0 && tx[0].status !== "pending") {
+      logger.info({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Duplicate callback, skipping");
+      return;
+    }
 
     await db
       .update(orders)

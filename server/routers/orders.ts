@@ -3,6 +3,7 @@ import { publicProcedure, adminProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { orders, orderItems, menuItems } from "../../drizzle/schema";
 import { eq, desc, and, inArray } from "drizzle-orm";
+import { signOrderPaymentToken } from "../_core/paymentToken";
 
 // Phone validation for Kenyan numbers
 const phoneRegex = /^(?:\+254|0)[7][0-9]{8}$/;
@@ -410,7 +411,7 @@ export const ordersRouter = router({
           .execute();
       }
 
-      return { success: true, orderId, totalPrice };
+      return { success: true, orderId, totalPrice, paymentToken: signOrderPaymentToken(orderId) };
     }),
 
   // Admin: sales summary

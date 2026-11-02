@@ -4,27 +4,52 @@ import { getDb } from "../db";
 import { orders, mpesaTransactions } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import axios from "axios";
+import {
+  signOrderPaymentToken,
+  verifyOrderPaymentToken,
+} from "../_core/paymentToken";
 
-// M-Pesa configuration
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value || value.trim() === "") {
+    throw new Error(`${name} is required`);
+  }
+  return value.trim();
+}
+
 const isProduction = process.env.NODE_ENV === "production";
 const MPESA_BASE_URL = isProduction
   ? "https://api.safaricom.co.ke"
   : "https://sandbox.safaricom.co.ke";
 
-const MPESA_SHORTCODE = process.env.MPESA_SHORTCODE || "174379";
-const MPESA_PASSKEY = process.env.MPESA_PASSKEY || "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
-const MPESA_CALLBACK_URL =
-  process.env.MPESA_CALLBACK_URL ||
-  (process.env.APP_URL
-    ? `${process.env.APP_URL.replace(/\/$/, "")}/api/payments/callback`
-    : "https://your-domain.com/api/payments/callback");
+function getMpesaConfig() {
+  return {
+    shortcode: requireEnv("MPESA_SHORTCODE"),
+    passkey: requireEnv("MPESA_PASSKEY"),
+    consumerKey: requireEnv("MPESA_CONSUMER_KEY"),
+    consumerSecret: requireEnv("MPESA_CONSUMER_SECRET"),
+    callbackUrl:
+      process.env.MPESA_CALLBACK_URL ||
+      (process.env.APP_URL
+        ? `${process.env.APP_URL.replace(/\/$/, "")}/api/payments/callback`
+        : null),
+  };
+}
 
-// OAuth token cache
+function getCallbackUrl(): string {
+  const cfg = getMpesaConfig();
+  if (!cfg.callbackUrl) {
+    throw new Error("MPESA_CALLBACK_URL or APP_URL is required");
+  }
+  return cfg.callbackUrl;
+}
+
+export { signOrderPaymentToken };
+
 let accessToken: string | null = null;
 let tokenExpiry: Date | null = null;
 
 async function getMpesaAccessToken(): Promise<string> {
-  // Return cached token if still valid (with 60s buffer)
   if (
     accessToken &&
     tokenExpiry &&
@@ -33,11 +58,10 @@ async function getMpesaAccessToken(): Promise<string> {
     return accessToken;
   }
 
-  const consumerKey = process.env.MPESA_CONSUMER_KEY || "";
-  const consumerSecret = process.env.MPESA_CONSUMER_SECRET || "";
-  const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString(
-    "base64"
-  );
+  const cfg = getMpesaConfig();
+  const auth = Buffer.from(
+    `${cfg.consumerKey}:${cfg.consumerSecret}`
+  ).toString("base64");
 
   const response = await axios.get(
     `${MPESA_BASE_URL}/oauth/v1/generate?grant_type=client_credentials`,
@@ -48,11 +72,12 @@ async function getMpesaAccessToken(): Promise<string> {
   );
 
   accessToken = response.data.access_token as string;
-  tokenExpiry = new Date(Date.now() + 3600000); // 1 hour
+  tokenExpiry = new Date(Date.now() + 3600000);
   return accessToken;
 }
 
 function generatePassword(): { password: string; timestamp: string } {
+  const cfg = getMpesaConfig();
   const now = new Date();
   const timestamp =
     now.getFullYear().toString() +
@@ -63,13 +88,13 @@ function generatePassword(): { password: string; timestamp: string } {
     now.getSeconds().toString().padStart(2, "0");
 
   const password = Buffer.from(
-    `${MPESA_SHORTCODE}${MPESA_PASSKEY}${timestamp}`
+    `${cfg.shortcode}${cfg.passkey}${timestamp}`
   ).toString("base64");
   return { password, timestamp };
 }
 
-function formatPhoneNumber(phone: string): string {
-  let cleaned = phone.replace(/[\s\-\+]/g, "");
+export function formatPhoneNumber(phone: string): string {
+  let cleaned = phone.replace(/[\s\-+]/g, "");
   if (cleaned.startsWith("0")) {
     cleaned = "254" + cleaned.slice(1);
   }
@@ -80,19 +105,24 @@ function formatPhoneNumber(phone: string): string {
 }
 
 export const paymentsRouter = router({
-  // Initiate STK Push
   initiateStkPush: publicProcedure
     .input(
       z.object({
         orderId: z.number(),
+        paymentToken: z.string().min(1),
         phoneNumber: z.string(),
       })
     )
     .mutation(async ({ input }) => {
+      if (!verifyOrderPaymentToken(input.paymentToken, input.orderId)) {
+        throw new Error("Invalid payment token");
+      }
+
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
-      // Get order
+      const cfg = getMpesaConfig();
+
       const orderResult = await db
         .select()
         .from(orders)
@@ -107,25 +137,53 @@ export const paymentsRouter = router({
       }
 
       const order = orderResult[0];
+
       const phone = formatPhoneNumber(input.phoneNumber);
-      const amount = Math.round(Number(order.totalPrice)); // Whole numbers only
+      const orderPhone = formatPhoneNumber(order.customerPhone);
+      if (phone !== orderPhone) {
+        throw new Error("Phone number does not match order");
+      }
+
+      const existingTx = await db
+        .select()
+        .from(mpesaTransactions)
+        .where(eq(mpesaTransactions.orderId, input.orderId))
+        .limit(1)
+        .execute();
+
+      if (existingTx.length > 0) {
+        const tx = existingTx[0];
+        if (tx.status === "completed") {
+          throw new Error("Order already paid");
+        }
+        if (tx.status === "pending") {
+          return {
+            success: true,
+            checkoutRequestID: tx.checkoutRequestID,
+            message: "STK Push already pending. Check your phone.",
+          };
+        }
+      }
+
+      const amount = Math.round(Number(order.totalPrice));
 
       const { password, timestamp } = generatePassword();
       const token = await getMpesaAccessToken();
 
+      let response: any;
       try {
-        const response = await axios.post(
+        response = await axios.post(
           `${MPESA_BASE_URL}/mpesa/stkpush/v1/processrequest`,
           {
-            BusinessShortCode: MPESA_SHORTCODE,
+            BusinessShortCode: cfg.shortcode,
             Password: password,
             Timestamp: timestamp,
             TransactionType: "CustomerPayBillOnline",
             Amount: amount,
             PartyA: phone,
-            PartyB: MPESA_SHORTCODE,
+            PartyB: cfg.shortcode,
             PhoneNumber: phone,
-            CallBackURL: MPESA_CALLBACK_URL,
+            CallBackURL: getCallbackUrl(),
             AccountReference: `PB${input.orderId}`,
             TransactionDesc: "Passua Bites order",
           },
@@ -137,33 +195,36 @@ export const paymentsRouter = router({
             timeout: 15000,
           }
         );
-
-        // Store transaction record
-        await db.insert(mpesaTransactions).values({
-          orderId: input.orderId,
-          checkoutRequestID: response.data.CheckoutRequestID,
-          merchantRequestID: response.data.MerchantRequestID,
-          phoneNumber: phone,
-          amount: amount.toString(),
-          accountReference: `PB${input.orderId}`,
-          status: "pending",
-        });
-
-        return {
-          success: true,
-          checkoutRequestID: response.data.CheckoutRequestID,
-          message: "STK Push sent successfully. Check your phone.",
-        };
       } catch (error: any) {
         const errorMsg =
           error.response?.data?.errorMessage || error.message || "STK Push failed";
         throw new Error(`M-Pesa STK Push failed: ${errorMsg}`);
       }
+
+      await db.insert(mpesaTransactions).values({
+        orderId: input.orderId,
+        checkoutRequestID: response.data.CheckoutRequestID,
+        merchantRequestID: response.data.MerchantRequestID,
+        phoneNumber: phone,
+        amount: amount.toString(),
+        accountReference: `PB${input.orderId}`,
+        status: "pending",
+      });
+
+      return {
+        success: true,
+        checkoutRequestID: response.data.CheckoutRequestID,
+        message: "STK Push sent successfully. Check your phone.",
+      };
     }),
 
-  // Query payment status
   queryStatus: publicProcedure
-    .input(z.object({ checkoutRequestID: z.string() }))
+    .input(
+      z.object({
+        checkoutRequestID: z.string(),
+        paymentToken: z.string().min(1),
+      })
+    )
     .query(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
@@ -182,8 +243,10 @@ export const paymentsRouter = router({
       }
 
       const tx = transaction[0];
+      if (!verifyOrderPaymentToken(input.paymentToken, tx.orderId)) {
+        throw new Error("Invalid payment token");
+      }
 
-      // If already completed, return cached status
       if (tx.status === "completed") {
         return {
           status: "completed",
@@ -192,7 +255,7 @@ export const paymentsRouter = router({
         };
       }
 
-      // Query Safaricom API
+      const cfg = getMpesaConfig();
       const { password, timestamp } = generatePassword();
       const token = await getMpesaAccessToken();
 
@@ -200,7 +263,7 @@ export const paymentsRouter = router({
         const response = await axios.post(
           `${MPESA_BASE_URL}/mpesa/stkpushquery/v1/query`,
           {
-            BusinessShortCode: MPESA_SHORTCODE,
+            BusinessShortCode: cfg.shortcode,
             Password: password,
             Timestamp: timestamp,
             CheckoutRequestID: input.checkoutRequestID,
@@ -217,7 +280,6 @@ export const paymentsRouter = router({
         const resultCode = Number(response.data.ResultCode);
 
         if (resultCode === 0) {
-          // Payment completed - update records
           const metadata: Record<string, any> = {};
           response.data.CallbackMetadata?.Item?.forEach((item: any) => {
             metadata[item.Name] = item.Value;
@@ -253,7 +315,6 @@ export const paymentsRouter = router({
             resultCode: 0,
           };
         } else {
-          // Payment failed or pending
           const status =
             resultCode === 1032 ? "cancelled" : "failed";
           await db
@@ -277,7 +338,6 @@ export const paymentsRouter = router({
           };
         }
       } catch (error: any) {
-        // Query failed - return current status
         return {
           status: tx.status,
           resultDesc: "Query failed, check callback for status",
@@ -286,10 +346,18 @@ export const paymentsRouter = router({
       }
     }),
 
-  // Get order payment status
   getOrderPaymentStatus: publicProcedure
-    .input(z.object({ orderId: z.number() }))
+    .input(
+      z.object({
+        orderId: z.number(),
+        paymentToken: z.string().min(1),
+      })
+    )
     .query(async ({ input }) => {
+      if (!verifyOrderPaymentToken(input.paymentToken, input.orderId)) {
+        throw new Error("Invalid payment token");
+      }
+
       const db = await getDb();
       if (!db) return { paymentStatus: "unknown" };
 
