@@ -8,6 +8,19 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
+// shared/const.ts
+var COOKIE_NAME, ONE_YEAR_MS, AXIOS_TIMEOUT_MS, UNAUTHED_ERR_MSG, NOT_ADMIN_ERR_MSG;
+var init_const = __esm({
+  "shared/const.ts"() {
+    "use strict";
+    COOKIE_NAME = "app_session_id";
+    ONE_YEAR_MS = 1e3 * 60 * 60 * 24 * 365;
+    AXIOS_TIMEOUT_MS = 3e4;
+    UNAUTHED_ERR_MSG = "Please login (10001)";
+    NOT_ADMIN_ERR_MSG = "You do not have required permission (10002)";
+  }
+});
+
 // server/logger.ts
 import pino from "pino";
 var level, logger;
@@ -53,6 +66,49 @@ var init_env = __esm({
   }
 });
 
+// server/_core/trpc.ts
+import { initTRPC, TRPCError as TRPCError2 } from "@trpc/server";
+import superjson from "superjson";
+var t, router, publicProcedure, requireUser, protectedProcedure, adminProcedure;
+var init_trpc = __esm({
+  "server/_core/trpc.ts"() {
+    "use strict";
+    init_const();
+    t = initTRPC.context().create({
+      transformer: superjson
+    });
+    router = t.router;
+    publicProcedure = t.procedure;
+    requireUser = t.middleware(async (opts) => {
+      const { ctx, next } = opts;
+      if (!ctx.user) {
+        throw new TRPCError2({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+      }
+      return next({
+        ctx: {
+          ...ctx,
+          user: ctx.user
+        }
+      });
+    });
+    protectedProcedure = t.procedure.use(requireUser);
+    adminProcedure = t.procedure.use(
+      t.middleware(async (opts) => {
+        const { ctx, next } = opts;
+        if (!ctx.user || ctx.user.role !== "admin") {
+          throw new TRPCError2({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+        }
+        return next({
+          ctx: {
+            ...ctx,
+            user: ctx.user
+          }
+        });
+      })
+    );
+  }
+});
+
 // drizzle/schema.ts
 var schema_exports = {};
 __export(schema_exports, {
@@ -60,6 +116,7 @@ __export(schema_exports, {
   analyticsEvents: () => analyticsEvents,
   announcements: () => announcements,
   menuItems: () => menuItems,
+  mpesaCallbackEvents: () => mpesaCallbackEvents,
   mpesaTransactions: () => mpesaTransactions,
   orderItems: () => orderItems,
   orders: () => orders,
@@ -67,9 +124,11 @@ __export(schema_exports, {
   siteSettings: () => siteSettings,
   users: () => users
 });
+import { sql } from "drizzle-orm";
 import {
   decimal,
   index,
+  uniqueIndex,
   serial,
   pgTable,
   text,
@@ -77,7 +136,7 @@ import {
   varchar,
   integer
 } from "drizzle-orm/pg-core";
-var users, menuItems, orders, orderItems, reviews, siteSettings, mpesaTransactions, analyticsEvents, announcements, adminUsers;
+var users, menuItems, orders, orderItems, reviews, siteSettings, mpesaTransactions, analyticsEvents, announcements, adminUsers, mpesaCallbackEvents;
 var init_schema = __esm({
   "drizzle/schema.ts"() {
     "use strict";
@@ -117,6 +176,9 @@ var init_schema = __esm({
       paymentMethod: varchar("paymentMethod", { length: 50 }).default("mpesa").notNull(),
       paymentStatus: varchar("paymentStatus", { length: 20 }).default("pending").notNull(),
       channel: varchar("channel", { length: 20 }).default("online").notNull(),
+      paidBy: varchar("paidBy", { length: 64 }),
+      paidAt: timestamp("paidAt"),
+      paymentReason: text("paymentReason"),
       mpesaTransactionId: varchar("mpesaTransactionId", { length: 255 }),
       notes: text("notes"),
       createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -162,7 +224,10 @@ var init_schema = __esm({
       resultDesc: text("resultDesc"),
       createdAt: timestamp("createdAt").defaultNow().notNull(),
       updatedAt: timestamp("updatedAt").defaultNow().notNull()
-    }, (t2) => [index("idx_mpesaTransactions_orderId").on(t2.orderId)]);
+    }, (t2) => [
+      index("idx_mpesaTransactions_orderId").on(t2.orderId),
+      uniqueIndex("uniq_mpesaTransactions_active_order").on(t2.orderId).where(sql`${t2.status} IN ('initiating', 'pending', 'unknown')`)
+    ]);
     analyticsEvents = pgTable("analyticsEvents", {
       id: serial("id").primaryKey(),
       sessionId: varchar("sessionId", { length: 64 }).notNull(),
@@ -199,6 +264,15 @@ var init_schema = __esm({
       createdAt: timestamp("createdAt").defaultNow().notNull(),
       updatedAt: timestamp("updatedAt").defaultNow().notNull()
     });
+    mpesaCallbackEvents = pgTable("mpesaCallbackEvents", {
+      id: serial("id").primaryKey(),
+      idempotencyKey: varchar("idempotencyKey", { length: 255 }).notNull().unique(),
+      payload: text("payload").notNull(),
+      receivedAt: timestamp("receivedAt").defaultNow().notNull(),
+      status: varchar("status", { length: 20 }).default("received").notNull(),
+      processedAt: timestamp("processedAt"),
+      error: text("error")
+    });
   }
 });
 
@@ -225,8 +299,8 @@ import { neon } from "@neondatabase/serverless";
 async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      const sql2 = neon(process.env.DATABASE_URL);
-      _db = drizzle(sql2);
+      const sql5 = neon(process.env.DATABASE_URL);
+      _db = drizzle(sql5);
     } catch (error) {
       logger.warn({ err: error }, "[Database] Failed to connect");
       _db = null;
@@ -362,16 +436,850 @@ var init_db = __esm({
   }
 });
 
+// server/_core/paymentToken.ts
+import crypto from "crypto";
+function getSecret() {
+  const isProduction2 = process.env.NODE_ENV === "production";
+  const secret = process.env.ORDER_PAYMENT_TOKEN_SECRET;
+  if (isProduction2) {
+    if (!secret || secret.trim() === "") {
+      throw new Error("ORDER_PAYMENT_TOKEN_SECRET is required in production");
+    }
+    return secret.trim();
+  }
+  return (secret || process.env.JWT_SECRET || process.env.COOKIE_SECRET || "dev-payment-token-secret").trim();
+}
+function encodePayload(payload) {
+  return Buffer.from(JSON.stringify(payload)).toString("base64url");
+}
+function signOrderPaymentToken(orderId, expiresInMs = DEFAULT_TTL_MS) {
+  const payload = {
+    v: TOKEN_VERSION,
+    p: TOKEN_PURPOSE,
+    o: orderId,
+    exp: Date.now() + expiresInMs
+  };
+  const encoded = encodePayload(payload);
+  const hmac = crypto.createHmac("sha256", getSecret()).update(encoded).digest("base64url");
+  return `${encoded}.${hmac}`;
+}
+function verifyOrderPaymentToken(token, orderId) {
+  if (typeof token !== "string" || token.indexOf(".") === -1) return false;
+  const [encoded, hmac] = token.split(".");
+  if (!encoded || !hmac) return false;
+  let payload;
+  try {
+    payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
+  } catch {
+    return false;
+  }
+  if (!payload || typeof payload !== "object") return false;
+  if (payload.v !== TOKEN_VERSION) return false;
+  if (payload.p !== TOKEN_PURPOSE) return false;
+  if (payload.o !== orderId) return false;
+  if (typeof payload.exp !== "number" || !Number.isFinite(payload.exp)) return false;
+  if (Date.now() > payload.exp) return false;
+  const expected = crypto.createHmac("sha256", getSecret()).update(encoded).digest("base64url");
+  const a = Buffer.from(hmac);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+var TOKEN_VERSION, TOKEN_PURPOSE, DEFAULT_TTL_MS;
+var init_paymentToken = __esm({
+  "server/_core/paymentToken.ts"() {
+    "use strict";
+    TOKEN_VERSION = 1;
+    TOKEN_PURPOSE = "order_payment";
+    DEFAULT_TTL_MS = 2 * 60 * 60 * 1e3;
+  }
+});
+
+// server/routers/payments.ts
+import crypto2 from "crypto";
+import { z as z3 } from "zod";
+import { eq as eq3, and, desc, inArray, sql as sql2 } from "drizzle-orm";
+import axios from "axios";
+function requireEnv(name) {
+  const value = process.env[name];
+  if (!value || value.trim() === "") {
+    throw new Error(`${name} is required`);
+  }
+  return value.trim();
+}
+function getMpesaConfig() {
+  return {
+    shortcode: requireEnv("MPESA_SHORTCODE"),
+    passkey: requireEnv("MPESA_PASSKEY"),
+    consumerKey: requireEnv("MPESA_CONSUMER_KEY"),
+    consumerSecret: requireEnv("MPESA_CONSUMER_SECRET"),
+    callbackUrl: process.env.MPESA_CALLBACK_URL || (process.env.APP_URL ? `${process.env.APP_URL.replace(/\/$/, "")}/api/payments/callback` : null)
+  };
+}
+function getCallbackUrl() {
+  const cfg = getMpesaConfig();
+  if (!cfg.callbackUrl) {
+    throw new Error("MPESA_CALLBACK_URL or APP_URL is required");
+  }
+  const secret = process.env.MPESA_CALLBACK_SECRET;
+  const isProduction2 = process.env.NODE_ENV === "production";
+  if (isProduction2) {
+    if (!secret || secret.trim() === "") {
+      throw new Error("MPESA_CALLBACK_SECRET is required in production");
+    }
+  }
+  if (secret && secret.trim() !== "") {
+    const url = new URL(cfg.callbackUrl);
+    url.searchParams.set("token", secret.trim());
+    return url.toString();
+  }
+  return cfg.callbackUrl;
+}
+async function queryStkPushStatus(checkoutRequestID) {
+  const cfg = getMpesaConfig();
+  const { password, timestamp: timestamp2 } = generatePassword();
+  const token = await getMpesaAccessToken();
+  const response = await axios.post(
+    `${MPESA_BASE_URL}/mpesa/stkpushquery/v1/query`,
+    {
+      BusinessShortCode: cfg.shortcode,
+      Password: password,
+      Timestamp: timestamp2,
+      CheckoutRequestID: checkoutRequestID
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      timeout: 1e4
+    }
+  );
+  return response.data;
+}
+async function getMpesaAccessToken() {
+  if (accessToken && tokenExpiry && /* @__PURE__ */ new Date() < new Date(tokenExpiry.getTime() - 6e4)) {
+    return accessToken;
+  }
+  const cfg = getMpesaConfig();
+  const auth = Buffer.from(
+    `${cfg.consumerKey}:${cfg.consumerSecret}`
+  ).toString("base64");
+  const response = await axios.get(
+    `${MPESA_BASE_URL}/oauth/v1/generate?grant_type=client_credentials`,
+    {
+      headers: { Authorization: `Basic ${auth}` },
+      timeout: 1e4
+    }
+  );
+  accessToken = response.data.access_token;
+  tokenExpiry = new Date(Date.now() + 36e5);
+  return accessToken;
+}
+function generatePassword() {
+  const cfg = getMpesaConfig();
+  const now = /* @__PURE__ */ new Date();
+  const timestamp2 = now.getFullYear().toString() + (now.getMonth() + 1).toString().padStart(2, "0") + now.getDate().toString().padStart(2, "0") + now.getHours().toString().padStart(2, "0") + now.getMinutes().toString().padStart(2, "0") + now.getSeconds().toString().padStart(2, "0");
+  const password = Buffer.from(
+    `${cfg.shortcode}${cfg.passkey}${timestamp2}`
+  ).toString("base64");
+  return { password, timestamp: timestamp2 };
+}
+function formatPhoneNumber(phone) {
+  let cleaned = phone.replace(/[\s\-+]/g, "");
+  if (cleaned.startsWith("0")) {
+    cleaned = "254" + cleaned.slice(1);
+  }
+  if (!/^254[17]\d{8}$/.test(cleaned)) {
+    throw new Error("Invalid Kenyan phone number format");
+  }
+  return cleaned;
+}
+var isProduction, MPESA_BASE_URL, accessToken, tokenExpiry, paymentsRouter;
+var init_payments = __esm({
+  "server/routers/payments.ts"() {
+    "use strict";
+    init_trpc();
+    init_db();
+    init_schema();
+    init_paymentToken();
+    isProduction = process.env.NODE_ENV === "production";
+    MPESA_BASE_URL = isProduction ? "https://api.safaricom.co.ke" : "https://sandbox.safaricom.co.ke";
+    accessToken = null;
+    tokenExpiry = null;
+    paymentsRouter = router({
+      initiateStkPush: publicProcedure.input(
+        z3.object({
+          orderId: z3.number(),
+          paymentToken: z3.string().min(1),
+          phoneNumber: z3.string()
+        })
+      ).mutation(async ({ input }) => {
+        if (!verifyOrderPaymentToken(input.paymentToken, input.orderId)) {
+          throw new Error("Invalid payment token");
+        }
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        const cfg = getMpesaConfig();
+        const orderResult = await db.select().from(orders).where(
+          and(eq3(orders.id, input.orderId), eq3(orders.status, "pending"))
+        ).limit(1).execute();
+        if (orderResult.length === 0) {
+          throw new Error("Order not found or not in pending state");
+        }
+        const order = orderResult[0];
+        if (order.paymentStatus === "completed") {
+          throw new Error("Order already paid");
+        }
+        const phone = formatPhoneNumber(input.phoneNumber);
+        const orderPhone = formatPhoneNumber(order.customerPhone);
+        if (phone !== orderPhone) {
+          throw new Error("Phone number does not match order");
+        }
+        const existingTx = await db.select().from(mpesaTransactions).where(eq3(mpesaTransactions.orderId, input.orderId)).orderBy(desc(mpesaTransactions.createdAt)).limit(1).execute();
+        if (existingTx.length > 0) {
+          const tx = existingTx[0];
+          if (tx.status === "completed") {
+            throw new Error("Order already paid");
+          }
+          if (tx.status === "pending") {
+            return {
+              success: true,
+              checkoutRequestID: tx.checkoutRequestID,
+              message: "STK Push already pending. Check your phone."
+            };
+          }
+        }
+        const amount = Number(order.totalPrice);
+        if (!Number.isFinite(amount) || amount <= 0) {
+          throw new Error("Order amount must be a positive number");
+        }
+        if (!Number.isInteger(amount)) {
+          throw new Error("Order amount must be a whole number of KSh");
+        }
+        const oauthToken = await getMpesaAccessToken();
+        const callbackUrl = getCallbackUrl();
+        const reservationKey = `INITIATING-${crypto2.randomUUID()}`;
+        let reservationId;
+        try {
+          const result = await db.execute(sql2`
+          INSERT INTO "mpesaTransactions" (
+            "orderId", "checkoutRequestID", "merchantRequestID", "phoneNumber", "amount",
+            "accountReference", "status"
+          )
+          SELECT ${input.orderId}, ${reservationKey}, NULL, ${phone}, ${amount.toString()}, ${`PB${input.orderId}`}, 'initiating'
+          WHERE NOT EXISTS (
+            SELECT 1 FROM "orders" WHERE "id" = ${input.orderId} AND "paymentStatus" = 'completed'
+          )
+          RETURNING "id"
+        `);
+          const rows2 = result.rows || (Array.isArray(result) ? result : []);
+          if (!rows2 || rows2.length === 0 || !rows2[0]?.id) {
+            throw new Error("Order already paid");
+          }
+          reservationId = rows2[0].id;
+        } catch (reserveError) {
+          const [existing] = await db.select().from(mpesaTransactions).where(eq3(mpesaTransactions.orderId, input.orderId)).orderBy(desc(mpesaTransactions.createdAt)).limit(1).execute();
+          if (existing && (existing.status === "pending" || existing.status === "initiating" || existing.status === "unknown")) {
+            return {
+              success: true,
+              checkoutRequestID: existing.checkoutRequestID,
+              message: "STK Push already in progress. Check your phone."
+            };
+          }
+          if (reserveError?.message === "Order already paid") {
+            throw new Error("Order already paid");
+          }
+          throw reserveError;
+        }
+        const { password, timestamp: timestamp2 } = generatePassword();
+        const token = oauthToken;
+        let response;
+        try {
+          response = await axios.post(
+            `${MPESA_BASE_URL}/mpesa/stkpush/v1/processrequest`,
+            {
+              BusinessShortCode: cfg.shortcode,
+              Password: password,
+              Timestamp: timestamp2,
+              TransactionType: "CustomerPayBillOnline",
+              Amount: amount,
+              PartyA: phone,
+              PartyB: cfg.shortcode,
+              PhoneNumber: phone,
+              CallBackURL: callbackUrl,
+              AccountReference: `PB${input.orderId}`,
+              TransactionDesc: "Passua Bites order"
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json"
+              },
+              timeout: 15e3
+            }
+          );
+        } catch (error) {
+          const isAmbiguous = !error?.response || error?.code === "ECONNABORTED" || error?.code === "ETIMEDOUT" || /timeout/i.test(String(error?.message || ""));
+          const errorMsg = error.response?.data?.errorMessage || error.message || "STK Push failed";
+          await db.update(mpesaTransactions).set({
+            status: isAmbiguous ? "unknown" : "failed",
+            resultDesc: isAmbiguous ? "Ambiguous STK response; reconcile before retry" : `STK Push failed: ${errorMsg}`
+          }).where(eq3(mpesaTransactions.id, reservationId)).execute().catch(() => void 0);
+          throw new Error(`M-Pesa STK Push failed: ${errorMsg}`);
+        }
+        try {
+          await db.update(mpesaTransactions).set({
+            checkoutRequestID: response.data.CheckoutRequestID,
+            merchantRequestID: response.data.MerchantRequestID,
+            status: "pending"
+          }).where(eq3(mpesaTransactions.id, reservationId)).execute();
+        } catch (insertError) {
+          const returnedCheckout = response?.data?.CheckoutRequestID;
+          const returnedMerchant = response?.data?.MerchantRequestID;
+          await db.update(mpesaTransactions).set({
+            status: "unknown",
+            resultDesc: `Safaricom accepted but persistence failed; reconcile. checkout=${returnedCheckout || "unknown"} merchant=${returnedMerchant || "unknown"}`
+          }).where(eq3(mpesaTransactions.id, reservationId)).execute().catch(() => void 0);
+          throw insertError;
+        }
+        return {
+          success: true,
+          checkoutRequestID: response.data.CheckoutRequestID,
+          message: "STK Push sent successfully. Check your phone."
+        };
+      }),
+      queryStatus: publicProcedure.input(
+        z3.object({
+          checkoutRequestID: z3.string(),
+          paymentToken: z3.string().min(1)
+        })
+      ).query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        const transaction = await db.select().from(mpesaTransactions).where(
+          eq3(mpesaTransactions.checkoutRequestID, input.checkoutRequestID)
+        ).limit(1).execute();
+        if (transaction.length === 0) {
+          throw new Error("Transaction not found");
+        }
+        const tx = transaction[0];
+        if (!verifyOrderPaymentToken(input.paymentToken, tx.orderId)) {
+          throw new Error("Invalid payment token");
+        }
+        if (tx.status === "completed") {
+          return {
+            status: "completed",
+            mpesaReceiptNumber: tx.mpesaReceiptNumber,
+            resultCode: tx.resultCode ?? 0
+          };
+        }
+        const cfg = getMpesaConfig();
+        const { password, timestamp: timestamp2 } = generatePassword();
+        const token = await getMpesaAccessToken();
+        try {
+          const response = await axios.post(
+            `${MPESA_BASE_URL}/mpesa/stkpushquery/v1/query`,
+            {
+              BusinessShortCode: cfg.shortcode,
+              Password: password,
+              Timestamp: timestamp2,
+              CheckoutRequestID: input.checkoutRequestID
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json"
+              },
+              timeout: 1e4
+            }
+          );
+          const resultCode = Number(response.data.ResultCode);
+          if (resultCode === 0) {
+            const queryCheckoutId = response.data.CheckoutRequestID;
+            const queryMerchantId = response.data.MerchantRequestID;
+            if (!queryCheckoutId || queryCheckoutId !== input.checkoutRequestID || queryCheckoutId !== tx.checkoutRequestID) {
+              await db.update(mpesaTransactions).set({ status: "pending", resultCode, resultDesc: "CheckoutRequestID mismatch" }).where(
+                and(
+                  eq3(mpesaTransactions.checkoutRequestID, input.checkoutRequestID),
+                  eq3(mpesaTransactions.status, "pending")
+                )
+              ).execute();
+              return { status: "pending", resultDesc: "CheckoutRequestID mismatch", resultCode };
+            }
+            if (!queryMerchantId || !tx.merchantRequestID || queryMerchantId !== tx.merchantRequestID) {
+              await db.update(mpesaTransactions).set({ status: "pending", resultCode, resultDesc: "MerchantRequestID mismatch" }).where(
+                and(
+                  eq3(mpesaTransactions.checkoutRequestID, input.checkoutRequestID),
+                  eq3(mpesaTransactions.status, "pending")
+                )
+              ).execute();
+              return { status: "pending", resultDesc: "MerchantRequestID mismatch", resultCode };
+            }
+            if (!tx.mpesaReceiptNumber) {
+              await db.update(mpesaTransactions).set({ status: "pending", resultCode, resultDesc: "Awaiting callback metadata" }).where(
+                and(
+                  eq3(mpesaTransactions.checkoutRequestID, input.checkoutRequestID),
+                  eq3(mpesaTransactions.status, "pending")
+                )
+              ).execute();
+              return { status: "pending", resultDesc: "Awaiting callback metadata", resultCode };
+            }
+            const receipt = tx.mpesaReceiptNumber;
+            const upd = await db.update(mpesaTransactions).set({
+              status: "completed",
+              mpesaReceiptNumber: receipt,
+              resultCode,
+              resultDesc: response.data.ResultDesc
+            }).where(
+              and(
+                eq3(mpesaTransactions.checkoutRequestID, input.checkoutRequestID),
+                eq3(mpesaTransactions.status, "pending")
+              )
+            ).execute();
+            const rowCount = upd.rowCount ?? 0;
+            if (rowCount === 0) {
+              return {
+                status: tx.status,
+                mpesaReceiptNumber: tx.mpesaReceiptNumber,
+                resultCode: tx.resultCode ?? 0
+              };
+            }
+            const [order] = await db.select().from(orders).where(eq3(orders.id, tx.orderId)).limit(1).execute();
+            await db.update(orders).set({
+              paymentStatus: "completed",
+              mpesaTransactionId: receipt,
+              paymentReason: order?.status === "cancelled" ? "Late payment after cancellation - reconcile/refund" : order?.paymentReason ?? null
+            }).where(
+              and(
+                eq3(orders.id, tx.orderId),
+                inArray(orders.paymentStatus, ["pending", "failed"])
+              )
+            ).execute();
+            await db.update(orders).set({ status: "confirmed" }).where(and(eq3(orders.id, tx.orderId), eq3(orders.status, "pending"))).execute();
+            return {
+              status: "completed",
+              mpesaReceiptNumber: receipt,
+              resultCode: 0
+            };
+          } else {
+            const status = resultCode === 1032 ? "cancelled" : "failed";
+            await db.update(mpesaTransactions).set({
+              status,
+              resultCode,
+              resultDesc: response.data.ResultDesc
+            }).where(
+              and(
+                eq3(mpesaTransactions.checkoutRequestID, input.checkoutRequestID),
+                eq3(mpesaTransactions.status, "pending")
+              )
+            );
+            return {
+              status,
+              resultDesc: response.data.ResultDesc,
+              resultCode
+            };
+          }
+        } catch (error) {
+          return {
+            status: tx.status,
+            resultDesc: "Query failed, check callback for status",
+            resultCode: tx.resultCode
+          };
+        }
+      }),
+      reconcileStkAttempt: adminProcedure.input(
+        z3.object({
+          orderId: z3.number(),
+          checkoutRequestID: z3.string().min(1),
+          merchantRequestID: z3.string().min(1),
+          resolution: z3.enum(["pending", "failed"])
+        })
+      ).mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        const [tx] = await db.select().from(mpesaTransactions).where(eq3(mpesaTransactions.orderId, input.orderId)).orderBy(desc(mpesaTransactions.createdAt)).limit(1).execute();
+        if (!tx || tx.status !== "initiating" && tx.status !== "unknown") {
+          throw new Error("No reconcilable STK attempt found");
+        }
+        let queryData;
+        try {
+          queryData = await queryStkPushStatus(input.checkoutRequestID);
+        } catch (error) {
+          throw new Error("Provider verification unavailable");
+        }
+        const queryCheckoutId = queryData?.CheckoutRequestID;
+        const queryMerchantId = queryData?.MerchantRequestID;
+        const queryResultCode = Number(queryData?.ResultCode);
+        if (!queryCheckoutId || queryCheckoutId !== input.checkoutRequestID || !queryMerchantId || queryMerchantId !== input.merchantRequestID) {
+          throw new Error("Provider identifiers do not match");
+        }
+        if (input.resolution === "failed") {
+          if (queryResultCode === 0 || Number.isNaN(queryResultCode)) {
+            throw new Error("Cannot mark a successful or ambiguous attempt as failed");
+          }
+        } else {
+          if (queryResultCode !== 0) {
+            throw new Error("Provider did not confirm the attempt");
+          }
+        }
+        const upd = await db.update(mpesaTransactions).set({
+          checkoutRequestID: input.checkoutRequestID,
+          merchantRequestID: input.merchantRequestID,
+          status: input.resolution,
+          resultDesc: "Reconciled by admin after provider verification"
+        }).where(
+          and(
+            eq3(mpesaTransactions.id, tx.id),
+            inArray(mpesaTransactions.status, ["initiating", "unknown"])
+          )
+        ).execute();
+        const rowCount = upd.rowCount ?? 0;
+        if (rowCount === 0) {
+          throw new Error("Reconciliation lost the race");
+        }
+        return { success: true };
+      }),
+      getOrderPaymentStatus: publicProcedure.input(
+        z3.object({
+          orderId: z3.number(),
+          paymentToken: z3.string().min(1)
+        })
+      ).query(async ({ input }) => {
+        if (!verifyOrderPaymentToken(input.paymentToken, input.orderId)) {
+          throw new Error("Invalid payment token");
+        }
+        const db = await getDb();
+        if (!db) return { paymentStatus: "unknown" };
+        const orderResult = await db.select().from(orders).where(eq3(orders.id, input.orderId)).limit(1).execute();
+        if (orderResult.length === 0) {
+          throw new Error("Order not found");
+        }
+        const order = orderResult[0];
+        const txResult = await db.select().from(mpesaTransactions).where(eq3(mpesaTransactions.orderId, input.orderId)).orderBy(desc(mpesaTransactions.createdAt)).limit(1).execute();
+        return {
+          paymentStatus: order.paymentStatus,
+          orderStatus: order.status,
+          mpesaReceiptNumber: txResult.length > 0 ? txResult[0].mpesaReceiptNumber : null
+        };
+      })
+    });
+  }
+});
+
+// server/mpesaCallback.ts
+var mpesaCallback_exports = {};
+__export(mpesaCallback_exports, {
+  processMpesaCallback: () => processMpesaCallback,
+  processMpesaCallbackDurable: () => processMpesaCallbackDurable,
+  reconcileOrderPayment: () => reconcileOrderPayment
+});
+import crypto3 from "crypto";
+import { eq as eq4, and as and2, desc as desc2, inArray as inArray2 } from "drizzle-orm";
+async function reconcileOrderPayment(orderId) {
+  const db = await getDb();
+  if (!db) return;
+  const [tx] = await db.select().from(mpesaTransactions).where(
+    and2(eq4(mpesaTransactions.orderId, orderId), eq4(mpesaTransactions.status, "completed"))
+  ).orderBy(desc2(mpesaTransactions.createdAt)).limit(1).execute();
+  if (!tx) return;
+  const [order] = await db.select().from(orders).where(eq4(orders.id, orderId)).limit(1).execute();
+  if (!order) return;
+  if (order.paymentStatus === "completed") return;
+  await db.update(orders).set({
+    paymentStatus: "completed",
+    mpesaTransactionId: tx.mpesaReceiptNumber || order.mpesaTransactionId,
+    paymentReason: order.paymentReason || "Reconciled from completed M-Pesa transaction",
+    status: order.status === "pending" ? "confirmed" : order.status
+  }).where(eq4(orders.id, orderId)).execute();
+}
+async function processMpesaCallbackDurable(payload) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const body = payload?.Body?.stkCallback || {};
+  const checkoutRequestID = body.CheckoutRequestID;
+  const resultCode = body.ResultCode;
+  const keySource = checkoutRequestID ? `${checkoutRequestID}:${resultCode}` : JSON.stringify(payload);
+  const idempotencyKey = crypto3.createHash("sha256").update(keySource).digest("hex");
+  let eventId = null;
+  try {
+    const [row] = await db.insert(mpesaCallbackEvents).values({
+      idempotencyKey,
+      payload: JSON.stringify(payload),
+      status: "received"
+    }).returning({ id: mpesaCallbackEvents.id });
+    eventId = row.id;
+  } catch (error) {
+    const [existing] = await db.select().from(mpesaCallbackEvents).where(eq4(mpesaCallbackEvents.idempotencyKey, idempotencyKey)).limit(1).execute();
+    if (existing?.status === "processed") {
+      logger.info({ idempotencyKey }, "[M-Pesa] Duplicate callback already processed");
+      return;
+    }
+    eventId = existing?.id ?? null;
+  }
+  try {
+    await processMpesaCallback(payload);
+    if (eventId) {
+      await db.update(mpesaCallbackEvents).set({ status: "processed", processedAt: /* @__PURE__ */ new Date() }).where(eq4(mpesaCallbackEvents.id, eventId)).execute();
+    }
+  } catch (error) {
+    if (eventId) {
+      await db.update(mpesaCallbackEvents).set({ status: "failed", error: String(error), processedAt: /* @__PURE__ */ new Date() }).where(eq4(mpesaCallbackEvents.id, eventId)).execute().catch(() => void 0);
+    }
+    throw error;
+  }
+}
+async function processMpesaCallback(body) {
+  try {
+    const { Body } = body || {};
+    if (!Body || !Body.stkCallback) {
+      logger.error("[M-Pesa] Invalid callback payload (missing stkCallback)");
+      return;
+    }
+    const { stkCallback } = Body;
+    const { ResultCode, CheckoutRequestID, CallbackMetadata, ResultDesc } = stkCallback;
+    const code = Number(ResultCode);
+    const db = await getDb();
+    if (!db) {
+      logger.error("[M-Pesa] Database not available for callback");
+      return;
+    }
+    const tx = await db.select().from(mpesaTransactions).where(eq4(mpesaTransactions.checkoutRequestID, CheckoutRequestID)).limit(1).execute();
+    if (tx.length === 0) {
+      logger.error(
+        { checkoutRequestID: CheckoutRequestID },
+        "[M-Pesa] Transaction not found for callback"
+      );
+      return;
+    }
+    const transaction = tx[0];
+    const callbackMerchantRequestID = stkCallback.MerchantRequestID;
+    if (!callbackMerchantRequestID || !transaction.merchantRequestID || callbackMerchantRequestID !== transaction.merchantRequestID) {
+      logger.error(
+        { checkoutRequestID: CheckoutRequestID },
+        "[M-Pesa] Merchant request ID missing or mismatched in callback"
+      );
+      await db.update(mpesaTransactions).set({ status: "pending", resultDesc: "Merchant request ID mismatch" }).where(
+        and2(
+          eq4(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+          eq4(mpesaTransactions.status, "pending")
+        )
+      ).execute();
+      return;
+    }
+    if (transaction.status === "completed") {
+      logger.info(
+        { checkoutRequestID: CheckoutRequestID },
+        "[M-Pesa] Duplicate callback for completed payment, skipping"
+      );
+      return;
+    }
+    if (code !== 0) {
+      const status = code === 1032 ? "cancelled" : "failed";
+      await db.update(mpesaTransactions).set({
+        status,
+        resultCode: code,
+        resultDesc: ResultDesc || null
+      }).where(
+        and2(
+          eq4(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+          eq4(mpesaTransactions.status, "pending")
+        )
+      ).execute();
+      await db.update(orders).set({ paymentStatus: "failed" }).where(
+        and2(eq4(orders.id, transaction.orderId), eq4(orders.paymentStatus, "pending"))
+      ).execute();
+      logger.info(
+        { status, code, checkoutRequestID: CheckoutRequestID },
+        "[M-Pesa] Payment not completed"
+      );
+      return;
+    }
+    let queryData;
+    try {
+      queryData = await queryStkPushStatus(CheckoutRequestID);
+    } catch (error) {
+      logger.error({ err: error, checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Daraja verification failed");
+      await db.update(mpesaTransactions).set({ status: "pending", resultDesc: "Provider verification unavailable" }).where(
+        and2(
+          eq4(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+          eq4(mpesaTransactions.status, "pending")
+        )
+      ).execute();
+      return;
+    }
+    if (Number(queryData?.ResultCode) !== 0) {
+      logger.info({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Daraja verification did not confirm payment");
+      await db.update(mpesaTransactions).set({ status: "pending", resultDesc: "Provider verification pending" }).where(
+        and2(
+          eq4(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+          eq4(mpesaTransactions.status, "pending")
+        )
+      ).execute();
+      return;
+    }
+    if (!queryData?.CheckoutRequestID || queryData.CheckoutRequestID !== CheckoutRequestID || queryData.CheckoutRequestID !== transaction.checkoutRequestID) {
+      logger.error({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] CheckoutRequestID mismatch in query");
+      await db.update(mpesaTransactions).set({ status: "pending", resultDesc: "CheckoutRequestID mismatch" }).where(
+        and2(
+          eq4(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+          eq4(mpesaTransactions.status, "pending")
+        )
+      ).execute();
+      return;
+    }
+    if (!queryData?.MerchantRequestID || queryData.MerchantRequestID !== callbackMerchantRequestID || queryData.MerchantRequestID !== transaction.merchantRequestID) {
+      logger.error({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] MerchantRequestID mismatch in query");
+      await db.update(mpesaTransactions).set({ status: "pending", resultDesc: "MerchantRequestID mismatch" }).where(
+        and2(
+          eq4(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+          eq4(mpesaTransactions.status, "pending")
+        )
+      ).execute();
+      return;
+    }
+    const metadata = {};
+    CallbackMetadata?.Item?.forEach((item) => {
+      metadata[item.Name] = item.Value;
+    });
+    const receipt = metadata.MpesaReceiptNumber;
+    const amount = metadata.Amount;
+    const phone = metadata.PhoneNumber;
+    if (!receipt || amount === void 0 || amount === null) {
+      logger.error(
+        { checkoutRequestID: CheckoutRequestID },
+        "[M-Pesa] Missing receipt or amount in callback"
+      );
+      await db.update(mpesaTransactions).set({
+        status: "pending",
+        resultCode: code,
+        resultDesc: "Insufficient payment evidence"
+      }).where(
+        and2(
+          eq4(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+          eq4(mpesaTransactions.status, "pending")
+        )
+      ).execute();
+      return;
+    }
+    if (Number(amount) !== Number(transaction.amount)) {
+      logger.error(
+        {
+          expected: transaction.amount,
+          received: amount,
+          checkoutRequestID: CheckoutRequestID
+        },
+        "[M-Pesa] Amount mismatch in callback"
+      );
+      await db.update(mpesaTransactions).set({ status: "failed", resultCode: code, resultDesc: "Amount mismatch" }).where(
+        and2(
+          eq4(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+          eq4(mpesaTransactions.status, "pending")
+        )
+      ).execute();
+      await db.update(orders).set({ paymentStatus: "failed" }).where(
+        and2(eq4(orders.id, transaction.orderId), eq4(orders.paymentStatus, "pending"))
+      ).execute();
+      return;
+    }
+    if (!phone) {
+      logger.error({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Missing phone in verification");
+      await db.update(mpesaTransactions).set({ status: "pending", resultDesc: "Missing phone evidence" }).where(
+        and2(
+          eq4(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+          eq4(mpesaTransactions.status, "pending")
+        )
+      ).execute();
+      return;
+    }
+    try {
+      const normalized = formatPhoneNumber(String(phone));
+      const txPhone = formatPhoneNumber(transaction.phoneNumber);
+      if (normalized !== txPhone) {
+        logger.error({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Phone mismatch in callback");
+        await db.update(mpesaTransactions).set({ status: "failed", resultCode: code, resultDesc: "Phone mismatch" }).where(
+          and2(
+            eq4(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+            eq4(mpesaTransactions.status, "pending")
+          )
+        ).execute();
+        await db.update(orders).set({ paymentStatus: "failed" }).where(
+          and2(eq4(orders.id, transaction.orderId), eq4(orders.paymentStatus, "pending"))
+        ).execute();
+        return;
+      }
+    } catch {
+      logger.error({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Invalid phone in callback");
+      await db.update(mpesaTransactions).set({ status: "failed", resultCode: code, resultDesc: "Invalid phone" }).where(
+        and2(
+          eq4(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+          eq4(mpesaTransactions.status, "pending")
+        )
+      ).execute();
+      await db.update(orders).set({ paymentStatus: "failed" }).where(
+        and2(eq4(orders.id, transaction.orderId), eq4(orders.paymentStatus, "pending"))
+      ).execute();
+      return;
+    }
+    const upd = await db.update(mpesaTransactions).set({
+      status: "completed",
+      mpesaReceiptNumber: receipt,
+      resultCode: code,
+      resultDesc: ResultDesc || null
+    }).where(
+      and2(
+        eq4(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+        eq4(mpesaTransactions.status, "pending")
+      )
+    ).execute();
+    const rowCount = upd.rowCount ?? 0;
+    if (rowCount === 0) {
+      logger.info(
+        { checkoutRequestID: CheckoutRequestID },
+        "[M-Pesa] Duplicate callback, skipping"
+      );
+      return;
+    }
+    const [order] = await db.select().from(orders).where(eq4(orders.id, transaction.orderId)).limit(1).execute();
+    await db.update(orders).set({
+      paymentStatus: "completed",
+      mpesaTransactionId: receipt,
+      paymentReason: order?.status === "cancelled" ? "Late payment after cancellation - reconcile/refund" : order?.paymentReason ?? null
+    }).where(
+      and2(
+        eq4(orders.id, transaction.orderId),
+        inArray2(orders.paymentStatus, ["pending", "failed"])
+      )
+    ).execute();
+    await db.update(orders).set({ status: "confirmed" }).where(
+      and2(eq4(orders.id, transaction.orderId), eq4(orders.status, "pending"))
+    ).execute();
+    logger.info(
+      { orderId: transaction.orderId, receipt, amount },
+      "[M-Pesa] Payment confirmed"
+    );
+  } catch (error) {
+    logger.error({ err: error }, "[M-Pesa] Callback processing error");
+    throw error;
+  }
+}
+var init_mpesaCallback = __esm({
+  "server/mpesaCallback.ts"() {
+    "use strict";
+    init_db();
+    init_schema();
+    init_logger();
+    init_payments();
+    init_payments();
+  }
+});
+
 // server/vercel-entry.ts
 import express from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 
-// shared/const.ts
-var COOKIE_NAME = "app_session_id";
-var ONE_YEAR_MS = 1e3 * 60 * 60 * 24 * 365;
-var AXIOS_TIMEOUT_MS = 3e4;
-var UNAUTHED_ERR_MSG = "Please login (10001)";
-var NOT_ADMIN_ERR_MSG = "You do not have required permission (10002)";
+// server/routers.ts
+init_const();
 
 // server/_core/cookies.ts
 function isSecureRequest(req) {
@@ -482,43 +1390,8 @@ async function notifyOwner(payload) {
   }
 }
 
-// server/_core/trpc.ts
-import { initTRPC, TRPCError as TRPCError2 } from "@trpc/server";
-import superjson from "superjson";
-var t = initTRPC.context().create({
-  transformer: superjson
-});
-var router = t.router;
-var publicProcedure = t.procedure;
-var requireUser = t.middleware(async (opts) => {
-  const { ctx, next } = opts;
-  if (!ctx.user) {
-    throw new TRPCError2({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
-  }
-  return next({
-    ctx: {
-      ...ctx,
-      user: ctx.user
-    }
-  });
-});
-var protectedProcedure = t.procedure.use(requireUser);
-var adminProcedure = t.procedure.use(
-  t.middleware(async (opts) => {
-    const { ctx, next } = opts;
-    if (!ctx.user || ctx.user.role !== "admin") {
-      throw new TRPCError2({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
-    }
-    return next({
-      ctx: {
-        ...ctx,
-        user: ctx.user
-      }
-    });
-  })
-);
-
 // server/_core/systemRouter.ts
+init_trpc();
 var systemRouter = router({
   health: publicProcedure.input(
     z.object({
@@ -541,13 +1414,15 @@ var systemRouter = router({
 });
 
 // server/routers.ts
+init_trpc();
 import { z as z10 } from "zod";
 
 // server/routers/menu.ts
-import { z as z2 } from "zod";
+init_trpc();
 init_db();
 init_logger();
 init_schema();
+import { z as z2 } from "zod";
 import { eq as eq2 } from "drizzle-orm";
 var FALLBACK_MENU = [
   {
@@ -740,27 +1615,30 @@ var menuRouter = router({
 });
 
 // server/routers/orders.ts
-import { z as z3 } from "zod";
+init_trpc();
 init_db();
+init_mpesaCallback();
 init_schema();
-import { eq as eq3, desc, inArray } from "drizzle-orm";
+init_paymentToken();
+import { z as z4 } from "zod";
+import { eq as eq5, desc as desc3, and as and3, inArray as inArray3, sql as sql3 } from "drizzle-orm";
 var phoneRegex = /^(?:\+254|0)[7][0-9]{8}$/;
 var ordersRouter = router({
   // Create a new order
   create: publicProcedure.input(
-    z3.object({
-      customerName: z3.string().min(2).max(255),
-      customerPhone: z3.string().regex(phoneRegex, "Invalid Kenyan phone number"),
-      customerEmail: z3.string().email().optional(),
-      deliveryAddress: z3.string().min(5).max(500),
-      items: z3.array(
-        z3.object({
-          menuItemId: z3.number(),
-          quantity: z3.number().min(1).max(50)
+    z4.object({
+      customerName: z4.string().min(2).max(255),
+      customerPhone: z4.string().regex(phoneRegex, "Invalid Kenyan phone number"),
+      customerEmail: z4.string().email().optional(),
+      deliveryAddress: z4.string().min(5).max(500),
+      items: z4.array(
+        z4.object({
+          menuItemId: z4.number(),
+          quantity: z4.number().min(1).max(50)
         })
       ).min(1).max(20),
-      paymentMethod: z3.enum(["mpesa", "cash"]).default("mpesa"),
-      notes: z3.string().max(500).optional()
+      paymentMethod: z4.enum(["mpesa", "cash"]).default("mpesa"),
+      notes: z4.string().max(500).optional()
     })
   ).mutation(async ({ input }) => {
     const db = await getDb();
@@ -771,7 +1649,7 @@ var ordersRouter = router({
       throw new Error("Ordering is currently paused. Please try again later.");
     }
     const { menuItems: menuItemsTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const availableItems = await db.select().from(menuItemsTable).where(eq3(menuItemsTable.available, 1)).execute();
+    const availableItems = await db.select().from(menuItemsTable).where(eq5(menuItemsTable.available, 1)).execute();
     let totalPrice = 0;
     const orderItemsData = [];
     for (const item of input.items) {
@@ -797,7 +1675,7 @@ var ordersRouter = router({
       totalPrice: totalPrice.toFixed(2),
       status: "pending",
       paymentMethod: input.paymentMethod,
-      paymentStatus: input.paymentMethod === "cash" ? "completed" : "pending",
+      paymentStatus: "pending",
       notes: input.notes || null
     }).returning({ id: orders.id });
     const orderId = inserted.id;
@@ -812,14 +1690,24 @@ var ordersRouter = router({
     return {
       success: true,
       orderId,
-      totalPrice
+      totalPrice,
+      paymentToken: signOrderPaymentToken(orderId)
     };
   }),
   // Track order by ID
-  getById: publicProcedure.input(z3.object({ id: z3.number() })).query(async ({ input }) => {
+  getById: publicProcedure.input(
+    z4.object({
+      id: z4.number(),
+      paymentToken: z4.string().min(1)
+    })
+  ).query(async ({ input }) => {
+    if (!verifyOrderPaymentToken(input.paymentToken, input.id)) {
+      throw new Error("Invalid payment token");
+    }
+    await reconcileOrderPayment(input.id);
     const db = await getDb();
     if (!db) return void 0;
-    const orderResult = await db.select().from(orders).where(eq3(orders.id, input.id)).limit(1).execute();
+    const orderResult = await db.select().from(orders).where(eq5(orders.id, input.id)).limit(1).execute();
     if (orderResult.length === 0) return void 0;
     const order = orderResult[0];
     const { menuItems: menuItemsTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
@@ -828,19 +1716,32 @@ var ordersRouter = router({
       quantity: orderItems.quantity,
       priceAtTime: orderItems.priceAtTime,
       name: menuItemsTable.name
-    }).from(orderItems).leftJoin(menuItemsTable, eq3(orderItems.menuItemId, menuItemsTable.id)).where(eq3(orderItems.orderId, input.id)).execute();
-    return { ...order, items };
+    }).from(orderItems).leftJoin(menuItemsTable, eq5(orderItems.menuItemId, menuItemsTable.id)).where(eq5(orderItems.orderId, input.id)).execute();
+    return {
+      id: order.id,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      totalPrice: order.totalPrice,
+      createdAt: order.createdAt,
+      items
+    };
   }),
-  // List orders by phone number
-  listByPhone: publicProcedure.input(z3.object({ phone: z3.string() })).query(async ({ input }) => {
+  listByPhone: adminProcedure.input(z4.object({ phone: z4.string().regex(phoneRegex, "Invalid Kenyan phone number") })).query(async ({ input }) => {
     const db = await getDb();
     if (!db) return [];
-    return db.select().from(orders).where(eq3(orders.customerPhone, input.phone)).orderBy(desc(orders.createdAt)).limit(50).execute();
+    const rows2 = await db.select().from(orders).where(eq5(orders.customerPhone, input.phone)).orderBy(desc3(orders.createdAt)).limit(50).execute();
+    return rows2.map((o) => ({
+      id: o.id,
+      status: o.status,
+      paymentStatus: o.paymentStatus,
+      totalPrice: o.totalPrice,
+      createdAt: o.createdAt
+    }));
   }),
   // Admin: List all orders
   listAll: adminProcedure.input(
-    z3.object({
-      status: z3.enum([
+    z4.object({
+      status: z4.enum([
         "pending",
         "confirmed",
         "preparing",
@@ -848,13 +1749,13 @@ var ordersRouter = router({
         "delivered",
         "cancelled"
       ]).optional(),
-      limit: z3.number().min(1).max(100).default(50)
+      limit: z4.number().min(1).max(100).default(50)
     }).optional()
   ).query(async ({ input }) => {
     const db = await getDb();
     if (!db) return [];
     const limit = input?.limit || 50;
-    const orderRows = await (input?.status ? db.select().from(orders).orderBy(desc(orders.createdAt)).where(eq3(orders.status, input.status)).limit(limit).execute() : db.select().from(orders).orderBy(desc(orders.createdAt)).limit(limit).execute());
+    const orderRows = await (input?.status ? db.select().from(orders).orderBy(desc3(orders.createdAt)).where(eq5(orders.status, input.status)).limit(limit).execute() : db.select().from(orders).orderBy(desc3(orders.createdAt)).limit(limit).execute());
     if (orderRows.length === 0) return orderRows;
     const ids = orderRows.map((o) => o.id);
     const itemRows = await db.select({
@@ -864,7 +1765,7 @@ var ordersRouter = router({
       name: menuItems.name,
       quantity: orderItems.quantity,
       price: orderItems.priceAtTime
-    }).from(orderItems).leftJoin(menuItems, eq3(orderItems.menuItemId, menuItems.id)).where(inArray(orderItems.orderId, ids)).execute();
+    }).from(orderItems).leftJoin(menuItems, eq5(orderItems.menuItemId, menuItems.id)).where(inArray3(orderItems.orderId, ids)).execute();
     const byOrder = /* @__PURE__ */ new Map();
     for (const it of itemRows) {
       if (!byOrder.has(it.orderId)) byOrder.set(it.orderId, []);
@@ -875,26 +1776,43 @@ var ordersRouter = router({
       items: byOrder.get(o.id) || []
     }));
   }),
-  // Admin: Mark an order as paid (cash fallback after failed M-Pesa)
-  markPaid: adminProcedure.input(z3.object({ id: z3.number() })).mutation(async ({ input }) => {
+  markPaid: adminProcedure.input(
+    z4.object({
+      id: z4.number(),
+      reason: z4.string().min(3).max(500)
+    })
+  ).mutation(async ({ input, ctx }) => {
     const db = await getDb();
     if (!db) throw new Error("Database not available");
-    const [order] = await db.select().from(orders).where(eq3(orders.id, input.id)).limit(1).execute();
+    const [order] = await db.select().from(orders).where(eq5(orders.id, input.id)).limit(1).execute();
     if (!order) throw new Error("Order not found");
     if (order.paymentStatus === "completed") {
       return { success: true, alreadyPaid: true };
     }
-    await db.update(orders).set({
+    const upd = await db.update(orders).set({
       paymentMethod: "cash",
       paymentStatus: "completed",
-      status: order.status === "pending" ? "confirmed" : order.status
-    }).where(eq3(orders.id, input.id)).execute();
-    return { success: true };
+      status: order.status === "pending" ? "confirmed" : order.status,
+      paidBy: ctx.user?.name || ctx.user?.openId || "admin",
+      paidAt: /* @__PURE__ */ new Date(),
+      paymentReason: input.reason
+    }).where(
+      and3(
+        eq5(orders.id, input.id),
+        inArray3(orders.paymentStatus, ["pending", "failed"]),
+        sql3`NOT EXISTS (SELECT 1 FROM "mpesaTransactions" WHERE "orderId" = ${input.id} AND "status" IN ('initiating', 'pending', 'unknown'))`
+      )
+    ).execute();
+    const rowCount = upd.rowCount ?? 0;
+    if (rowCount === 0) {
+      return { success: false, alreadyPaid: false };
+    }
+    return { success: true, alreadyPaid: false };
   }),
   updateStatus: adminProcedure.input(
-    z3.object({
-      id: z3.number(),
-      status: z3.enum([
+    z4.object({
+      id: z4.number(),
+      status: z4.enum([
         "pending",
         "confirmed",
         "preparing",
@@ -906,7 +1824,7 @@ var ordersRouter = router({
   ).mutation(async ({ input }) => {
     const db = await getDb();
     if (!db) throw new Error("Database not available");
-    const [order] = await db.select().from(orders).where(eq3(orders.id, input.id)).limit(1).execute();
+    const [order] = await db.select().from(orders).where(eq5(orders.id, input.id)).limit(1).execute();
     if (!order) throw new Error("Order not found");
     const allowed = {
       pending: ["confirmed", "cancelled"],
@@ -930,25 +1848,25 @@ var ordersRouter = router({
     if (order.status === "cancelled") {
       throw new Error("Cancelled orders cannot be updated");
     }
-    await db.update(orders).set({ status: input.status }).where(eq3(orders.id, input.id)).execute();
+    await db.update(orders).set({ status: input.status }).where(eq5(orders.id, input.id)).execute();
     return { success: true };
   }),
   // Admin: Create walk-in / POS order
   createWalkIn: adminProcedure.input(
-    z3.object({
-      customerName: z3.string().min(1).max(255),
-      customerPhone: z3.string().regex(phoneRegex, "Invalid Kenyan phone number"),
-      deliveryAddress: z3.string().max(500).optional(),
-      items: z3.array(
-        z3.object({
-          menuItemId: z3.number(),
-          quantity: z3.number().min(1).max(50)
+    z4.object({
+      customerName: z4.string().min(1).max(255),
+      customerPhone: z4.string().regex(phoneRegex, "Invalid Kenyan phone number"),
+      deliveryAddress: z4.string().max(500).optional(),
+      items: z4.array(
+        z4.object({
+          menuItemId: z4.number(),
+          quantity: z4.number().min(1).max(50)
         })
       ).min(1).max(50),
-      paymentMethod: z3.enum(["mpesa", "cash"]).default("cash"),
-      notes: z3.string().max(500).optional()
+      paymentMethod: z4.enum(["mpesa", "cash"]).default("cash"),
+      notes: z4.string().max(500).optional()
     })
-  ).mutation(async ({ input }) => {
+  ).mutation(async ({ input, ctx }) => {
     const db = await getDb();
     if (!db) throw new Error("Database not available");
     const { menuItems: menuItemsTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
@@ -978,6 +1896,9 @@ var ordersRouter = router({
       paymentMethod: input.paymentMethod,
       paymentStatus: isCash ? "completed" : "pending",
       channel: "pos",
+      paidBy: isCash ? ctx.user?.name || ctx.user?.openId || "pos" : null,
+      paidAt: isCash ? /* @__PURE__ */ new Date() : null,
+      paymentReason: isCash ? "POS cash receipt" : null,
       notes: input.notes || null
     }).returning({ id: orders.id });
     const orderId = inserted.id;
@@ -989,7 +1910,7 @@ var ordersRouter = router({
         priceAtTime: oi.priceAtTime
       }).execute();
     }
-    return { success: true, orderId, totalPrice };
+    return { success: true, orderId, totalPrice, paymentToken: signOrderPaymentToken(orderId) };
   }),
   // Admin: sales summary
   getSalesSummary: adminProcedure.query(async () => {
@@ -1051,241 +1972,22 @@ var ordersRouter = router({
     const setting = await getSiteSetting2("orders_paused");
     return setting?.value === "true";
   }),
-  setPaused: adminProcedure.input(z3.object({ paused: z3.boolean() })).mutation(async ({ input }) => {
+  setPaused: adminProcedure.input(z4.object({ paused: z4.boolean() })).mutation(async ({ input }) => {
     const { setSiteSetting: setSiteSetting2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     await setSiteSetting2("orders_paused", input.paused ? "true" : "false");
     return { success: true, paused: input.paused };
   })
 });
 
-// server/routers/payments.ts
-import { z as z4 } from "zod";
-init_db();
-init_schema();
-import { eq as eq4, and as and2 } from "drizzle-orm";
-import axios from "axios";
-var isProduction = process.env.NODE_ENV === "production";
-var MPESA_BASE_URL = isProduction ? "https://api.safaricom.co.ke" : "https://sandbox.safaricom.co.ke";
-var MPESA_SHORTCODE = process.env.MPESA_SHORTCODE || "174379";
-var MPESA_PASSKEY = process.env.MPESA_PASSKEY || "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
-var MPESA_CALLBACK_URL = process.env.MPESA_CALLBACK_URL || (process.env.APP_URL ? `${process.env.APP_URL.replace(/\/$/, "")}/api/payments/callback` : "https://your-domain.com/api/payments/callback");
-var accessToken = null;
-var tokenExpiry = null;
-async function getMpesaAccessToken() {
-  if (accessToken && tokenExpiry && /* @__PURE__ */ new Date() < new Date(tokenExpiry.getTime() - 6e4)) {
-    return accessToken;
-  }
-  const consumerKey = process.env.MPESA_CONSUMER_KEY || "";
-  const consumerSecret = process.env.MPESA_CONSUMER_SECRET || "";
-  const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString(
-    "base64"
-  );
-  const response = await axios.get(
-    `${MPESA_BASE_URL}/oauth/v1/generate?grant_type=client_credentials`,
-    {
-      headers: { Authorization: `Basic ${auth}` },
-      timeout: 1e4
-    }
-  );
-  accessToken = response.data.access_token;
-  tokenExpiry = new Date(Date.now() + 36e5);
-  return accessToken;
-}
-function generatePassword() {
-  const now = /* @__PURE__ */ new Date();
-  const timestamp2 = now.getFullYear().toString() + (now.getMonth() + 1).toString().padStart(2, "0") + now.getDate().toString().padStart(2, "0") + now.getHours().toString().padStart(2, "0") + now.getMinutes().toString().padStart(2, "0") + now.getSeconds().toString().padStart(2, "0");
-  const password = Buffer.from(
-    `${MPESA_SHORTCODE}${MPESA_PASSKEY}${timestamp2}`
-  ).toString("base64");
-  return { password, timestamp: timestamp2 };
-}
-function formatPhoneNumber(phone) {
-  let cleaned = phone.replace(/[\s\-\+]/g, "");
-  if (cleaned.startsWith("0")) {
-    cleaned = "254" + cleaned.slice(1);
-  }
-  if (!/^254[17]\d{8}$/.test(cleaned)) {
-    throw new Error("Invalid Kenyan phone number format");
-  }
-  return cleaned;
-}
-var paymentsRouter = router({
-  // Initiate STK Push
-  initiateStkPush: publicProcedure.input(
-    z4.object({
-      orderId: z4.number(),
-      phoneNumber: z4.string()
-    })
-  ).mutation(async ({ input }) => {
-    const db = await getDb();
-    if (!db) throw new Error("Database not available");
-    const orderResult = await db.select().from(orders).where(
-      and2(eq4(orders.id, input.orderId), eq4(orders.status, "pending"))
-    ).limit(1).execute();
-    if (orderResult.length === 0) {
-      throw new Error("Order not found or not in pending state");
-    }
-    const order = orderResult[0];
-    const phone = formatPhoneNumber(input.phoneNumber);
-    const amount = Math.round(Number(order.totalPrice));
-    const { password, timestamp: timestamp2 } = generatePassword();
-    const token = await getMpesaAccessToken();
-    try {
-      const response = await axios.post(
-        `${MPESA_BASE_URL}/mpesa/stkpush/v1/processrequest`,
-        {
-          BusinessShortCode: MPESA_SHORTCODE,
-          Password: password,
-          Timestamp: timestamp2,
-          TransactionType: "CustomerPayBillOnline",
-          Amount: amount,
-          PartyA: phone,
-          PartyB: MPESA_SHORTCODE,
-          PhoneNumber: phone,
-          CallBackURL: MPESA_CALLBACK_URL,
-          AccountReference: `PB${input.orderId}`,
-          TransactionDesc: "Passua Bites order"
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json"
-          },
-          timeout: 15e3
-        }
-      );
-      await db.insert(mpesaTransactions).values({
-        orderId: input.orderId,
-        checkoutRequestID: response.data.CheckoutRequestID,
-        merchantRequestID: response.data.MerchantRequestID,
-        phoneNumber: phone,
-        amount: amount.toString(),
-        accountReference: `PB${input.orderId}`,
-        status: "pending"
-      });
-      return {
-        success: true,
-        checkoutRequestID: response.data.CheckoutRequestID,
-        message: "STK Push sent successfully. Check your phone."
-      };
-    } catch (error) {
-      const errorMsg = error.response?.data?.errorMessage || error.message || "STK Push failed";
-      throw new Error(`M-Pesa STK Push failed: ${errorMsg}`);
-    }
-  }),
-  // Query payment status
-  queryStatus: publicProcedure.input(z4.object({ checkoutRequestID: z4.string() })).query(async ({ input }) => {
-    const db = await getDb();
-    if (!db) throw new Error("Database not available");
-    const transaction = await db.select().from(mpesaTransactions).where(
-      eq4(mpesaTransactions.checkoutRequestID, input.checkoutRequestID)
-    ).limit(1).execute();
-    if (transaction.length === 0) {
-      throw new Error("Transaction not found");
-    }
-    const tx = transaction[0];
-    if (tx.status === "completed") {
-      return {
-        status: "completed",
-        mpesaReceiptNumber: tx.mpesaReceiptNumber,
-        resultCode: tx.resultCode ?? 0
-      };
-    }
-    const { password, timestamp: timestamp2 } = generatePassword();
-    const token = await getMpesaAccessToken();
-    try {
-      const response = await axios.post(
-        `${MPESA_BASE_URL}/mpesa/stkpushquery/v1/query`,
-        {
-          BusinessShortCode: MPESA_SHORTCODE,
-          Password: password,
-          Timestamp: timestamp2,
-          CheckoutRequestID: input.checkoutRequestID
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json"
-          },
-          timeout: 1e4
-        }
-      );
-      const resultCode = Number(response.data.ResultCode);
-      if (resultCode === 0) {
-        const metadata = {};
-        response.data.CallbackMetadata?.Item?.forEach((item) => {
-          metadata[item.Name] = item.Value;
-        });
-        await db.update(mpesaTransactions).set({
-          status: "completed",
-          mpesaReceiptNumber: metadata.MpesaReceiptNumber || null,
-          resultCode,
-          resultDesc: response.data.ResultDesc
-        }).where(
-          eq4(
-            mpesaTransactions.checkoutRequestID,
-            input.checkoutRequestID
-          )
-        );
-        await db.update(orders).set({
-          paymentStatus: "completed",
-          mpesaTransactionId: metadata.MpesaReceiptNumber || null,
-          status: "confirmed"
-        }).where(eq4(orders.id, tx.orderId));
-        return {
-          status: "completed",
-          mpesaReceiptNumber: metadata.MpesaReceiptNumber,
-          resultCode: 0
-        };
-      } else {
-        const status = resultCode === 1032 ? "cancelled" : "failed";
-        await db.update(mpesaTransactions).set({
-          status,
-          resultCode,
-          resultDesc: response.data.ResultDesc
-        }).where(
-          eq4(
-            mpesaTransactions.checkoutRequestID,
-            input.checkoutRequestID
-          )
-        );
-        return {
-          status,
-          resultDesc: response.data.ResultDesc,
-          resultCode
-        };
-      }
-    } catch (error) {
-      return {
-        status: tx.status,
-        resultDesc: "Query failed, check callback for status",
-        resultCode: tx.resultCode
-      };
-    }
-  }),
-  // Get order payment status
-  getOrderPaymentStatus: publicProcedure.input(z4.object({ orderId: z4.number() })).query(async ({ input }) => {
-    const db = await getDb();
-    if (!db) return { paymentStatus: "unknown" };
-    const orderResult = await db.select().from(orders).where(eq4(orders.id, input.orderId)).limit(1).execute();
-    if (orderResult.length === 0) {
-      throw new Error("Order not found");
-    }
-    const order = orderResult[0];
-    const txResult = await db.select().from(mpesaTransactions).where(eq4(mpesaTransactions.orderId, input.orderId)).limit(1).execute();
-    return {
-      paymentStatus: order.paymentStatus,
-      orderStatus: order.status,
-      mpesaReceiptNumber: txResult.length > 0 ? txResult[0].mpesaReceiptNumber : null
-    };
-  })
-});
+// server/routers.ts
+init_payments();
 
 // server/routers/reviews.ts
-import { z as z5 } from "zod";
+init_trpc();
 init_db();
 init_schema();
-import { eq as eq5, desc as desc2 } from "drizzle-orm";
+import { z as z5 } from "zod";
+import { eq as eq6, desc as desc4 } from "drizzle-orm";
 var reviewsRouter = router({
   // Submit a review
   create: publicProcedure.input(
@@ -1319,7 +2021,7 @@ var reviewsRouter = router({
   ).query(async ({ input }) => {
     const db = await getDb();
     if (!db) return [];
-    const allReviews = await db.select().from(reviews).where(eq5(reviews.approved, 1)).orderBy(desc2(reviews.createdAt)).execute();
+    const allReviews = await db.select().from(reviews).where(eq6(reviews.approved, 1)).orderBy(desc4(reviews.createdAt)).execute();
     const filtered = input?.menuItemId ? allReviews.filter((r) => r.menuItemId === input.menuItemId) : allReviews;
     return filtered.slice(0, input?.limit || 20);
   }),
@@ -1327,7 +2029,7 @@ var reviewsRouter = router({
   getAverageRating: publicProcedure.input(z5.object({ menuItemId: z5.number().optional() })).query(async ({ input }) => {
     const db = await getDb();
     if (!db) return { average: 0, count: 0 };
-    const allReviews = await db.select().from(reviews).where(eq5(reviews.approved, 1)).execute();
+    const allReviews = await db.select().from(reviews).where(eq6(reviews.approved, 1)).execute();
     const filtered = input.menuItemId ? allReviews.filter((r) => r.menuItemId === input.menuItemId) : allReviews;
     if (filtered.length === 0) {
       return { average: 0, count: 0 };
@@ -1342,7 +2044,7 @@ var reviewsRouter = router({
   listPending: adminProcedure.query(async () => {
     const db = await getDb();
     if (!db) return [];
-    return db.select().from(reviews).where(eq5(reviews.approved, 0)).orderBy(desc2(reviews.createdAt)).execute();
+    return db.select().from(reviews).where(eq6(reviews.approved, 0)).orderBy(desc4(reviews.createdAt)).execute();
   }),
   // Admin: Approve or reject review
   moderate: adminProcedure.input(
@@ -1353,17 +2055,23 @@ var reviewsRouter = router({
   ).mutation(async ({ input }) => {
     const db = await getDb();
     if (!db) throw new Error("Database not available");
-    await db.update(reviews).set({ approved: input.approved ? 1 : 0 }).where(eq5(reviews.id, input.id)).execute();
+    await db.update(reviews).set({ approved: input.approved ? 1 : 0 }).where(eq6(reviews.id, input.id)).execute();
     return { success: true };
   }),
   // Admin: Delete review
   delete: adminProcedure.input(z5.object({ id: z5.number() })).mutation(async ({ input }) => {
     const db = await getDb();
     if (!db) throw new Error("Database not available");
-    await db.delete(reviews).where(eq5(reviews.id, input.id)).execute();
+    await db.delete(reviews).where(eq6(reviews.id, input.id)).execute();
     return { success: true };
   })
 });
+
+// server/routers/admin.ts
+init_const();
+
+// server/_core/sdk.ts
+init_const();
 
 // shared/_core/errors.ts
 var HttpError = class extends Error {
@@ -1603,19 +2311,20 @@ var SDKServer = class {
 var sdk = new SDKServer();
 
 // server/routers/admin.ts
-import { z as z6 } from "zod";
+init_trpc();
 init_db();
 init_db();
 init_schema();
-import { eq as eq6 } from "drizzle-orm";
+import { z as z6 } from "zod";
+import { eq as eq7 } from "drizzle-orm";
 
 // server/_core/password.ts
-import crypto from "crypto";
+import crypto4 from "crypto";
 var SCRYPT_KEYLEN = 64;
 var SCRYPT_COST = 16384;
 function hashPassword(password) {
-  const salt = crypto.randomBytes(16);
-  const derived = crypto.scryptSync(password, salt, SCRYPT_KEYLEN, {
+  const salt = crypto4.randomBytes(16);
+  const derived = crypto4.scryptSync(password, salt, SCRYPT_KEYLEN, {
     N: SCRYPT_COST
   });
   return `scrypt$${SCRYPT_COST}$${salt.toString("hex")}$${derived.toString("hex")}`;
@@ -1626,8 +2335,8 @@ function verifyPassword(password, hash) {
   const cost = Number(parts[1]);
   const salt = Buffer.from(parts[2], "hex");
   const stored = Buffer.from(parts[3], "hex");
-  const derived = crypto.scryptSync(password, salt, stored.length, { N: cost });
-  return crypto.timingSafeEqual(stored, derived);
+  const derived = crypto4.scryptSync(password, salt, stored.length, { N: cost });
+  return crypto4.timingSafeEqual(stored, derived);
 }
 
 // server/routers/admin.ts
@@ -1657,7 +2366,7 @@ var adminRouter = router({
         role: "admin"
       });
     }
-    const [user] = await database.select().from(adminUsers).where(eq6(adminUsers.username, input.username)).limit(1).execute();
+    const [user] = await database.select().from(adminUsers).where(eq7(adminUsers.username, input.username)).limit(1).execute();
     if (!user || !verifyPassword(input.password, user.passwordHash)) {
       throw new Error("Invalid username or password");
     }
@@ -1698,7 +2407,7 @@ var adminRouter = router({
     }
     const database = await getDb();
     if (!database) throw new Error("Database not available");
-    const [existing] = await database.select().from(adminUsers).where(eq6(adminUsers.username, input.username)).limit(1).execute();
+    const [existing] = await database.select().from(adminUsers).where(eq7(adminUsers.username, input.username)).limit(1).execute();
     if (existing) throw new Error("Username already exists");
     await database.insert(adminUsers).values({
       username: input.username,
@@ -1711,9 +2420,10 @@ var adminRouter = router({
 });
 
 // server/routers/analytics.ts
+init_trpc();
 init_db();
 init_schema();
-import { sql } from "drizzle-orm";
+import { sql as sql4 } from "drizzle-orm";
 import { z as z7 } from "zod";
 import { createHash } from "crypto";
 var geo = null;
@@ -1812,7 +2522,7 @@ var analyticsRouter = router({
       browsersRes,
       referrersRes
     ] = await Promise.all([
-      db.execute(sql`
+      db.execute(sql4`
           SELECT
             SUM(CASE WHEN "browser" != 'Bot/Crawler' THEN 1 ELSE 0 END) AS total_pageviews,
             COUNT(DISTINCT CASE WHEN "browser" != 'Bot/Crawler' THEN "sessionId" END) AS total_sessions,
@@ -1822,7 +2532,7 @@ var analyticsRouter = router({
           WHERE "createdAt" >= NOW() - INTERVAL '30 days'
             AND "eventType" = 'pageview'
         `),
-      db.execute(sql`
+      db.execute(sql4`
           SELECT
             DATE("createdAt")               AS date,
             COUNT(*)                        AS pageviews,
@@ -1835,7 +2545,7 @@ var analyticsRouter = router({
           GROUP BY DATE("createdAt")
           ORDER BY date ASC
         `),
-      db.execute(sql`
+      db.execute(sql4`
           SELECT
             "page",
             COUNT(*) AS views
@@ -1848,7 +2558,7 @@ var analyticsRouter = router({
           ORDER BY views DESC
           LIMIT 10
         `),
-      db.execute(sql`
+      db.execute(sql4`
           SELECT
             COALESCE("device", 'unknown')   AS device,
             COUNT(DISTINCT "sessionId")     AS sessions
@@ -1858,7 +2568,7 @@ var analyticsRouter = router({
           GROUP BY "device"
           ORDER BY sessions DESC
         `),
-      db.execute(sql`
+      db.execute(sql4`
           SELECT
             COALESCE("country", 'Unknown')  AS country,
             COUNT(DISTINCT "ip")            AS visitors
@@ -1869,7 +2579,7 @@ var analyticsRouter = router({
           ORDER BY visitors DESC
           LIMIT 10
         `),
-      db.execute(sql`
+      db.execute(sql4`
           SELECT
             COALESCE("city", 'Unknown')  AS city,
             COUNT(DISTINCT "ip")         AS visitors
@@ -1880,7 +2590,7 @@ var analyticsRouter = router({
           ORDER BY visitors DESC
           LIMIT 10
         `),
-      db.execute(sql`
+      db.execute(sql4`
           SELECT
             COALESCE("browser", 'Other')    AS browser,
             COUNT(DISTINCT "sessionId")     AS sessions
@@ -1890,7 +2600,7 @@ var analyticsRouter = router({
           GROUP BY "browser"
           ORDER BY sessions DESC
         `),
-      db.execute(sql`
+      db.execute(sql4`
           SELECT
             COALESCE("referer", 'Direct')   AS source,
             COUNT(*)                        AS visits
@@ -1947,7 +2657,7 @@ var analyticsRouter = router({
     const db = await getDb();
     if (!db) return null;
     const [revenueRes, topItemsRes, peakRes, aovRes, repeatRes, statusRes] = await Promise.all([
-      db.execute(sql`
+      db.execute(sql4`
           SELECT
             DATE("createdAt")                   AS date,
             COUNT(*)                            AS order_count,
@@ -1958,7 +2668,7 @@ var analyticsRouter = router({
           GROUP BY DATE("createdAt")
           ORDER BY date ASC
         `),
-      db.execute(sql`
+      db.execute(sql4`
           SELECT
             m.name,
             SUM(oi.quantity)                                AS units,
@@ -1971,7 +2681,7 @@ var analyticsRouter = router({
           ORDER BY revenue DESC
           LIMIT 8
         `),
-      db.execute(sql`
+      db.execute(sql4`
           SELECT
             EXTRACT(HOUR FROM "createdAt")::int AS hour,
             COUNT(*)                            AS orders
@@ -1980,7 +2690,7 @@ var analyticsRouter = router({
           GROUP BY hour
           ORDER BY hour ASC
         `),
-      db.execute(sql`
+      db.execute(sql4`
           SELECT
             ROUND(AVG("totalPrice"::numeric), 2)  AS avg_order_value,
             COUNT(*)                              AS total_orders,
@@ -1988,7 +2698,7 @@ var analyticsRouter = router({
           FROM "orders"
           WHERE "paymentStatus" = 'completed'
         `),
-      db.execute(sql`
+      db.execute(sql4`
           SELECT
             COUNT(*)                                                AS total_customers,
             SUM(CASE WHEN order_count > 1 THEN 1 ELSE 0 END)       AS repeat_customers
@@ -1998,7 +2708,7 @@ var analyticsRouter = router({
             GROUP BY "customerPhone"
           ) sub
         `),
-      db.execute(sql`
+      db.execute(sql4`
           SELECT "status", COUNT(*) AS count
           FROM "orders"
           GROUP BY "status"
@@ -2045,6 +2755,7 @@ var analyticsRouter = router({
 });
 
 // server/routers/upload.ts
+init_trpc();
 import { z as z8 } from "zod";
 import { put } from "@vercel/blob";
 var uploadRouter = router({
@@ -2071,10 +2782,11 @@ var uploadRouter = router({
 });
 
 // server/routers/announcements.ts
-import { z as z9 } from "zod";
+init_trpc();
 init_db();
 init_schema();
-import { eq as eq7, desc as desc3, and as and4, or, isNull, gte, lte } from "drizzle-orm";
+import { z as z9 } from "zod";
+import { eq as eq8, desc as desc5, and as and5, or, isNull, gte, lte } from "drizzle-orm";
 var announcementsRouter = router({
   // Public: active announcements currently in window
   listActive: publicProcedure.query(async () => {
@@ -2082,18 +2794,18 @@ var announcementsRouter = router({
     if (!db) return [];
     const now = /* @__PURE__ */ new Date();
     return db.select().from(announcements).where(
-      and4(
-        eq7(announcements.active, 1),
+      and5(
+        eq8(announcements.active, 1),
         or(isNull(announcements.startsAt), lte(announcements.startsAt, now)),
         or(isNull(announcements.endsAt), gte(announcements.endsAt, now))
       )
-    ).orderBy(desc3(announcements.createdAt)).execute();
+    ).orderBy(desc5(announcements.createdAt)).execute();
   }),
   // Admin: all
   listAll: adminProcedure.query(async () => {
     const db = await getDb();
     if (!db) return [];
-    return db.select().from(announcements).orderBy(desc3(announcements.createdAt)).execute();
+    return db.select().from(announcements).orderBy(desc5(announcements.createdAt)).execute();
   }),
   create: adminProcedure.input(
     z9.object({
@@ -2139,19 +2851,19 @@ var announcementsRouter = router({
       patch.startsAt = input.startsAt ? new Date(input.startsAt) : null;
     if (input.endsAt !== void 0)
       patch.endsAt = input.endsAt ? new Date(input.endsAt) : null;
-    await db.update(announcements).set(patch).where(eq7(announcements.id, input.id)).execute();
+    await db.update(announcements).set(patch).where(eq8(announcements.id, input.id)).execute();
     return { success: true };
   }),
   delete: adminProcedure.input(z9.object({ id: z9.number() })).mutation(async ({ input }) => {
     const db = await getDb();
     if (!db) throw new Error("Database not available");
-    await db.delete(announcements).where(eq7(announcements.id, input.id)).execute();
+    await db.delete(announcements).where(eq8(announcements.id, input.id)).execute();
     return { success: true };
   }),
   toggle: adminProcedure.input(z9.object({ id: z9.number(), active: z9.boolean() })).mutation(async ({ input }) => {
     const db = await getDb();
     if (!db) throw new Error("Database not available");
-    await db.update(announcements).set({ active: input.active ? 1 : 0, updatedAt: /* @__PURE__ */ new Date() }).where(eq7(announcements.id, input.id)).execute();
+    await db.update(announcements).set({ active: input.active ? 1 : 0, updatedAt: /* @__PURE__ */ new Date() }).where(eq8(announcements.id, input.id)).execute();
     return { success: true };
   })
 });
@@ -2212,103 +2924,19 @@ async function createContext(opts) {
 
 // server/vercel-entry.ts
 import rateLimit from "express-rate-limit";
-
-// server/mpesaCallback.ts
-init_db();
-init_schema();
-init_logger();
-import { eq as eq8 } from "drizzle-orm";
-async function processMpesaCallback(body) {
-  try {
-    const { Body } = body || {};
-    if (!Body || !Body.stkCallback) {
-      logger.error("[M-Pesa] Invalid callback payload (missing stkCallback)");
-      return;
-    }
-    const { stkCallback } = Body;
-    const {
-      ResultCode,
-      CheckoutRequestID,
-      CallbackMetadata,
-      ResultDesc
-    } = stkCallback;
-    const code = Number(ResultCode);
-    const db = await getDb();
-    if (!db) {
-      logger.error("[M-Pesa] Database not available for callback");
-      return;
-    }
-    const tx = await db.select().from(mpesaTransactions).where(eq8(mpesaTransactions.checkoutRequestID, CheckoutRequestID)).limit(1).execute();
-    if (tx.length === 0) {
-      logger.error(
-        { checkoutRequestID: CheckoutRequestID },
-        "[M-Pesa] Transaction not found for callback"
-      );
-      return;
-    }
-    if (tx[0].status === "completed") {
-      logger.info(
-        { checkoutRequestID: CheckoutRequestID },
-        "[M-Pesa] Duplicate callback, skipping"
-      );
-      return;
-    }
-    if (code !== 0) {
-      const status = code === 1032 ? "cancelled" : "failed";
-      await db.update(mpesaTransactions).set({
-        status,
-        resultCode: code,
-        resultDesc: ResultDesc || null
-      }).where(eq8(mpesaTransactions.checkoutRequestID, CheckoutRequestID));
-      await db.update(orders).set({ paymentStatus: "failed" }).where(eq8(orders.id, tx[0].orderId));
-      logger.info(
-        { status, code, checkoutRequestID: CheckoutRequestID, orderId: tx[0].orderId },
-        "[M-Pesa] Payment not completed"
-      );
-      return;
-    }
-    const metadata = {};
-    CallbackMetadata?.Item?.forEach((item) => {
-      metadata[item.Name] = item.Value;
-    });
-    const { MpesaReceiptNumber, Amount } = metadata;
-    if (Amount !== void 0 && Number(Amount) !== Number(tx[0].amount)) {
-      logger.error(
-        {
-          expected: tx[0].amount,
-          received: Amount,
-          orderId: tx[0].orderId,
-          checkoutRequestID: CheckoutRequestID
-        },
-        "[M-Pesa] Amount mismatch in callback"
-      );
-      return;
-    }
-    await db.update(mpesaTransactions).set({
-      status: "completed",
-      mpesaReceiptNumber: MpesaReceiptNumber || null,
-      resultCode: code,
-      resultDesc: ResultDesc || null
-    }).where(eq8(mpesaTransactions.checkoutRequestID, CheckoutRequestID));
-    await db.update(orders).set({
-      paymentStatus: "completed",
-      mpesaTransactionId: MpesaReceiptNumber || null,
-      status: "confirmed"
-    }).where(eq8(orders.id, tx[0].orderId));
-    logger.info(
-      {
-        orderId: tx[0].orderId,
-        receipt: MpesaReceiptNumber,
-        amount: Amount
-      },
-      "[M-Pesa] Payment confirmed"
-    );
-  } catch (error) {
-    logger.error({ err: error }, "[M-Pesa] Callback processing error");
-  }
+var ALLOWED_ORIGINS = new Set(
+  [
+    process.env.APP_URL,
+    "https://passua-bites-web.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:3000"
+  ].filter(Boolean)
+);
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  return ALLOWED_ORIGINS.has(origin);
 }
-
-// server/vercel-entry.ts
 var app = express();
 app.set("trust proxy", 1);
 app.use(express.json({ limit: "50mb" }));
@@ -2329,12 +2957,34 @@ app.use((_req, res, next) => {
   next();
 });
 app.post("/api/payments/callback", async (req, res) => {
-  await processMpesaCallback(req.body);
-  res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
+  const secret = process.env.MPESA_CALLBACK_SECRET;
+  const provided = req.query?.token || req.headers["x-callback-token"] || req.headers["x-mpesa-callback-token"];
+  if (secret) {
+    if (provided !== secret) {
+      return res.status(401).json({ ResultCode: 1, ResultDesc: "Unauthorized" });
+    }
+  } else if (process.env.NODE_ENV === "production") {
+    return res.status(503).json({ ResultCode: 1, ResultDesc: "Callback not configured" });
+  }
+  try {
+    const { processMpesaCallbackDurable: processMpesaCallbackDurable2 } = await Promise.resolve().then(() => (init_mpesaCallback(), mpesaCallback_exports));
+    await processMpesaCallbackDurable2(req.body);
+    res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
+  } catch (error) {
+    res.status(500).json({ ResultCode: 1, ResultDesc: "Callback processing failed" });
+  }
 });
 var generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1e3,
   max: process.env.NODE_ENV === "production" ? 200 : 500,
+  message: { error: "Too many requests, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { ip: false }
+});
+var orderLimiter = rateLimit({
+  windowMs: 60 * 1e3,
+  max: 10,
   message: { error: "Too many requests, please try again later" },
   standardHeaders: true,
   legacyHeaders: false,
@@ -2354,14 +3004,24 @@ var authLimiter = rateLimit({
 });
 app.use("/api/", generalLimiter);
 app.use("/api/trpc/admin.login", authLimiter);
+app.use("/api/trpc/orders.create", orderLimiter);
+app.use("/api/trpc/payments.initiateStkPush", orderLimiter);
 app.use((req, res, next) => {
   const origin = req.headers.origin;
+  if (origin && !isAllowedOrigin(origin)) {
+    return res.status(403).json({ error: "Origin not allowed" });
+  }
   if (origin) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Credentials", "true");
   }
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method) && origin) {
+    if (!isAllowedOrigin(origin)) {
+      return res.status(403).json({ error: "CSRF origin check failed" });
+    }
+  }
   if (req.method === "OPTIONS") {
     res.status(204).end();
     return;

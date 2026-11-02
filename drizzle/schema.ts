@@ -1,6 +1,9 @@
+import { sql } from "drizzle-orm";
+
 import {
   decimal,
   index,
+  uniqueIndex,
   serial,
   pgTable,
   text,
@@ -66,6 +69,9 @@ export const orders = pgTable("orders", {
     .default("pending")
     .notNull(),
   channel: varchar("channel", { length: 20 }).default("online").notNull(),
+  paidBy: varchar("paidBy", { length: 64 }),
+  paidAt: timestamp("paidAt"),
+  paymentReason: text("paymentReason"),
   mpesaTransactionId: varchar("mpesaTransactionId", { length: 255 }),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -141,7 +147,12 @@ export const mpesaTransactions = pgTable("mpesaTransactions", {
   resultDesc: text("resultDesc"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-}, (t) => [index("idx_mpesaTransactions_orderId").on(t.orderId)]);
+}, (t) => [
+  index("idx_mpesaTransactions_orderId").on(t.orderId),
+  uniqueIndex("uniq_mpesaTransactions_active_order")
+    .on(t.orderId)
+    .where(sql`${t.status} IN ('initiating', 'pending', 'unknown')`),
+]);
 
 export type MpesaTransaction = typeof mpesaTransactions.$inferSelect;
 export type InsertMpesaTransaction = typeof mpesaTransactions.$inferInsert;
@@ -199,3 +210,13 @@ export type Announcement = typeof announcements.$inferSelect;
 export type InsertAnnouncement = typeof announcements.$inferInsert;
 export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
 export type InsertAnalyticsEvent = typeof analyticsEvents.$inferInsert;
+
+export const mpesaCallbackEvents = pgTable("mpesaCallbackEvents", {
+  id: serial("id").primaryKey(),
+  idempotencyKey: varchar("idempotencyKey", { length: 255 }).notNull().unique(),
+  payload: text("payload").notNull(),
+  receivedAt: timestamp("receivedAt").defaultNow().notNull(),
+  status: varchar("status", { length: 20 }).default("received").notNull(),
+  processedAt: timestamp("processedAt"),
+  error: text("error"),
+});

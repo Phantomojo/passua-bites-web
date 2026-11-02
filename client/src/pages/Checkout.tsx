@@ -38,15 +38,16 @@ export default function Checkout() {
   >("idle");
   const [stkReceipt, setStkReceipt] = useState<string | null>(null);
   const [stkResultDesc, setStkResultDesc] = useState<string>("");
+  const [paymentToken, setPaymentToken] = useState<string | null>(null);
 
   const createOrder = trpc.orders.create.useMutation();
   const initiateStk = trpc.payments.initiateStkPush.useMutation();
   const [pollingId, setPollingId] = useState<string>("");
 
   const queryPayment = trpc.payments.queryStatus.useQuery(
-    { checkoutRequestID: pollingId },
+    { checkoutRequestID: pollingId, paymentToken: paymentToken || "" },
     {
-      enabled: !!pollingId,
+      enabled: !!pollingId && !!paymentToken,
       retry: false,
       refetchInterval: 5000,
       throwOnError: false,
@@ -129,6 +130,7 @@ export default function Checkout() {
     try {
       const stkResult = await initiateStk.mutateAsync({
         orderId,
+        paymentToken: paymentToken || "",
         phoneNumber: formData.customerPhone,
       });
       setStkSent(true);
@@ -213,10 +215,17 @@ export default function Checkout() {
         })),
         paymentMethod,
         notes: mpesaCode ? `M-Pesa Code: ${mpesaCode}` : undefined,
-      });
+      }) as any;
 
       const newOrderId = orderResult.orderId;
       setOrderId(newOrderId);
+      if (orderResult.paymentToken) {
+        setPaymentToken(orderResult.paymentToken);
+        try {
+          localStorage.setItem("pb_last_order_id", String(newOrderId));
+          localStorage.setItem("pb_last_payment_token", orderResult.paymentToken);
+        } catch {}
+      }
 
       if (paymentMethod === "mpesa") {
         // Trigger M-Pesa STK Push
@@ -224,6 +233,7 @@ export default function Checkout() {
         try {
           const stkResult = await initiateStk.mutateAsync({
             orderId: newOrderId,
+            paymentToken: orderResult.paymentToken || "",
             phoneNumber: formData.customerPhone,
           });
           setStkSent(true);

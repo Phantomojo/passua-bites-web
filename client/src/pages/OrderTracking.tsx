@@ -29,33 +29,28 @@ export default function OrderTracking() {
     description: "Track your Passua Bites order by order ID or phone number.",
   });
   const [searchId, setSearchId] = useState("");
-  const [searchPhone, setSearchPhone] = useState("");
-  const [searchBy, setSearchBy] = useState<"id" | "phone">("phone");
+  const [searchToken, setSearchToken] = useState(() => {
+    try {
+      return localStorage.getItem("pb_last_payment_token") || "";
+    } catch {
+      return "";
+    }
+  });
   const [attempted, setAttempted] = useState(false);
 
   const getOrderById = trpc.orders.getById.useQuery(
-    { id: parseInt(searchId.replace(/\D/g, "")) || 0 },
+    { id: parseInt(searchId.replace(/\D/g, "")) || 0, paymentToken: searchToken },
     { enabled: false, retry: false }
   );
 
-  const getOrdersByPhone = trpc.orders.listByPhone.useQuery(
-    { phone: searchPhone },
-    { enabled: false, retry: false }
-  );
-
-  const isSearching = getOrderById.isFetching || getOrdersByPhone.isFetching;
+  const isSearching = getOrderById.isFetching;
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setAttempted(true);
-
-    if (searchBy === "phone" && searchPhone) {
-      await getOrdersByPhone.refetch();
-    } else if (searchBy === "id" && searchId) {
-      const numericId = parseInt(searchId.replace(/\D/g, ""));
-      if (numericId) {
-        await getOrderById.refetch();
-      }
+    const numericId = parseInt(searchId.replace(/\D/g, ""));
+    if (numericId) {
+      await getOrderById.refetch();
     }
   };
 
@@ -64,10 +59,8 @@ export default function OrderTracking() {
   // Get the order data based on search method
   let orders: any[] = [];
 
-  if (searchBy === "id" && getOrderById.data) {
+  if (getOrderById.data) {
     orders = [getOrderById.data];
-  } else if (searchBy === "phone" && getOrdersByPhone.data) {
-    orders = getOrdersByPhone.data; // All orders
   }
 
   const order = selectedOrderId
@@ -97,55 +90,6 @@ export default function OrderTracking() {
           Track Order
         </h1>
 
-        {/* Search method toggle */}
-        <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem" }}>
-          <button
-            onClick={() => {
-              setSearchBy("phone");
-              setAttempted(false);
-            }}
-            style={{
-              flex: 1,
-              padding: "0.75rem",
-              border: `1px solid ${searchBy === "phone" ? "var(--pb-ember)" : "var(--pb-rule)"}`,
-              background:
-                searchBy === "phone" ? "rgba(196,92,40,0.1)" : "transparent",
-              color:
-                searchBy === "phone" ? "var(--pb-ember)" : "var(--pb-ivory3)",
-              fontFamily: "'DM Mono',monospace",
-              fontSize: "0.65rem",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              cursor: "pointer",
-              minHeight: 44,
-            }}
-          >
-            By Phone
-          </button>
-          <button
-            onClick={() => {
-              setSearchBy("id");
-              setAttempted(false);
-            }}
-            style={{
-              flex: 1,
-              padding: "0.75rem",
-              border: `1px solid ${searchBy === "id" ? "var(--pb-ember)" : "var(--pb-rule)"}`,
-              background:
-                searchBy === "id" ? "rgba(196,92,40,0.1)" : "transparent",
-              color: searchBy === "id" ? "var(--pb-ember)" : "var(--pb-ivory3)",
-              fontFamily: "'DM Mono',monospace",
-              fontSize: "0.65rem",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              cursor: "pointer",
-              minHeight: 44,
-            }}
-          >
-            By Order ID
-          </button>
-        </div>
-
         {/* Search form */}
         <form
           onSubmit={handleSearch}
@@ -157,37 +101,20 @@ export default function OrderTracking() {
             flexWrap: "wrap",
           }}
         >
-          {searchBy === "phone" ? (
-            <input
-              type="tel"
-              value={searchPhone}
-              onChange={e => setSearchPhone(e.target.value)}
-              placeholder="Your phone number (e.g. 0712345678)"
-              style={{
-                flex: 1,
-                padding: "0.75rem 0.9rem",
-                fontFamily: "'DM Mono',monospace",
-                fontSize: "0.78rem",
-                letterSpacing: "0.04em",
-                minHeight: 44,
-              }}
-            />
-          ) : (
-            <input
-              type="text"
-              value={searchId}
-              onChange={e => setSearchId(e.target.value)}
-              placeholder="Order ID (e.g. 1, 2, 3)"
-              style={{
-                flex: 1,
-                padding: "0.75rem 0.9rem",
-                fontFamily: "'DM Mono',monospace",
-                fontSize: "0.78rem",
-                letterSpacing: "0.04em",
-                minHeight: 44,
-              }}
-            />
-          )}
+          <input
+            type="text"
+            value={searchId}
+            onChange={e => setSearchId(e.target.value)}
+            placeholder="Order ID (e.g. 1, 2, 3)"
+            style={{
+              flex: 1,
+              padding: "0.75rem 0.9rem",
+              fontFamily: "'DM Mono',monospace",
+              fontSize: "0.78rem",
+              letterSpacing: "0.04em",
+              minHeight: 44,
+            }}
+          />          
           <button
             type="submit"
             className="pb-btn-primary"

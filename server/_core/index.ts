@@ -10,7 +10,7 @@ import { serveStatic, setupVite } from "./vite";
 import rateLimit from "express-rate-limit";
 import pinoHttp from "pino-http";
 import { logger } from "../logger";
-import { processMpesaCallback } from "../mpesaCallback";
+import { processMpesaCallbackDurable } from "../mpesaCallback";
 
 // Security: Rate limiting
 const generalLimiter = rateLimit({
@@ -98,12 +98,27 @@ async function startServer() {
     next();
   });
 
-  // M-Pesa Callback endpoint — neutral path (Safaricom drops URLs containing
-  // "mpesa"/"m-pesa"/"safaricom"). Registered before the general rate limiter
-  // so Safaricom callbacks are never throttled.
+  // M-Pesa Callback endpoint — protected by a server-held secret token.
   app.post("/api/payments/callback", async (req: any, res: any) => {
-    await processMpesaCallback(req.body);
-    res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
+    const secret = process.env.MPESA_CALLBACK_SECRET;
+    const provided =
+      req.query?.token || req.headers["x-callback-token"] || req.headers["x-mpesa-callback-token"];
+    if (secret) {
+      if (provided !== secret) {
+        logger.warn("[M-Pesa] Callback rejected: invalid callback secret");
+        return res.status(401).json({ ResultCode: 1, ResultDesc: "Unauthorized" });
+      }
+    } else if (process.env.NODE_ENV === "production") {
+      logger.error("[M-Pesa] MPESA_CALLBACK_SECRET is required in production");
+      return res.status(503).json({ ResultCode: 1, ResultDesc: "Callback not configured" });
+    }
+    try {
+      await processMpesaCallbackDurable(req.body);
+      res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
+    } catch (error) {
+      logger.error({ err: error }, "[M-Pesa] Callback processing failed");
+      res.status(500).json({ ResultCode: 1, ResultDesc: "Callback processing failed" });
+    }
   });
 
   app.use("/api/", generalLimiter); // Apply rate limiting to other API routes
@@ -115,35 +130,25 @@ async function startServer() {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
-  // tRPC API with stricter rate limiting on mutations
-  app.use(
-    "/api/trpc/orders.create",
-    orderLimiter, // Stricter limit for orders
-    createExpressMiddleware({
-      router: appRouter,
-      createContext,
-    })
-  );
-  app.use(
-    "/api/trpc/payments.initiateStkPush",
-    orderLimiter, // Stricter limit for payments
-    createExpressMiddleware({
-      router: appRouter,
-      createContext,
-    })
-  );
-  app.use(
-    "/api/trpc/admin.login",
-    authLimiter,
-    createExpressMiddleware({
-      router: appRouter,
-      createContext,
-    })
-  );
-
-  // Other API routes with general limit
+  // tRPC API with path-aware rate limiting on sensitive mutations
   app.use(
     "/api/trpc",
+    (req, _res, next) => {
+      const p = req.path || "";
+      if (p === "/orders.create" || p.startsWith("/orders.create?")) {
+        return orderLimiter(req, _res, next);
+      }
+      if (
+        p === "/payments.initiateStkPush" ||
+        p.startsWith("/payments.initiateStkPush?")
+      ) {
+        return orderLimiter(req, _res, next);
+      }
+      if (p === "/admin.login" || p.startsWith("/admin.login?")) {
+        return authLimiter(req, _res, next);
+      }
+      next();
+    },
     createExpressMiddleware({
       router: appRouter,
       createContext,

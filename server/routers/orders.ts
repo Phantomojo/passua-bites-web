@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { publicProcedure, adminProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
+import { reconcileOrderPayment } from "../mpesaCallback";
 import { orders, orderItems, menuItems } from "../../drizzle/schema";
-import { eq, desc, and, inArray } from "drizzle-orm";
+import { eq, desc, and, inArray, sql } from "drizzle-orm";
+import { signOrderPaymentToken, verifyOrderPaymentToken } from "../_core/paymentToken";
 
 // Phone validation for Kenyan numbers
 const phoneRegex = /^(?:\+254|0)[7][0-9]{8}$/;
@@ -85,7 +87,7 @@ export const ordersRouter = router({
           totalPrice: totalPrice.toFixed(2),
           status: "pending",
           paymentMethod: input.paymentMethod,
-          paymentStatus: input.paymentMethod === "cash" ? "completed" : "pending",
+          paymentStatus: "pending",
           notes: input.notes || null,
         })
         .returning({ id: orders.id });
@@ -109,13 +111,25 @@ export const ordersRouter = router({
         success: true,
         orderId,
         totalPrice,
+        paymentToken: signOrderPaymentToken(orderId),
       };
     }),
 
   // Track order by ID
   getById: publicProcedure
-    .input(z.object({ id: z.number() }))
+    .input(
+      z.object({
+        id: z.number(),
+        paymentToken: z.string().min(1),
+      })
+    )
     .query(async ({ input }) => {
+      if (!verifyOrderPaymentToken(input.paymentToken, input.id)) {
+        throw new Error("Invalid payment token");
+      }
+
+      await reconcileOrderPayment(input.id);
+
       const db = await getDb();
       if (!db) return undefined;
 
@@ -130,7 +144,6 @@ export const ordersRouter = router({
 
       const order = orderResult[0];
 
-      // Get order items with menu item names
       const { menuItems: menuItemsTable } = await import(
         "../../drizzle/schema"
       );
@@ -146,22 +159,37 @@ export const ordersRouter = router({
         .where(eq(orderItems.orderId, input.id))
         .execute();
 
-      return { ...order, items };
+      return {
+        id: order.id,
+        status: order.status,
+        paymentStatus: order.paymentStatus,
+        totalPrice: order.totalPrice,
+        createdAt: order.createdAt,
+        items,
+      };
     }),
 
-  // List orders by phone number
-  listByPhone: publicProcedure
-    .input(z.object({ phone: z.string() }))
+  listByPhone: adminProcedure
+    .input(z.object({ phone: z.string().regex(phoneRegex, "Invalid Kenyan phone number") }))
     .query(async ({ input }) => {
       const db = await getDb();
       if (!db) return [];
-      return db
+      const rows = await db
         .select()
         .from(orders)
         .where(eq(orders.customerPhone, input.phone))
         .orderBy(desc(orders.createdAt))
         .limit(50)
         .execute();
+
+      // Return only order-tracking fields; never expose customer personal data.
+      return rows.map((o: any) => ({
+        id: o.id,
+        status: o.status,
+        paymentStatus: o.paymentStatus,
+        totalPrice: o.totalPrice,
+        createdAt: o.createdAt,
+      }));
     }),
 
   // Admin: List all orders
@@ -233,10 +261,14 @@ export const ordersRouter = router({
       }));
     }),
 
-  // Admin: Mark an order as paid (cash fallback after failed M-Pesa)
   markPaid: adminProcedure
-    .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .input(
+      z.object({
+        id: z.number(),
+        reason: z.string().min(3).max(500),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
       const [order] = await db
@@ -249,16 +281,29 @@ export const ordersRouter = router({
       if (order.paymentStatus === "completed") {
         return { success: true, alreadyPaid: true };
       }
-      await db
+      const upd = await db
         .update(orders)
         .set({
           paymentMethod: "cash",
           paymentStatus: "completed",
           status: order.status === "pending" ? "confirmed" : order.status,
+          paidBy: ctx.user?.name || ctx.user?.openId || "admin",
+          paidAt: new Date(),
+          paymentReason: input.reason,
         })
-        .where(eq(orders.id, input.id))
+        .where(
+          and(
+            eq(orders.id, input.id),
+            inArray(orders.paymentStatus, ["pending", "failed"]),
+            sql`NOT EXISTS (SELECT 1 FROM "mpesaTransactions" WHERE "orderId" = ${input.id} AND "status" IN ('initiating', 'pending', 'unknown'))`
+          )
+        )
         .execute();
-      return { success: true };
+      const rowCount = (upd as any).rowCount ?? 0;
+      if (rowCount === 0) {
+        return { success: false, alreadyPaid: false };
+      }
+      return { success: true, alreadyPaid: false };
     }),
   updateStatus: adminProcedure
     .input(
@@ -349,7 +394,7 @@ export const ordersRouter = router({
         notes: z.string().max(500).optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
@@ -392,6 +437,9 @@ export const ordersRouter = router({
           paymentMethod: input.paymentMethod,
           paymentStatus: isCash ? "completed" : "pending",
           channel: "pos",
+          paidBy: isCash ? (ctx.user?.name || ctx.user?.openId || "pos") : null,
+          paidAt: isCash ? new Date() : null,
+          paymentReason: isCash ? "POS cash receipt" : null,
           notes: input.notes || null,
         })
         .returning({ id: orders.id });
@@ -410,7 +458,7 @@ export const ordersRouter = router({
           .execute();
       }
 
-      return { success: true, orderId, totalPrice };
+      return { success: true, orderId, totalPrice, paymentToken: signOrderPaymentToken(orderId) };
     }),
 
   // Admin: sales summary

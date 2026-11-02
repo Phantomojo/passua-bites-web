@@ -1,7 +1,10 @@
+import crypto from "crypto";
 import { getDb } from "./db";
-import { orders, mpesaTransactions } from "../drizzle/schema";
-import { eq } from "drizzle-orm";
+import { orders, mpesaTransactions, mpesaCallbackEvents } from "../drizzle/schema";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { logger } from "./logger";
+import { queryStkPushStatus } from "./routers/payments";
+import { formatPhoneNumber } from "./routers/payments";
 
 /**
  * Process a Safaricom Daraja STK Push callback payload.
@@ -25,6 +28,99 @@ import { logger } from "./logger";
  * filter silently drops such callbacks. Use a neutral path such as
  * /api/payments/callback.
  */
+export async function reconcileOrderPayment(orderId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const [tx] = await db
+    .select()
+    .from(mpesaTransactions)
+    .where(
+      and(eq(mpesaTransactions.orderId, orderId), eq(mpesaTransactions.status, "completed"))
+    )
+    .orderBy(desc(mpesaTransactions.createdAt))
+    .limit(1)
+    .execute();
+  if (!tx) return;
+  const [order] = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.id, orderId))
+    .limit(1)
+    .execute();
+  if (!order) return;
+  if (order.paymentStatus === "completed") return;
+  await db
+    .update(orders)
+    .set({
+      paymentStatus: "completed",
+      mpesaTransactionId: tx.mpesaReceiptNumber || order.mpesaTransactionId,
+      paymentReason: order.paymentReason || "Reconciled from completed M-Pesa transaction",
+      status: order.status === "pending" ? "confirmed" : order.status,
+    })
+    .where(eq(orders.id, orderId))
+    .execute();
+}
+
+export async function processMpesaCallbackDurable(payload: any): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const body = payload?.Body?.stkCallback || {};
+  const checkoutRequestID = body.CheckoutRequestID;
+  const resultCode = body.ResultCode;
+  const keySource = checkoutRequestID
+    ? `${checkoutRequestID}:${resultCode}`
+    : JSON.stringify(payload);
+  const idempotencyKey = crypto.createHash("sha256").update(keySource).digest("hex");
+
+  // Persist the callback before acknowledging/processing it.
+  let eventId: number | null = null;
+  try {
+    const [row] = await db
+      .insert(mpesaCallbackEvents)
+      .values({
+        idempotencyKey,
+        payload: JSON.stringify(payload),
+        status: "received",
+      })
+      .returning({ id: mpesaCallbackEvents.id });
+    eventId = row.id;
+  } catch (error) {
+    const [existing] = await db
+      .select()
+      .from(mpesaCallbackEvents)
+      .where(eq(mpesaCallbackEvents.idempotencyKey, idempotencyKey))
+      .limit(1)
+      .execute();
+    if (existing?.status === "processed") {
+      logger.info({ idempotencyKey }, "[M-Pesa] Duplicate callback already processed");
+      return;
+    }
+    eventId = existing?.id ?? null;
+  }
+
+  try {
+    await processMpesaCallback(payload);
+    if (eventId) {
+      await db
+        .update(mpesaCallbackEvents)
+        .set({ status: "processed", processedAt: new Date() })
+        .where(eq(mpesaCallbackEvents.id, eventId))
+        .execute();
+    }
+  } catch (error) {
+    if (eventId) {
+      await db
+        .update(mpesaCallbackEvents)
+        .set({ status: "failed", error: String(error), processedAt: new Date() })
+        .where(eq(mpesaCallbackEvents.id, eventId))
+        .execute()
+        .catch(() => undefined);
+    }
+    throw error;
+  }
+}
+
 export async function processMpesaCallback(body: any): Promise<void> {
   try {
     const { Body } = body || {};
@@ -34,12 +130,8 @@ export async function processMpesaCallback(body: any): Promise<void> {
     }
 
     const { stkCallback } = Body;
-    const {
-      ResultCode,
-      CheckoutRequestID,
-      CallbackMetadata,
-      ResultDesc,
-    } = stkCallback;
+    const { ResultCode, CheckoutRequestID, CallbackMetadata, ResultDesc } =
+      stkCallback;
 
     const code = Number(ResultCode);
 
@@ -49,7 +141,6 @@ export async function processMpesaCallback(body: any): Promise<void> {
       return;
     }
 
-    // Find transaction
     const tx = await db
       .select()
       .from(mpesaTransactions)
@@ -65,11 +156,37 @@ export async function processMpesaCallback(body: any): Promise<void> {
       return;
     }
 
-    // Idempotency: already completed
-    if (tx[0].status === "completed") {
+    const transaction = tx[0];
+
+    // Require merchant request ID match.
+    const callbackMerchantRequestID = stkCallback.MerchantRequestID;
+    if (
+      !callbackMerchantRequestID ||
+      !transaction.merchantRequestID ||
+      callbackMerchantRequestID !== transaction.merchantRequestID
+    ) {
+      logger.error(
+        { checkoutRequestID: CheckoutRequestID },
+        "[M-Pesa] Merchant request ID missing or mismatched in callback"
+      );
+      await db
+        .update(mpesaTransactions)
+        .set({ status: "pending", resultDesc: "Merchant request ID mismatch" })
+        .where(
+          and(
+            eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+            eq(mpesaTransactions.status, "pending")
+          )
+        )
+        .execute();
+      return;
+    }
+
+    // Idempotency: already completed — never downgrade.
+    if (transaction.status === "completed") {
       logger.info(
         { checkoutRequestID: CheckoutRequestID },
-        "[M-Pesa] Duplicate callback, skipping"
+        "[M-Pesa] Duplicate callback for completed payment, skipping"
       );
       return;
     }
@@ -84,71 +201,292 @@ export async function processMpesaCallback(body: any): Promise<void> {
           resultCode: code,
           resultDesc: ResultDesc || null,
         })
-        .where(eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID));
+        .where(
+          and(
+            eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+            eq(mpesaTransactions.status, "pending")
+          )
+        )
+        .execute();
 
       await db
         .update(orders)
         .set({ paymentStatus: "failed" })
-        .where(eq(orders.id, tx[0].orderId));
+        .where(
+          and(eq(orders.id, transaction.orderId), eq(orders.paymentStatus, "pending"))
+        )
+        .execute();
 
       logger.info(
-        { status, code, checkoutRequestID: CheckoutRequestID, orderId: tx[0].orderId },
+        { status, code, checkoutRequestID: CheckoutRequestID },
         "[M-Pesa] Payment not completed"
       );
       return;
     }
 
-    // Extract metadata
+    // Independently verify with Daraja before settling.
+    let queryData: any;
+    try {
+      queryData = await queryStkPushStatus(CheckoutRequestID);
+    } catch (error) {
+      logger.error({ err: error, checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Daraja verification failed");
+      await db
+        .update(mpesaTransactions)
+        .set({ status: "pending", resultDesc: "Provider verification unavailable" })
+        .where(
+          and(
+            eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+            eq(mpesaTransactions.status, "pending")
+          )
+        )
+        .execute();
+      return;
+    }
+
+    if (Number(queryData?.ResultCode) !== 0) {
+      logger.info({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Daraja verification did not confirm payment");
+      await db
+        .update(mpesaTransactions)
+        .set({ status: "pending", resultDesc: "Provider verification pending" })
+        .where(
+          and(
+            eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+            eq(mpesaTransactions.status, "pending")
+          )
+        )
+        .execute();
+      return;
+    }
+
+    // Require query IDs to match stored and callback values.
+    if (
+      !queryData?.CheckoutRequestID ||
+      queryData.CheckoutRequestID !== CheckoutRequestID ||
+      queryData.CheckoutRequestID !== transaction.checkoutRequestID
+    ) {
+      logger.error({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] CheckoutRequestID mismatch in query");
+      await db
+        .update(mpesaTransactions)
+        .set({ status: "pending", resultDesc: "CheckoutRequestID mismatch" })
+        .where(
+          and(
+            eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+            eq(mpesaTransactions.status, "pending")
+          )
+        )
+        .execute();
+      return;
+    }
+
+    if (
+      !queryData?.MerchantRequestID ||
+      queryData.MerchantRequestID !== callbackMerchantRequestID ||
+      queryData.MerchantRequestID !== transaction.merchantRequestID
+    ) {
+      logger.error({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] MerchantRequestID mismatch in query");
+      await db
+        .update(mpesaTransactions)
+        .set({ status: "pending", resultDesc: "MerchantRequestID mismatch" })
+        .where(
+          and(
+            eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+            eq(mpesaTransactions.status, "pending")
+          )
+        )
+        .execute();
+      return;
+    }
+
+    // Use callback metadata for amount/receipt/phone (STK Query does not return it).
     const metadata: Record<string, any> = {};
     CallbackMetadata?.Item?.forEach((item: any) => {
       metadata[item.Name] = item.Value;
     });
 
-    const { MpesaReceiptNumber, Amount } = metadata;
+    const receipt = metadata.MpesaReceiptNumber;
+    const amount = metadata.Amount;
+    const phone = metadata.PhoneNumber;
 
-    // Validate amount when present
-    if (Amount !== undefined && Number(Amount) !== Number(tx[0].amount)) {
+    // Require receipt and amount evidence.
+    if (!receipt || amount === undefined || amount === null) {
+      logger.error(
+        { checkoutRequestID: CheckoutRequestID },
+        "[M-Pesa] Missing receipt or amount in callback"
+      );
+      await db
+        .update(mpesaTransactions)
+        .set({
+          status: "pending",
+          resultCode: code,
+          resultDesc: "Insufficient payment evidence",
+        })
+        .where(
+          and(
+            eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+            eq(mpesaTransactions.status, "pending")
+          )
+        )
+        .execute();
+      return;
+    }
+
+    // Validate amount.
+    if (Number(amount) !== Number(transaction.amount)) {
       logger.error(
         {
-          expected: tx[0].amount,
-          received: Amount,
-          orderId: tx[0].orderId,
+          expected: transaction.amount,
+          received: amount,
           checkoutRequestID: CheckoutRequestID,
         },
         "[M-Pesa] Amount mismatch in callback"
       );
+      await db
+        .update(mpesaTransactions)
+        .set({ status: "failed", resultCode: code, resultDesc: "Amount mismatch" })
+        .where(
+          and(
+            eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+            eq(mpesaTransactions.status, "pending")
+          )
+        )
+        .execute();
+      await db
+        .update(orders)
+        .set({ paymentStatus: "failed" })
+        .where(
+          and(eq(orders.id, transaction.orderId), eq(orders.paymentStatus, "pending"))
+        )
+        .execute();
       return;
     }
 
-    // Confirm payment
-    await db
+    // Require and validate phone evidence.
+    if (!phone) {
+      logger.error({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Missing phone in verification");
+      await db
+        .update(mpesaTransactions)
+        .set({ status: "pending", resultDesc: "Missing phone evidence" })
+        .where(
+          and(
+            eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+            eq(mpesaTransactions.status, "pending")
+          )
+        )
+        .execute();
+      return;
+    }
+
+    try {
+      const normalized = formatPhoneNumber(String(phone));
+      const txPhone = formatPhoneNumber(transaction.phoneNumber);
+      if (normalized !== txPhone) {
+        logger.error({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Phone mismatch in callback");
+        await db
+          .update(mpesaTransactions)
+          .set({ status: "failed", resultCode: code, resultDesc: "Phone mismatch" })
+          .where(
+            and(
+              eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+              eq(mpesaTransactions.status, "pending")
+            )
+          )
+          .execute();
+        await db
+          .update(orders)
+          .set({ paymentStatus: "failed" })
+          .where(
+            and(eq(orders.id, transaction.orderId), eq(orders.paymentStatus, "pending"))
+          )
+          .execute();
+        return;
+      }
+    } catch {
+      logger.error({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Invalid phone in callback");
+      await db
+        .update(mpesaTransactions)
+        .set({ status: "failed", resultCode: code, resultDesc: "Invalid phone" })
+        .where(
+          and(
+            eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+            eq(mpesaTransactions.status, "pending")
+          )
+        )
+        .execute();
+      await db
+        .update(orders)
+        .set({ paymentStatus: "failed" })
+        .where(
+          and(eq(orders.id, transaction.orderId), eq(orders.paymentStatus, "pending"))
+        )
+        .execute();
+      return;
+    }
+
+    // Confirm payment conditionally.
+    const upd = await db
       .update(mpesaTransactions)
       .set({
         status: "completed",
-        mpesaReceiptNumber: MpesaReceiptNumber || null,
+        mpesaReceiptNumber: receipt,
         resultCode: code,
         resultDesc: ResultDesc || null,
       })
-      .where(eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID));
+      .where(
+        and(
+          eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+          eq(mpesaTransactions.status, "pending")
+        )
+      )
+      .execute();
+
+    const rowCount = (upd as any).rowCount ?? 0;
+    if (rowCount === 0) {
+      logger.info(
+        { checkoutRequestID: CheckoutRequestID },
+        "[M-Pesa] Duplicate callback, skipping"
+      );
+      return;
+    }
+
+    const [order] = await db
+      .select()
+      .from(orders)
+      .where(eq(orders.id, transaction.orderId))
+      .limit(1)
+      .execute();
 
     await db
       .update(orders)
       .set({
         paymentStatus: "completed",
-        mpesaTransactionId: MpesaReceiptNumber || null,
-        status: "confirmed",
+        mpesaTransactionId: receipt,
+        paymentReason:
+          order?.status === "cancelled"
+            ? "Late payment after cancellation - reconcile/refund"
+            : order?.paymentReason ?? null,
       })
-      .where(eq(orders.id, tx[0].orderId));
+      .where(
+        and(
+          eq(orders.id, transaction.orderId),
+          inArray(orders.paymentStatus, ["pending", "failed"])
+        )
+      )
+      .execute();
+
+    await db
+      .update(orders)
+      .set({ status: "confirmed" })
+      .where(
+        and(eq(orders.id, transaction.orderId), eq(orders.status, "pending"))
+      )
+      .execute();
 
     logger.info(
-      {
-        orderId: tx[0].orderId,
-        receipt: MpesaReceiptNumber,
-        amount: Amount,
-      },
+      { orderId: transaction.orderId, receipt, amount },
       "[M-Pesa] Payment confirmed"
     );
   } catch (error) {
     logger.error({ err: error }, "[M-Pesa] Callback processing error");
+    throw error;
   }
 }
