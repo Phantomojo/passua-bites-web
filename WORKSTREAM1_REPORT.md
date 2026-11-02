@@ -76,6 +76,32 @@
 
 ## 6. PR handling
 
+## 7. Review Round 2 (security) — final
+
+- Branch: `workstream/payment-order-security`
+- Latest commit: `c8209e3`
+- PR #6 updated; not merged.
+
+### Fixed
+1. Forged callback: independent Daraja verification, secret-protected endpoint, match IDs/amount/phone/receipt.
+2. Phone verification mandatory.
+3. Duplicate STK: DB-level partial unique index + reservation.
+4. Cash fallback failed→cash with audit + accurate results.
+5. Cancelled orders not resurrected; late payment flagged.
+6. Phone tracking admin-only.
+7. Production token secret required.
+8. POS cash audit fields.
+9. Reconciliation helper for split state.
+10. Migration added (not applied).
+
+### Verification
+- `pnpm check`: passed
+- `pnpm test`: 8 passed
+- `pnpm run build`: passed
+- `pnpm run vercel-build`: passed
+
+No production deployment or migration performed.
+
 - PR #1 (`hardening/production-safety-2026-08-15`): not merged — conflicts with live Vercel/STK strategy.
 - PR #3 (`feat/customer-whatsapp-availability-2026-11-02`): tests passed; fixed `Set` spread iteration with `Array.from` in `server/_core/index.ts` and `server/_core/whatsapp.ts`; pushed `fix/pr3-set-iteration`.
 - PR #4 and PR #5: fast-forward merged into `master`; closed.
