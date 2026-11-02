@@ -1,5 +1,6 @@
+import crypto from "crypto";
 import { getDb } from "./db";
-import { orders, mpesaTransactions } from "../drizzle/schema";
+import { orders, mpesaTransactions, mpesaCallbackEvents } from "../drizzle/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { logger } from "./logger";
 import { queryStkPushStatus } from "./routers/payments";
@@ -58,6 +59,66 @@ export async function reconcileOrderPayment(orderId: number): Promise<void> {
     })
     .where(eq(orders.id, orderId))
     .execute();
+}
+
+export async function processMpesaCallbackDurable(payload: any): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const body = payload?.Body?.stkCallback || {};
+  const checkoutRequestID = body.CheckoutRequestID;
+  const resultCode = body.ResultCode;
+  const keySource = checkoutRequestID
+    ? `${checkoutRequestID}:${resultCode}`
+    : JSON.stringify(payload);
+  const idempotencyKey = crypto.createHash("sha256").update(keySource).digest("hex");
+
+  // Persist the callback before acknowledging/processing it.
+  let eventId: number | null = null;
+  try {
+    const [row] = await db
+      .insert(mpesaCallbackEvents)
+      .values({
+        idempotencyKey,
+        payload: JSON.stringify(payload),
+        status: "received",
+      })
+      .returning({ id: mpesaCallbackEvents.id });
+    eventId = row.id;
+  } catch (error) {
+    const [existing] = await db
+      .select()
+      .from(mpesaCallbackEvents)
+      .where(eq(mpesaCallbackEvents.idempotencyKey, idempotencyKey))
+      .limit(1)
+      .execute();
+    if (existing?.status === "processed") {
+      logger.info({ idempotencyKey }, "[M-Pesa] Duplicate callback already processed");
+      return;
+    }
+    eventId = existing?.id ?? null;
+  }
+
+  try {
+    await processMpesaCallback(payload);
+    if (eventId) {
+      await db
+        .update(mpesaCallbackEvents)
+        .set({ status: "processed", processedAt: new Date() })
+        .where(eq(mpesaCallbackEvents.id, eventId))
+        .execute();
+    }
+  } catch (error) {
+    if (eventId) {
+      await db
+        .update(mpesaCallbackEvents)
+        .set({ status: "failed", error: String(error), processedAt: new Date() })
+        .where(eq(mpesaCallbackEvents.id, eventId))
+        .execute()
+        .catch(() => undefined);
+    }
+    throw error;
+  }
 }
 
 export async function processMpesaCallback(body: any): Promise<void> {

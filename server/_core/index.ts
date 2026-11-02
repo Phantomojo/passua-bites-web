@@ -10,7 +10,7 @@ import { serveStatic, setupVite } from "./vite";
 import rateLimit from "express-rate-limit";
 import pinoHttp from "pino-http";
 import { logger } from "../logger";
-import { processMpesaCallback } from "../mpesaCallback";
+import { processMpesaCallbackDurable } from "../mpesaCallback";
 
 // Security: Rate limiting
 const generalLimiter = rateLimit({
@@ -113,7 +113,7 @@ async function startServer() {
       return res.status(503).json({ ResultCode: 1, ResultDesc: "Callback not configured" });
     }
     try {
-      await processMpesaCallback(req.body);
+      await processMpesaCallbackDurable(req.body);
       res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
     } catch (error) {
       logger.error({ err: error }, "[M-Pesa] Callback processing failed");

@@ -210,3 +210,13 @@ export type Announcement = typeof announcements.$inferSelect;
 export type InsertAnnouncement = typeof announcements.$inferInsert;
 export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
 export type InsertAnalyticsEvent = typeof analyticsEvents.$inferInsert;
+
+export const mpesaCallbackEvents = pgTable("mpesaCallbackEvents", {
+  id: serial("id").primaryKey(),
+  idempotencyKey: varchar("idempotencyKey", { length: 255 }).notNull().unique(),
+  payload: text("payload").notNull(),
+  receivedAt: timestamp("receivedAt").defaultNow().notNull(),
+  status: varchar("status", { length: 20 }).default("received").notNull(),
+  processedAt: timestamp("processedAt"),
+  error: text("error"),
+});

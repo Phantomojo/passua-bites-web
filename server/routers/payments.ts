@@ -3,7 +3,7 @@ import { z } from "zod";
 import { publicProcedure, adminProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { orders, mpesaTransactions } from "../../drizzle/schema";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import axios from "axios";
 import {
   signOrderPaymentToken,
@@ -215,23 +215,29 @@ export const paymentsRouter = router({
       // Acquire OAuth token before reserving, so token failures do not strand reservations.
       const oauthToken = await getMpesaAccessToken();
 
+      // Validate local configuration before creating a reservation.
+      const callbackUrl = getCallbackUrl();
+
       // Reserve an idempotent payment attempt before contacting Safaricom.
       const reservationKey = `INITIATING-${crypto.randomUUID()}`;
       let reservationId: number;
       try {
-        const [inserted] = await db
-          .insert(mpesaTransactions)
-          .values({
-            orderId: input.orderId,
-            checkoutRequestID: reservationKey,
-            merchantRequestID: null,
-            phoneNumber: phone,
-            amount: amount.toString(),
-            accountReference: `PB${input.orderId}`,
-            status: "initiating",
-          })
-          .returning({ id: mpesaTransactions.id });
-        reservationId = inserted.id;
+        const result = await db.execute(sql`
+          INSERT INTO "mpesaTransactions" (
+            "orderId", "checkoutRequestID", "merchantRequestID", "phoneNumber", "amount",
+            "accountReference", "status"
+          )
+          SELECT ${input.orderId}, ${reservationKey}, NULL, ${phone}, ${amount.toString()}, ${`PB${input.orderId}`}, 'initiating'
+          WHERE NOT EXISTS (
+            SELECT 1 FROM "orders" WHERE "id" = ${input.orderId} AND "paymentStatus" = 'completed'
+          )
+          RETURNING "id"
+        `);
+        const rows = (result as any).rows || (Array.isArray(result) ? result : []);
+        if (!rows || rows.length === 0 || !rows[0]?.id) {
+          throw new Error("Order already paid");
+        }
+        reservationId = rows[0].id;
       } catch (reserveError: any) {
         const [existing] = await db
           .select()
@@ -246,6 +252,9 @@ export const paymentsRouter = router({
             checkoutRequestID: existing.checkoutRequestID,
             message: "STK Push already in progress. Check your phone.",
           };
+        }
+        if (reserveError?.message === "Order already paid") {
+          throw new Error("Order already paid");
         }
         throw reserveError;
       }
@@ -266,7 +275,7 @@ export const paymentsRouter = router({
             PartyA: phone,
             PartyB: cfg.shortcode,
             PhoneNumber: phone,
-            CallBackURL: getCallbackUrl(),
+            CallBackURL: callbackUrl,
             AccountReference: `PB${input.orderId}`,
             TransactionDesc: "Passua Bites order",
           },
@@ -551,7 +560,7 @@ export const paymentsRouter = router({
         resolution: z.enum(["pending", "failed"]),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
@@ -567,16 +576,59 @@ export const paymentsRouter = router({
         throw new Error("No reconcilable STK attempt found");
       }
 
-      await db
+      // Independently query Safaricom before changing state.
+      let queryData: any;
+      try {
+        queryData = await queryStkPushStatus(input.checkoutRequestID);
+      } catch (error) {
+        throw new Error("Provider verification unavailable");
+      }
+
+      const queryCheckoutId = queryData?.CheckoutRequestID;
+      const queryMerchantId = queryData?.MerchantRequestID;
+      const queryResultCode = Number(queryData?.ResultCode);
+
+      if (
+        !queryCheckoutId ||
+        queryCheckoutId !== input.checkoutRequestID ||
+        !queryMerchantId ||
+        queryMerchantId !== input.merchantRequestID
+      ) {
+        throw new Error("Provider identifiers do not match");
+      }
+
+      if (input.resolution === "failed") {
+        // Require a definitive terminal provider failure.
+        if (queryResultCode === 0 || Number.isNaN(queryResultCode)) {
+          throw new Error("Cannot mark a successful or ambiguous attempt as failed");
+        }
+      } else {
+        // Keep successful/ambiguous attempts blocked; only persist IDs as pending.
+        if (queryResultCode !== 0) {
+          throw new Error("Provider did not confirm the attempt");
+        }
+      }
+
+      const upd = await db
         .update(mpesaTransactions)
         .set({
           checkoutRequestID: input.checkoutRequestID,
           merchantRequestID: input.merchantRequestID,
           status: input.resolution,
-          resultDesc: "Reconciled by admin with provider identifiers",
+          resultDesc: "Reconciled by admin after provider verification",
         })
-        .where(eq(mpesaTransactions.id, tx.id))
+        .where(
+          and(
+            eq(mpesaTransactions.id, tx.id),
+            inArray(mpesaTransactions.status, ["initiating", "unknown"])
+          )
+        )
         .execute();
+
+      const rowCount = (upd as any).rowCount ?? 0;
+      if (rowCount === 0) {
+        throw new Error("Reconciliation lost the race");
+      }
 
       return { success: true };
     }),
