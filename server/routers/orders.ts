@@ -110,6 +110,7 @@ export const ordersRouter = router({
         success: true,
         orderId,
         totalPrice,
+        paymentToken: signOrderPaymentToken(orderId),
       };
     }),
 

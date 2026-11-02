@@ -115,35 +115,25 @@ async function startServer() {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
-  // tRPC API with stricter rate limiting on mutations
-  app.use(
-    "/api/trpc/orders.create",
-    orderLimiter, // Stricter limit for orders
-    createExpressMiddleware({
-      router: appRouter,
-      createContext,
-    })
-  );
-  app.use(
-    "/api/trpc/payments.initiateStkPush",
-    orderLimiter, // Stricter limit for payments
-    createExpressMiddleware({
-      router: appRouter,
-      createContext,
-    })
-  );
-  app.use(
-    "/api/trpc/admin.login",
-    authLimiter,
-    createExpressMiddleware({
-      router: appRouter,
-      createContext,
-    })
-  );
-
-  // Other API routes with general limit
+  // tRPC API with path-aware rate limiting on sensitive mutations
   app.use(
     "/api/trpc",
+    (req, _res, next) => {
+      const p = req.path || "";
+      if (p === "/orders.create" || p.startsWith("/orders.create?")) {
+        return orderLimiter(req, _res, next);
+      }
+      if (
+        p === "/payments.initiateStkPush" ||
+        p.startsWith("/payments.initiateStkPush?")
+      ) {
+        return orderLimiter(req, _res, next);
+      }
+      if (p === "/admin.login" || p.startsWith("/admin.login?")) {
+        return authLimiter(req, _res, next);
+      }
+      next();
+    },
     createExpressMiddleware({
       router: appRouter,
       createContext,
