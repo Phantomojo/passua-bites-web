@@ -4,6 +4,7 @@ import { PBNav, PBFooter } from "./Home";
 import { trpc } from "@/lib/trpc";
 import { trackGA4Event } from "@/hooks/useAnalytics";
 import { usePageMeta } from "@/hooks/usePageMeta";
+import { LazyImage } from "@/LazyImage";
 
 function MediaPreview({ item }: { item: any }) {
   const [isMuted, setIsMuted] = useState(true);
@@ -197,11 +198,12 @@ function MediaPreview({ item }: { item: any }) {
         ) : (
           <>
             {item.imageUrl ? (
-              <img
+              <LazyImage
                 src={item.imageUrl}
                 alt={item.name || "Food item"}
-                loading="lazy"
-                decoding="async"
+                width={400}
+                height={300}
+                eager={false}
                 className="pb-food-img"
                 style={{
                   width: "100%",
