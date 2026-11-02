@@ -7,6 +7,7 @@ import {
   timestamp,
   varchar,
   integer,
+  boolean,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -190,11 +191,26 @@ export const adminUsers = pgTable("adminUsers", {
   passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
   name: text("name"),
   role: varchar("role", { length: 20 }).default("admin").notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type AdminUser = typeof adminUsers.$inferSelect;
+
+export const adminSessions = pgTable("adminSessions", {
+  id: serial("id").primaryKey(),
+  adminUserId: integer("adminUserId").notNull(),
+  tokenHash: varchar("tokenHash", { length: 128 }).notNull().unique(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  lastUsedAt: timestamp("lastUsedAt").defaultNow().notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  revokedAt: timestamp("revokedAt"),
+  ip: varchar("ip", { length: 64 }),
+  userAgent: text("userAgent"),
+});
+
+export type AdminSession = typeof adminSessions.$inferSelect;
 export type Announcement = typeof announcements.$inferSelect;
 export type InsertAnnouncement = typeof announcements.$inferInsert;
 export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
