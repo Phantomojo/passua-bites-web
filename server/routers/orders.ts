@@ -3,7 +3,7 @@ import { publicProcedure, adminProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { reconcileOrderPayment } from "../mpesaCallback";
 import { orders, orderItems, menuItems } from "../../drizzle/schema";
-import { eq, desc, and, inArray } from "drizzle-orm";
+import { eq, desc, and, inArray, sql } from "drizzle-orm";
 import { signOrderPaymentToken, verifyOrderPaymentToken } from "../_core/paymentToken";
 
 // Phone validation for Kenyan numbers
@@ -294,7 +294,8 @@ export const ordersRouter = router({
         .where(
           and(
             eq(orders.id, input.id),
-            inArray(orders.paymentStatus, ["pending", "failed"])
+            inArray(orders.paymentStatus, ["pending", "failed"]),
+            sql`NOT EXISTS (SELECT 1 FROM "mpesaTransactions" WHERE "orderId" = ${input.id} AND "status" IN ('initiating', 'pending', 'unknown'))`
           )
         )
         .execute();

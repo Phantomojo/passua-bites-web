@@ -1,6 +1,6 @@
 import { getDb } from "./db";
 import { orders, mpesaTransactions } from "../drizzle/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { logger } from "./logger";
 import { queryStkPushStatus } from "./routers/payments";
 import { formatPhoneNumber } from "./routers/payments";
@@ -404,7 +404,12 @@ export async function processMpesaCallback(body: any): Promise<void> {
             ? "Late payment after cancellation - reconcile/refund"
             : order?.paymentReason ?? null,
       })
-      .where(eq(orders.id, transaction.orderId))
+      .where(
+        and(
+          eq(orders.id, transaction.orderId),
+          inArray(orders.paymentStatus, ["pending", "failed"])
+        )
+      )
       .execute();
 
     await db
@@ -421,5 +426,6 @@ export async function processMpesaCallback(body: any): Promise<void> {
     );
   } catch (error) {
     logger.error({ err: error }, "[M-Pesa] Callback processing error");
+    throw error;
   }
 }

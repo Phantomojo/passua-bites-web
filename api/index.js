@@ -233,8 +233,8 @@ import { neon } from "@neondatabase/serverless";
 async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      const sql3 = neon(process.env.DATABASE_URL);
-      _db = drizzle(sql3);
+      const sql4 = neon(process.env.DATABASE_URL);
+      _db = drizzle(sql4);
     } catch (error) {
       logger.warn({ err: error }, "[Database] Failed to connect");
       _db = null;
@@ -755,14 +755,14 @@ init_db();
 init_db();
 init_schema();
 init_logger();
-import { eq as eq4, and as and2, desc as desc2 } from "drizzle-orm";
+import { eq as eq4, and as and2, desc as desc2, inArray as inArray2 } from "drizzle-orm";
 
 // server/routers/payments.ts
 import crypto2 from "crypto";
 import { z as z3 } from "zod";
 init_db();
 init_schema();
-import { eq as eq3, and, desc } from "drizzle-orm";
+import { eq as eq3, and, desc, inArray } from "drizzle-orm";
 import axios from "axios";
 
 // server/_core/paymentToken.ts
@@ -968,6 +968,7 @@ var paymentsRouter = router({
     if (!Number.isInteger(amount)) {
       throw new Error("Order amount must be a whole number of KSh");
     }
+    const oauthToken = await getMpesaAccessToken();
     const reservationKey = `INITIATING-${crypto2.randomUUID()}`;
     let reservationId;
     try {
@@ -993,7 +994,7 @@ var paymentsRouter = router({
       throw reserveError;
     }
     const { password, timestamp: timestamp2 } = generatePassword();
-    const token = await getMpesaAccessToken();
+    const token = oauthToken;
     let response;
     try {
       response = await axios.post(
@@ -1035,7 +1036,12 @@ var paymentsRouter = router({
         status: "pending"
       }).where(eq3(mpesaTransactions.id, reservationId)).execute();
     } catch (insertError) {
-      await db.update(mpesaTransactions).set({ status: "failed", resultDesc: "Reservation update failed" }).where(eq3(mpesaTransactions.id, reservationId)).execute();
+      const returnedCheckout = response?.data?.CheckoutRequestID;
+      const returnedMerchant = response?.data?.MerchantRequestID;
+      await db.update(mpesaTransactions).set({
+        status: "unknown",
+        resultDesc: `Safaricom accepted but persistence failed; reconcile. checkout=${returnedCheckout || "unknown"} merchant=${returnedMerchant || "unknown"}`
+      }).where(eq3(mpesaTransactions.id, reservationId)).execute().catch(() => void 0);
       throw insertError;
     }
     return {
@@ -1145,7 +1151,12 @@ var paymentsRouter = router({
           paymentStatus: "completed",
           mpesaTransactionId: receipt,
           paymentReason: order?.status === "cancelled" ? "Late payment after cancellation - reconcile/refund" : order?.paymentReason ?? null
-        }).where(eq3(orders.id, tx.orderId)).execute();
+        }).where(
+          and(
+            eq3(orders.id, tx.orderId),
+            inArray(orders.paymentStatus, ["pending", "failed"])
+          )
+        ).execute();
         await db.update(orders).set({ status: "confirmed" }).where(and(eq3(orders.id, tx.orderId), eq3(orders.status, "pending"))).execute();
         return {
           status: "completed",
@@ -1177,6 +1188,28 @@ var paymentsRouter = router({
         resultCode: tx.resultCode
       };
     }
+  }),
+  reconcileStkAttempt: adminProcedure.input(
+    z3.object({
+      orderId: z3.number(),
+      checkoutRequestID: z3.string().min(1),
+      merchantRequestID: z3.string().min(1),
+      resolution: z3.enum(["pending", "failed"])
+    })
+  ).mutation(async ({ input }) => {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+    const [tx] = await db.select().from(mpesaTransactions).where(eq3(mpesaTransactions.orderId, input.orderId)).orderBy(desc(mpesaTransactions.createdAt)).limit(1).execute();
+    if (!tx || tx.status !== "initiating" && tx.status !== "unknown") {
+      throw new Error("No reconcilable STK attempt found");
+    }
+    await db.update(mpesaTransactions).set({
+      checkoutRequestID: input.checkoutRequestID,
+      merchantRequestID: input.merchantRequestID,
+      status: input.resolution,
+      resultDesc: "Reconciled by admin with provider identifiers"
+    }).where(eq3(mpesaTransactions.id, tx.id)).execute();
+    return { success: true };
   }),
   getOrderPaymentStatus: publicProcedure.input(
     z3.object({
@@ -1437,7 +1470,12 @@ async function processMpesaCallback(body) {
       paymentStatus: "completed",
       mpesaTransactionId: receipt,
       paymentReason: order?.status === "cancelled" ? "Late payment after cancellation - reconcile/refund" : order?.paymentReason ?? null
-    }).where(eq4(orders.id, transaction.orderId)).execute();
+    }).where(
+      and2(
+        eq4(orders.id, transaction.orderId),
+        inArray2(orders.paymentStatus, ["pending", "failed"])
+      )
+    ).execute();
     await db.update(orders).set({ status: "confirmed" }).where(
       and2(eq4(orders.id, transaction.orderId), eq4(orders.status, "pending"))
     ).execute();
@@ -1447,12 +1485,13 @@ async function processMpesaCallback(body) {
     );
   } catch (error) {
     logger.error({ err: error }, "[M-Pesa] Callback processing error");
+    throw error;
   }
 }
 
 // server/routers/orders.ts
 init_schema();
-import { eq as eq5, desc as desc3, and as and3, inArray } from "drizzle-orm";
+import { eq as eq5, desc as desc3, and as and3, inArray as inArray3, sql as sql2 } from "drizzle-orm";
 var phoneRegex = /^(?:\+254|0)[7][0-9]{8}$/;
 var ordersRouter = router({
   // Create a new order
@@ -1596,7 +1635,7 @@ var ordersRouter = router({
       name: menuItems.name,
       quantity: orderItems.quantity,
       price: orderItems.priceAtTime
-    }).from(orderItems).leftJoin(menuItems, eq5(orderItems.menuItemId, menuItems.id)).where(inArray(orderItems.orderId, ids)).execute();
+    }).from(orderItems).leftJoin(menuItems, eq5(orderItems.menuItemId, menuItems.id)).where(inArray3(orderItems.orderId, ids)).execute();
     const byOrder = /* @__PURE__ */ new Map();
     for (const it of itemRows) {
       if (!byOrder.has(it.orderId)) byOrder.set(it.orderId, []);
@@ -1630,7 +1669,8 @@ var ordersRouter = router({
     }).where(
       and3(
         eq5(orders.id, input.id),
-        inArray(orders.paymentStatus, ["pending", "failed"])
+        inArray3(orders.paymentStatus, ["pending", "failed"]),
+        sql2`NOT EXISTS (SELECT 1 FROM "mpesaTransactions" WHERE "orderId" = ${input.id} AND "status" IN ('initiating', 'pending', 'unknown'))`
       )
     ).execute();
     const rowCount = upd.rowCount ?? 0;
@@ -2241,7 +2281,7 @@ var adminRouter = router({
 // server/routers/analytics.ts
 init_db();
 init_schema();
-import { sql as sql2 } from "drizzle-orm";
+import { sql as sql3 } from "drizzle-orm";
 import { z as z7 } from "zod";
 import { createHash } from "crypto";
 var geo = null;
@@ -2340,7 +2380,7 @@ var analyticsRouter = router({
       browsersRes,
       referrersRes
     ] = await Promise.all([
-      db.execute(sql2`
+      db.execute(sql3`
           SELECT
             SUM(CASE WHEN "browser" != 'Bot/Crawler' THEN 1 ELSE 0 END) AS total_pageviews,
             COUNT(DISTINCT CASE WHEN "browser" != 'Bot/Crawler' THEN "sessionId" END) AS total_sessions,
@@ -2350,7 +2390,7 @@ var analyticsRouter = router({
           WHERE "createdAt" >= NOW() - INTERVAL '30 days'
             AND "eventType" = 'pageview'
         `),
-      db.execute(sql2`
+      db.execute(sql3`
           SELECT
             DATE("createdAt")               AS date,
             COUNT(*)                        AS pageviews,
@@ -2363,7 +2403,7 @@ var analyticsRouter = router({
           GROUP BY DATE("createdAt")
           ORDER BY date ASC
         `),
-      db.execute(sql2`
+      db.execute(sql3`
           SELECT
             "page",
             COUNT(*) AS views
@@ -2376,7 +2416,7 @@ var analyticsRouter = router({
           ORDER BY views DESC
           LIMIT 10
         `),
-      db.execute(sql2`
+      db.execute(sql3`
           SELECT
             COALESCE("device", 'unknown')   AS device,
             COUNT(DISTINCT "sessionId")     AS sessions
@@ -2386,7 +2426,7 @@ var analyticsRouter = router({
           GROUP BY "device"
           ORDER BY sessions DESC
         `),
-      db.execute(sql2`
+      db.execute(sql3`
           SELECT
             COALESCE("country", 'Unknown')  AS country,
             COUNT(DISTINCT "ip")            AS visitors
@@ -2397,7 +2437,7 @@ var analyticsRouter = router({
           ORDER BY visitors DESC
           LIMIT 10
         `),
-      db.execute(sql2`
+      db.execute(sql3`
           SELECT
             COALESCE("city", 'Unknown')  AS city,
             COUNT(DISTINCT "ip")         AS visitors
@@ -2408,7 +2448,7 @@ var analyticsRouter = router({
           ORDER BY visitors DESC
           LIMIT 10
         `),
-      db.execute(sql2`
+      db.execute(sql3`
           SELECT
             COALESCE("browser", 'Other')    AS browser,
             COUNT(DISTINCT "sessionId")     AS sessions
@@ -2418,7 +2458,7 @@ var analyticsRouter = router({
           GROUP BY "browser"
           ORDER BY sessions DESC
         `),
-      db.execute(sql2`
+      db.execute(sql3`
           SELECT
             COALESCE("referer", 'Direct')   AS source,
             COUNT(*)                        AS visits
@@ -2475,7 +2515,7 @@ var analyticsRouter = router({
     const db = await getDb();
     if (!db) return null;
     const [revenueRes, topItemsRes, peakRes, aovRes, repeatRes, statusRes] = await Promise.all([
-      db.execute(sql2`
+      db.execute(sql3`
           SELECT
             DATE("createdAt")                   AS date,
             COUNT(*)                            AS order_count,
@@ -2486,7 +2526,7 @@ var analyticsRouter = router({
           GROUP BY DATE("createdAt")
           ORDER BY date ASC
         `),
-      db.execute(sql2`
+      db.execute(sql3`
           SELECT
             m.name,
             SUM(oi.quantity)                                AS units,
@@ -2499,7 +2539,7 @@ var analyticsRouter = router({
           ORDER BY revenue DESC
           LIMIT 8
         `),
-      db.execute(sql2`
+      db.execute(sql3`
           SELECT
             EXTRACT(HOUR FROM "createdAt")::int AS hour,
             COUNT(*)                            AS orders
@@ -2508,7 +2548,7 @@ var analyticsRouter = router({
           GROUP BY hour
           ORDER BY hour ASC
         `),
-      db.execute(sql2`
+      db.execute(sql3`
           SELECT
             ROUND(AVG("totalPrice"::numeric), 2)  AS avg_order_value,
             COUNT(*)                              AS total_orders,
@@ -2516,7 +2556,7 @@ var analyticsRouter = router({
           FROM "orders"
           WHERE "paymentStatus" = 'completed'
         `),
-      db.execute(sql2`
+      db.execute(sql3`
           SELECT
             COUNT(*)                                                AS total_customers,
             SUM(CASE WHEN order_count > 1 THEN 1 ELSE 0 END)       AS repeat_customers
@@ -2526,7 +2566,7 @@ var analyticsRouter = router({
             GROUP BY "customerPhone"
           ) sub
         `),
-      db.execute(sql2`
+      db.execute(sql3`
           SELECT "status", COUNT(*) AS count
           FROM "orders"
           GROUP BY "status"
@@ -2782,8 +2822,12 @@ app.post("/api/payments/callback", async (req, res) => {
   } else if (process.env.NODE_ENV === "production") {
     return res.status(503).json({ ResultCode: 1, ResultDesc: "Callback not configured" });
   }
-  await processMpesaCallback(req.body);
-  res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
+  try {
+    await processMpesaCallback(req.body);
+    res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
+  } catch (error) {
+    res.status(500).json({ ResultCode: 1, ResultDesc: "Callback processing failed" });
+  }
 });
 var generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1e3,

@@ -112,8 +112,13 @@ async function startServer() {
       logger.error("[M-Pesa] MPESA_CALLBACK_SECRET is required in production");
       return res.status(503).json({ ResultCode: 1, ResultDesc: "Callback not configured" });
     }
-    await processMpesaCallback(req.body);
-    res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
+    try {
+      await processMpesaCallback(req.body);
+      res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
+    } catch (error) {
+      logger.error({ err: error }, "[M-Pesa] Callback processing failed");
+      res.status(500).json({ ResultCode: 1, ResultDesc: "Callback processing failed" });
+    }
   });
 
   app.use("/api/", generalLimiter); // Apply rate limiting to other API routes

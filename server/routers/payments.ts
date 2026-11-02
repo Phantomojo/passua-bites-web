@@ -1,9 +1,9 @@
 import crypto from "crypto";
 import { z } from "zod";
-import { publicProcedure, router } from "../_core/trpc";
+import { publicProcedure, adminProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { orders, mpesaTransactions } from "../../drizzle/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import axios from "axios";
 import {
   signOrderPaymentToken,
@@ -212,6 +212,9 @@ export const paymentsRouter = router({
         throw new Error("Order amount must be a whole number of KSh");
       }
 
+      // Acquire OAuth token before reserving, so token failures do not strand reservations.
+      const oauthToken = await getMpesaAccessToken();
+
       // Reserve an idempotent payment attempt before contacting Safaricom.
       const reservationKey = `INITIATING-${crypto.randomUUID()}`;
       let reservationId: number;
@@ -248,7 +251,7 @@ export const paymentsRouter = router({
       }
 
       const { password, timestamp } = generatePassword();
-      const token = await getMpesaAccessToken();
+      const token = oauthToken;
 
       let response: any;
       try {
@@ -308,11 +311,17 @@ export const paymentsRouter = router({
           .where(eq(mpesaTransactions.id, reservationId))
           .execute();
       } catch (insertError: any) {
+        const returnedCheckout = response?.data?.CheckoutRequestID;
+        const returnedMerchant = response?.data?.MerchantRequestID;
         await db
           .update(mpesaTransactions)
-          .set({ status: "failed", resultDesc: "Reservation update failed" })
+          .set({
+            status: "unknown",
+            resultDesc: `Safaricom accepted but persistence failed; reconcile. checkout=${returnedCheckout || "unknown"} merchant=${returnedMerchant || "unknown"}`,
+          })
           .where(eq(mpesaTransactions.id, reservationId))
-          .execute();
+          .execute()
+          .catch(() => undefined);
         throw insertError;
       }
 
@@ -482,7 +491,12 @@ export const paymentsRouter = router({
                   ? "Late payment after cancellation - reconcile/refund"
                   : order?.paymentReason ?? null,
             })
-            .where(eq(orders.id, tx.orderId))
+            .where(
+              and(
+                eq(orders.id, tx.orderId),
+                inArray(orders.paymentStatus, ["pending", "failed"])
+              )
+            )
             .execute();
 
           await db
@@ -526,6 +540,45 @@ export const paymentsRouter = router({
           resultCode: tx.resultCode,
         };
       }
+    }),
+
+  reconcileStkAttempt: adminProcedure
+    .input(
+      z.object({
+        orderId: z.number(),
+        checkoutRequestID: z.string().min(1),
+        merchantRequestID: z.string().min(1),
+        resolution: z.enum(["pending", "failed"]),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const [tx] = await db
+        .select()
+        .from(mpesaTransactions)
+        .where(eq(mpesaTransactions.orderId, input.orderId))
+        .orderBy(desc(mpesaTransactions.createdAt))
+        .limit(1)
+        .execute();
+
+      if (!tx || (tx.status !== "initiating" && tx.status !== "unknown")) {
+        throw new Error("No reconcilable STK attempt found");
+      }
+
+      await db
+        .update(mpesaTransactions)
+        .set({
+          checkoutRequestID: input.checkoutRequestID,
+          merchantRequestID: input.merchantRequestID,
+          status: input.resolution,
+          resultDesc: "Reconciled by admin with provider identifiers",
+        })
+        .where(eq(mpesaTransactions.id, tx.id))
+        .execute();
+
+      return { success: true };
     }),
 
   getOrderPaymentStatus: publicProcedure
