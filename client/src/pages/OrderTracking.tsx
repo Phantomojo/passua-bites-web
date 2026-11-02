@@ -45,24 +45,14 @@ export default function OrderTracking() {
     { enabled: false, retry: false }
   );
 
-  const getOrdersByPhone = trpc.orders.listByPhone.useQuery(
-    { phone: searchPhone },
-    { enabled: false, retry: false }
-  );
-
-  const isSearching = getOrderById.isFetching || getOrdersByPhone.isFetching;
+  const isSearching = getOrderById.isFetching;
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setAttempted(true);
-
-    if (searchBy === "phone" && searchPhone) {
-      await getOrdersByPhone.refetch();
-    } else if (searchBy === "id" && searchId) {
-      const numericId = parseInt(searchId.replace(/\D/g, ""));
-      if (numericId) {
-        await getOrderById.refetch();
-      }
+    const numericId = parseInt(searchId.replace(/\D/g, ""));
+    if (numericId) {
+      await getOrderById.refetch();
     }
   };
 
@@ -71,10 +61,8 @@ export default function OrderTracking() {
   // Get the order data based on search method
   let orders: any[] = [];
 
-  if (searchBy === "id" && getOrderById.data) {
+  if (getOrderById.data) {
     orders = [getOrderById.data];
-  } else if (searchBy === "phone" && getOrdersByPhone.data) {
-    orders = getOrdersByPhone.data; // All orders
   }
 
   const order = selectedOrderId

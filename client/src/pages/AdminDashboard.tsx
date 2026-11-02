@@ -213,8 +213,13 @@ const deleteAnnouncement = trpc.announcements.delete.useMutation();
   };
 
   const handleMarkPaid = async (orderId: number) => {
+    const reason = window.prompt("Reason for marking as paid (cash):");
+    if (!reason || reason.trim().length < 3) {
+      toast.error("A reason is required");
+      return;
+    }
     try {
-      await markOrderPaid.mutateAsync({ id: orderId });
+      await markOrderPaid.mutateAsync({ id: orderId, reason: reason.trim() });
       toast.success(`Order #${orderId} marked as paid (cash)`);
       if (activeTab === "orders") orders.refetch();
       kitchenOrders.refetch();

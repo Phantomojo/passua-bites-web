@@ -5,16 +5,20 @@ const TOKEN_PURPOSE = "order_payment";
 const DEFAULT_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 function getSecret(): string {
-  const secret =
-    process.env.ORDER_PAYMENT_TOKEN_SECRET ||
-    process.env.JWT_SECRET ||
-    process.env.COOKIE_SECRET;
-  if (!secret) {
-    throw new Error(
-      "ORDER_PAYMENT_TOKEN_SECRET (or JWT_SECRET/COOKIE_SECRET) is required for payment tokens"
-    );
+  const isProduction = process.env.NODE_ENV === "production";
+  const secret = process.env.ORDER_PAYMENT_TOKEN_SECRET;
+  if (isProduction) {
+    if (!secret || secret.trim() === "") {
+      throw new Error("ORDER_PAYMENT_TOKEN_SECRET is required in production");
+    }
+    return secret.trim();
   }
-  return secret;
+  return (
+    secret ||
+    process.env.JWT_SECRET ||
+    process.env.COOKIE_SECRET ||
+    "dev-payment-token-secret"
+  ).trim();
 }
 
 type PaymentTokenPayload = {

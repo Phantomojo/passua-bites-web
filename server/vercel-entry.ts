@@ -60,6 +60,16 @@ app.use((_req, res, next) => {
 // "mpesa"/"m-pesa"/"safaricom"). Registered before the general rate limiter
 // so Safaricom callbacks are never throttled.
 app.post("/api/payments/callback", async (req: any, res: any) => {
+  const secret = process.env.MPESA_CALLBACK_SECRET;
+  const provided =
+    req.query?.token || req.headers["x-callback-token"] || req.headers["x-mpesa-callback-token"];
+  if (secret) {
+    if (provided !== secret) {
+      return res.status(401).json({ ResultCode: 1, ResultDesc: "Unauthorized" });
+    }
+  } else if (process.env.NODE_ENV === "production") {
+    return res.status(503).json({ ResultCode: 1, ResultDesc: "Callback not configured" });
+  }
   await processMpesaCallback(req.body);
   res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
 });

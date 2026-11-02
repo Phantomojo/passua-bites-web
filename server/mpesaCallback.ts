@@ -2,6 +2,8 @@ import { getDb } from "./db";
 import { orders, mpesaTransactions } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { logger } from "./logger";
+import { queryStkPushStatus } from "./routers/payments";
+import { formatPhoneNumber } from "./routers/payments";
 
 /**
  * Process a Safaricom Daraja STK Push callback payload.
@@ -62,6 +64,20 @@ export async function processMpesaCallback(body: any): Promise<void> {
 
     const transaction = tx[0];
 
+    // Match merchant request ID when the callback provides it.
+    const callbackMerchantRequestID = stkCallback.MerchantRequestID;
+    if (
+      callbackMerchantRequestID &&
+      transaction.merchantRequestID &&
+      callbackMerchantRequestID !== transaction.merchantRequestID
+    ) {
+      logger.error(
+        { checkoutRequestID: CheckoutRequestID },
+        "[M-Pesa] Merchant request ID mismatch in callback"
+      );
+      return;
+    }
+
     // Idempotency: already completed — never downgrade.
     if (transaction.status === "completed") {
       logger.info(
@@ -104,9 +120,42 @@ export async function processMpesaCallback(body: any): Promise<void> {
       return;
     }
 
-    // Extract metadata
+    // Independently verify with Daraja before settling.
+    let queryData: any;
+    try {
+      queryData = await queryStkPushStatus(CheckoutRequestID);
+    } catch (error) {
+      logger.error({ err: error, checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Daraja verification failed");
+      await db
+        .update(mpesaTransactions)
+        .set({ status: "pending", resultDesc: "Provider verification unavailable" })
+        .where(
+          and(
+            eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+            eq(mpesaTransactions.status, "pending")
+          )
+        )
+        .execute();
+      return;
+    }
+
+    if (Number(queryData?.ResultCode) !== 0) {
+      logger.info({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Daraja verification did not confirm payment");
+      await db
+        .update(mpesaTransactions)
+        .set({ status: "pending", resultDesc: "Provider verification pending" })
+        .where(
+          and(
+            eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+            eq(mpesaTransactions.status, "pending")
+          )
+        )
+        .execute();
+      return;
+    }
+
     const metadata: Record<string, any> = {};
-    CallbackMetadata?.Item?.forEach((item: any) => {
+    queryData?.CallbackMetadata?.Item?.forEach((item: any) => {
       metadata[item.Name] = item.Value;
     });
 
@@ -167,38 +216,66 @@ export async function processMpesaCallback(body: any): Promise<void> {
       return;
     }
 
-    // Validate phone when present.
-    if (phone !== undefined && phone !== null) {
-      try {
-        const normalized = String(phone).replace(/\D/g, "");
-        const txPhone = transaction.phoneNumber.replace(/\D/g, "");
-        if (normalized && txPhone && normalized !== txPhone) {
-          logger.error(
-            { checkoutRequestID: CheckoutRequestID },
-            "[M-Pesa] Phone mismatch in callback"
-          );
-          await db
-            .update(mpesaTransactions)
-            .set({ status: "failed", resultCode: code, resultDesc: "Phone mismatch" })
-            .where(
-              and(
-                eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
-                eq(mpesaTransactions.status, "pending")
-              )
+    // Require and validate phone evidence.
+    if (!phone) {
+      logger.error({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Missing phone in verification");
+      await db
+        .update(mpesaTransactions)
+        .set({ status: "pending", resultDesc: "Missing phone evidence" })
+        .where(
+          and(
+            eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+            eq(mpesaTransactions.status, "pending")
+          )
+        )
+        .execute();
+      return;
+    }
+
+    try {
+      const normalized = formatPhoneNumber(String(phone));
+      const txPhone = formatPhoneNumber(transaction.phoneNumber);
+      if (normalized !== txPhone) {
+        logger.error({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Phone mismatch in callback");
+        await db
+          .update(mpesaTransactions)
+          .set({ status: "failed", resultCode: code, resultDesc: "Phone mismatch" })
+          .where(
+            and(
+              eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+              eq(mpesaTransactions.status, "pending")
             )
-            .execute();
-          await db
-            .update(orders)
-            .set({ paymentStatus: "failed" })
-            .where(
-              and(eq(orders.id, transaction.orderId), eq(orders.paymentStatus, "pending"))
-            )
-            .execute();
-          return;
-        }
-      } catch {
-        // ignore
+          )
+          .execute();
+        await db
+          .update(orders)
+          .set({ paymentStatus: "failed" })
+          .where(
+            and(eq(orders.id, transaction.orderId), eq(orders.paymentStatus, "pending"))
+          )
+          .execute();
+        return;
       }
+    } catch {
+      logger.error({ checkoutRequestID: CheckoutRequestID }, "[M-Pesa] Invalid phone in callback");
+      await db
+        .update(mpesaTransactions)
+        .set({ status: "failed", resultCode: code, resultDesc: "Invalid phone" })
+        .where(
+          and(
+            eq(mpesaTransactions.checkoutRequestID, CheckoutRequestID),
+            eq(mpesaTransactions.status, "pending")
+          )
+        )
+        .execute();
+      await db
+        .update(orders)
+        .set({ paymentStatus: "failed" })
+        .where(
+          and(eq(orders.id, transaction.orderId), eq(orders.paymentStatus, "pending"))
+        )
+        .execute();
+      return;
     }
 
     // Confirm payment conditionally.
@@ -232,10 +309,15 @@ export async function processMpesaCallback(body: any): Promise<void> {
       .set({
         paymentStatus: "completed",
         mpesaTransactionId: receipt,
-        status: "confirmed",
       })
+      .where(eq(orders.id, transaction.orderId))
+      .execute();
+
+    await db
+      .update(orders)
+      .set({ status: "confirmed" })
       .where(
-        and(eq(orders.id, transaction.orderId), eq(orders.paymentStatus, "pending"))
+        and(eq(orders.id, transaction.orderId), eq(orders.status, "pending"))
       )
       .execute();
 

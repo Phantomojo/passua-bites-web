@@ -166,7 +166,7 @@ export const ordersRouter = router({
       };
     }),
 
-  listByPhone: publicProcedure
+  listByPhone: adminProcedure
     .input(z.object({ phone: z.string().regex(phoneRegex, "Invalid Kenyan phone number") }))
     .query(async ({ input }) => {
       const db = await getDb();
@@ -387,7 +387,7 @@ export const ordersRouter = router({
         notes: z.string().max(500).optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
@@ -430,6 +430,9 @@ export const ordersRouter = router({
           paymentMethod: input.paymentMethod,
           paymentStatus: isCash ? "completed" : "pending",
           channel: "pos",
+          paidBy: isCash ? (ctx.user?.name || ctx.user?.openId || "pos") : null,
+          paidAt: isCash ? new Date() : null,
+          paymentReason: isCash ? "POS cash receipt" : null,
           notes: input.notes || null,
         })
         .returning({ id: orders.id });
