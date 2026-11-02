@@ -31,10 +31,17 @@ export default function OrderTracking() {
   const [searchId, setSearchId] = useState("");
   const [searchPhone, setSearchPhone] = useState("");
   const [searchBy, setSearchBy] = useState<"id" | "phone">("phone");
+  const [searchToken, setSearchToken] = useState(() => {
+    try {
+      return localStorage.getItem("pb_last_payment_token") || "";
+    } catch {
+      return "";
+    }
+  });
   const [attempted, setAttempted] = useState(false);
 
   const getOrderById = trpc.orders.getById.useQuery(
-    { id: parseInt(searchId.replace(/\D/g, "")) || 0 },
+    { id: parseInt(searchId.replace(/\D/g, "")) || 0, paymentToken: searchToken },
     { enabled: false, retry: false }
   );
 

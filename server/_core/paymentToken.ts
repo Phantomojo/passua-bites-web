@@ -1,36 +1,75 @@
 import crypto from "crypto";
 
+const TOKEN_VERSION = 1;
+const TOKEN_PURPOSE = "order_payment";
+const DEFAULT_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
+
 function getSecret(): string {
-  const secret = process.env.JWT_SECRET || process.env.COOKIE_SECRET;
+  const secret =
+    process.env.ORDER_PAYMENT_TOKEN_SECRET ||
+    process.env.JWT_SECRET ||
+    process.env.COOKIE_SECRET;
   if (!secret) {
-    throw new Error("JWT_SECRET or COOKIE_SECRET is required for payment tokens");
+    throw new Error(
+      "ORDER_PAYMENT_TOKEN_SECRET (or JWT_SECRET/COOKIE_SECRET) is required for payment tokens"
+    );
   }
   return secret;
 }
 
-export function signOrderPaymentToken(orderId: number): string {
-  const payload = String(orderId);
+type PaymentTokenPayload = {
+  v: number;
+  p: string;
+  o: number;
+  exp: number;
+};
+
+function encodePayload(payload: PaymentTokenPayload): string {
+  return Buffer.from(JSON.stringify(payload)).toString("base64url");
+}
+
+export function signOrderPaymentToken(
+  orderId: number,
+  expiresInMs: number = DEFAULT_TTL_MS
+): string {
+  const payload: PaymentTokenPayload = {
+    v: TOKEN_VERSION,
+    p: TOKEN_PURPOSE,
+    o: orderId,
+    exp: Date.now() + expiresInMs,
+  };
+  const encoded = encodePayload(payload);
   const hmac = crypto
     .createHmac("sha256", getSecret())
-    .update(payload)
+    .update(encoded)
     .digest("base64url");
-  return `${Buffer.from(payload).toString("base64url")}.${hmac}`;
+  return `${encoded}.${hmac}`;
 }
 
 export function verifyOrderPaymentToken(token: string, orderId: number): boolean {
   if (typeof token !== "string" || token.indexOf(".") === -1) return false;
-  const [payloadB64, hmac] = token.split(".");
-  let payload: string;
+  const [encoded, hmac] = token.split(".");
+  if (!encoded || !hmac) return false;
+
+  let payload: PaymentTokenPayload;
   try {
-    payload = Buffer.from(payloadB64, "base64url").toString("utf8");
+    payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
   } catch {
     return false;
   }
-  if (payload !== String(orderId)) return false;
+
+  if (!payload || typeof payload !== "object") return false;
+  if (payload.v !== TOKEN_VERSION) return false;
+  if (payload.p !== TOKEN_PURPOSE) return false;
+  if (payload.o !== orderId) return false;
+  if (typeof payload.exp !== "number" || !Number.isFinite(payload.exp)) return false;
+  if (Date.now() > payload.exp) return false;
+
   const expected = crypto
     .createHmac("sha256", getSecret())
-    .update(payload)
+    .update(encoded)
     .digest("base64url");
+
   const a = Buffer.from(hmac);
   const b = Buffer.from(expected);
   if (a.length !== b.length) return false;

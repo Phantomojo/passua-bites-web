@@ -219,7 +219,13 @@ export default function Checkout() {
 
       const newOrderId = orderResult.orderId;
       setOrderId(newOrderId);
-      if (orderResult.paymentToken) setPaymentToken(orderResult.paymentToken);
+      if (orderResult.paymentToken) {
+        setPaymentToken(orderResult.paymentToken);
+        try {
+          localStorage.setItem("pb_last_order_id", String(newOrderId));
+          localStorage.setItem("pb_last_payment_token", orderResult.paymentToken);
+        } catch {}
+      }
 
       if (paymentMethod === "mpesa") {
         // Trigger M-Pesa STK Push
