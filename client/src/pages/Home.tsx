@@ -49,11 +49,10 @@ function MediaPreview({ item }: { item: any }) {
               ref={videoRef}
               src={item.videoUrl}
               poster={item.imageUrl || undefined}
-              autoPlay
               loop
               muted={isMuted}
               playsInline
-              preload="metadata"
+              preload="none"
               className="pb-food-img"
               style={{
                 width: "100%",
